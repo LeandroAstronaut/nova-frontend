@@ -52,8 +52,9 @@ export const getProducts = async (search) => {
     return response.data;
 };
 
+// Obtener usuarios disponibles para asignar pedidos (vendedores + admins activos)
 export const getSellers = async () => {
-    const response = await api.get('/users/sellers');
+    const response = await api.get('/users/staff/assignable');
     return response.data;
 };
 
@@ -64,8 +65,8 @@ export const convertBudgetToOrder = async (budgetId, notificationSettings) => {
     return response.data;
 };
 
-export const revertOrderToBudget = async (orderId) => {
-    const response = await api.post(`/orders/${orderId}/revert`);
+export const revertOrderToBudget = async (orderId, targetStatus = 'budget') => {
+    const response = await api.post(`/orders/${orderId}/revert`, { targetStatus });
     return response.data;
 };
 

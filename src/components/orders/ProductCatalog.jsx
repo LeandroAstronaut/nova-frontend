@@ -10,7 +10,8 @@ const ProductCatalog = ({
     priceList,
     itemsInCart,
     onProductClick,
-    onAddDirect
+    onAddDirect,
+    isClient = false
 }) => {
     return (
         <div className="space-y-6">
@@ -58,6 +59,13 @@ const ProductCatalog = ({
                                         <div className="absolute top-3 right-3 px-2 py-1 bg-primary-600 text-white text-[9px] font-bold uppercase rounded-lg flex items-center gap-1 shadow-md z-10">
                                             <Check size={10} />
                                             {inCart.quantity} en carrito
+                                        </div>
+                                    )}
+
+                                    {/* Badge de descuento para clientes */}
+                                    {isClient && product.pricing?.discount > 0 && (
+                                        <div className="absolute top-3 left-3 px-2 py-1 bg-success-500 text-white text-[9px] font-bold rounded-lg shadow-md z-10">
+                                            -{product.pricing.discount}%
                                         </div>
                                     )}
 

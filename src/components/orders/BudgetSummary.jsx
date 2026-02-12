@@ -20,6 +20,7 @@ const BudgetSummary = ({
     mode = 'create',
     canChangeSeller = true,
     readOnly = false,
+    isClient = false,
     selectedClient = null,
     priceList = 1,
     features = {}
@@ -47,7 +48,7 @@ const BudgetSummary = ({
                         type="date"
                         value={date}
                         onChange={(e) => setDate(e.target.value)}
-                        disabled={readOnly}
+                        disabled={readOnly || isClient}
                         className="w-full px-3 py-2 bg-(--bg-input) border border-(--border-color) rounded-lg text-xs font-semibold text-(--text-primary) focus:outline-none focus:border-primary-500 disabled:opacity-50"
                     />
                 </div>
@@ -90,7 +91,7 @@ const BudgetSummary = ({
                                         value={discountGlobal}
                                         onChange={(e) => setDiscountGlobal(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
                                         placeholder="0"
-                                        disabled={readOnly}
+                                        disabled={readOnly || isClient}
                                     />
                                     <span className="text-xs font-bold text-success-600/50 dark:text-success-400/50">%</span>
                                 </div>
@@ -108,7 +109,7 @@ const BudgetSummary = ({
                                     value={discountGlobal}
                                     onChange={(e) => setDiscountGlobal(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
                                     placeholder="0"
-                                    disabled={readOnly}
+                                    disabled={readOnly || isClient}
                                 />
                                 <span className="text-xs font-bold text-success-600/50 dark:text-success-400/50">%</span>
                             </div>
@@ -164,34 +165,37 @@ const BudgetSummary = ({
                                                     ) : (
                                                         <>
                                                             <div className="flex items-center gap-1 p-0.5 bg-(--bg-hover) rounded-lg border border-(--border-color)">
-                                                                <button 
-                                                                    onClick={() => updateItem(item.productId, 'quantity', Math.max(1, item.quantity - 1))} 
+                                                                <button
+                                                                    onClick={() => updateItem(item.productId, 'quantity', Math.max(1, item.quantity - 1))}
                                                                     className="w-7 h-7 flex items-center justify-center text-(--text-muted) hover:text-primary-600 hover:bg-(--bg-card) rounded-md transition-colors"
                                                                 >
                                                                     <Minus size={14} />
                                                                 </button>
-                                                                <input 
-                                                                    type="number" 
-                                                                    className="w-10 bg-transparent text-center text-xs font-bold text-(--text-primary)" 
-                                                                    value={item.quantity} 
-                                                                    onChange={(e) => updateItem(item.productId, 'quantity', parseInt(e.target.value) || 0)} 
+                                                                <input
+                                                                    type="number"
+                                                                    className="w-10 bg-transparent text-center text-xs font-bold text-(--text-primary)"
+                                                                    value={item.quantity}
+                                                                    onChange={(e) => updateItem(item.productId, 'quantity', parseInt(e.target.value) || 0)}
                                                                 />
-                                                                <button 
-                                                                    onClick={() => updateItem(item.productId, 'quantity', item.quantity + 1)} 
+                                                                <button
+                                                                    onClick={() => updateItem(item.productId, 'quantity', item.quantity + 1)}
                                                                     className="w-7 h-7 flex items-center justify-center text-(--text-muted) hover:text-primary-600 hover:bg-(--bg-card) rounded-md transition-colors"
                                                                 >
                                                                     <Plus size={14} />
                                                                 </button>
                                                             </div>
-                                                            <div className="flex items-center gap-1 px-2 py-1.5 bg-success-50 dark:bg-success-900/30 rounded-lg border border-success-100 dark:border-success-800">
-                                                                <input 
-                                                                    type="number" 
-                                                                    className="w-8 bg-transparent text-center text-xs font-bold text-success-700 dark:text-success-400" 
-                                                                    value={item.discount || 0} 
-                                                                    onChange={(e) => updateItem(item.productId, 'discount', Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))} 
-                                                                />
-                                                                <span className="text-[10px] font-bold text-success-600/50 dark:text-success-400/50">%</span>
-                                                            </div>
+                                                            {item.discount > 0 || !isClient ? (
+                                                                <div className="flex items-center gap-1 px-2 py-1.5 bg-success-50 dark:bg-success-900/30 rounded-lg border border-success-100 dark:border-success-800">
+                                                                    <input
+                                                                        type="number"
+                                                                        className="w-8 bg-transparent text-center text-xs font-bold text-success-700 dark:text-success-400 disabled:opacity-60"
+                                                                        value={item.discount || 0}
+                                                                        onChange={(e) => updateItem(item.productId, 'discount', Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
+                                                                        disabled={isClient}
+                                                                    />
+                                                                    <span className="text-[10px] font-bold text-success-600/50 dark:text-success-400/50">%</span>
+                                                                </div>
+                                                            ) : null}
                                                         </>
                                                     )}
                                                 </div>

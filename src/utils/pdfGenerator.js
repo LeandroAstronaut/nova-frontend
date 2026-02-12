@@ -191,9 +191,13 @@ export const generateOrderPDF = (order, company) => {
     doc.setTextColor(150, 150, 150);
     doc.text(`NOVA Orden - ${company?.name || ''} - ${new Date().getFullYear()}`, pageWidth / 2, footerY, { align: 'center' });
     
-    // Guardar PDF
+    // Generar nombre del archivo
     const fileName = `${typeLabel}_${String(order.orderNumber).padStart(5, '0')}_${clientName.replace(/\s+/g, '_')}.pdf`;
-    doc.save(fileName);
+    
+    // Abrir en nueva pestaña en lugar de descargar
+    const pdfBlob = doc.output('blob');
+    const pdfUrl = URL.createObjectURL(pdfBlob);
+    window.open(pdfUrl, '_blank');
 };
 
 export default generateOrderPDF;

@@ -16,7 +16,8 @@ import {
     Printer,
     X,
     Package,
-    CheckCircle
+    CheckCircle,
+    MessageCircle
 } from 'lucide-react';
 
 const StatusBadge = ({ status }) => {
@@ -27,9 +28,16 @@ const StatusBadge = ({ status }) => {
         completo: 'bg-success-50 dark:bg-success-900/30 text-success-600 dark:text-success-400 border-success-100 dark:border-success-800'
     };
 
+    const labels = {
+        espera: 'En Espera',
+        confirmado: 'Confirmado',
+        preparado: 'Preparando',
+        completo: 'Completado'
+    };
+
     return (
         <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${styles[status] || styles.espera}`}>
-            {status}
+            {labels[status] || status}
         </span>
     );
 };
@@ -40,22 +48,32 @@ import BudgetDrawer from '../../components/orders/BudgetDrawer';
 import ConvertToOrderModal from '../../components/orders/ConvertToOrderModal';
 import UpdateOrderStatusModal from '../../components/orders/UpdateOrderStatusModal';
 import SendEmailModal from '../../components/orders/SendEmailModal';
+import SendWhatsAppModal from '../../components/orders/SendWhatsAppModal';
+import OrderActivityDrawer from '../../components/orders/OrderActivityDrawer';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { Building2 } from 'lucide-react';
+import { Building2, History } from 'lucide-react';
 import { generateOrderPDF } from '../../utils/pdfGenerator';
 
 // Función para exportar a CSV
 const exportToCSV = (data, mode) => {
     const headers = ['Número', 'Cliente', 'Fecha', 'Vendedor', 'Total', 'Estado'];
-    const rows = data.map(order => [
-        `#${String(order.orderNumber).padStart(5, '0')}`,
-        order.clientId?.businessName || 'N/A',
-        new Date(order.date).toLocaleDateString(),
-        `${order.salesRepId?.firstName || ''} ${order.salesRepId?.lastName || ''}`.trim(),
-        `$${order.items.reduce((acc, item) => acc + (item.quantity * item.listPrice * (1 - (item.discount || 0) / 100)), 0).toLocaleString()}`,
-        order.status
-    ]);
+    const rows = data.map(order => {
+        // Calcular subtotal con descuento por ítem
+        const subtotal = order.items.reduce((acc, item) => 
+            acc + (item.quantity * item.listPrice * (1 - (item.discount || 0) / 100)), 0
+        );
+        // Aplicar descuento general de la orden
+        const total = subtotal * (1 - (order.discount || 0) / 100);
+        return [
+            `#${String(order.orderNumber).padStart(5, '0')}`,
+            order.clientId?.businessName || 'N/A',
+            new Date(order.date).toLocaleDateString(),
+            `${order.salesRepId?.firstName || ''} ${order.salesRepId?.lastName || ''}`.trim(),
+            `$${total.toLocaleString()}`,
+            order.status
+        ];
+    });
     
     const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -66,7 +84,7 @@ const exportToCSV = (data, mode) => {
 };
 
 // Dropdown Menu Component - Posicionado fijo para evitar overflow de la tabla
-const ActionMenu = ({ items, onClose, position }) => {
+const ActionMenu = ({ items, onClose, position, openAbove = false }) => {
     const menuRef = useRef(null);
 
     useEffect(() => {
@@ -75,24 +93,39 @@ const ActionMenu = ({ items, onClose, position }) => {
                 onClose();
             }
         };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
+        const handleEscape = (e) => {
+            if (e.key === 'Escape') {
+                onClose();
+            }
+        };
+        // Usar click en lugar de mousedown para que no interfiera con los clicks en los items
+        document.addEventListener('click', handleClickOutside);
+        document.addEventListener('keydown', handleEscape);
+        return () => {
+            document.removeEventListener('click', handleClickOutside);
+            document.removeEventListener('keydown', handleEscape);
+        };
     }, [onClose]);
+
+    // Calcular altura estimada del menú (aprox 40px por item)
+    const estimatedHeight = items.length * 42;
 
     return (
         <div
             ref={menuRef}
+            onClick={(e) => e.stopPropagation()}
             style={{
                 position: 'fixed',
-                top: position?.top || 0,
+                top: openAbove ? (position?.top - estimatedHeight) : position?.top,
                 left: position?.left || 0,
             }}
-            className="w-48 bg-(--bg-card) rounded-xl shadow-xl border border-(--border-color) z-300 overflow-hidden"
+            className="w-48 bg-(--bg-card) rounded-xl shadow-xl border border-(--border-color) z-[9999] overflow-hidden"
         >
             {items.map((item, idx) => (
                 <button
                     key={idx}
-                    onClick={() => {
+                    onClick={(e) => {
+                        e.stopPropagation();
                         item.onClick();
                         onClose();
                     }}
@@ -118,6 +151,7 @@ const OrdersPage = ({ mode = 'order' }) => {
     const isSuperadmin = user?.role?.name === 'superadmin';
     const isAdmin = user?.role?.name === 'admin';
     const isVendedor = user?.role?.name === 'vendedor';
+    const isClient = user?.role?.name === 'cliente';
     
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -161,23 +195,63 @@ const OrdersPage = ({ mode = 'order' }) => {
     const [selectedOrderForEmail, setSelectedOrderForEmail] = useState(null);
     const [sendingEmail, setSendingEmail] = useState(false);
 
+    // Send WhatsApp Modal states
+    const [isSendWhatsAppModalOpen, setIsSendWhatsAppModalOpen] = useState(false);
+    const [selectedOrderForWhatsApp, setSelectedOrderForWhatsApp] = useState(null);
+
+    // Activity Drawer states
+    const [isActivityDrawerOpen, setIsActivityDrawerOpen] = useState(false);
+    const [selectedOrderForActivity, setSelectedOrderForActivity] = useState(null);
+
     // Action Menu state
-    const [openMenu, setOpenMenu] = useState({ id: null, position: null });
+    const [openMenu, setOpenMenu] = useState({ id: null, position: null, openAbove: false });
 
     // Delete confirmation state
     const [deleteModal, setDeleteModal] = useState({ isOpen: false, order: null, loading: false });
 
-    // Revert to budget confirmation state
-    const [revertModal, setRevertModal] = useState({ isOpen: false, order: null, loading: false });
+    // Revert to previous state confirmation
+    const [revertModal, setRevertModal] = useState({ isOpen: false, order: null, loading: false, targetStatus: null, title: '', description: '' });
 
     const handleOpenMenu = (e, orderId) => {
         const rect = e.currentTarget.getBoundingClientRect();
+        const windowHeight = window.innerHeight;
+        const windowWidth = window.innerWidth;
+        const menuHeight = 300; // Altura máxima estimada del menú
+        const menuWidth = 192; // Ancho del menú
+        
+        // Detectar si está cerca del borde inferior (últimos 300px de la pantalla)
+        const openAbove = (rect.bottom + menuHeight) > windowHeight;
+        
+        // Detectar si está cerca del borde izquierdo (móvil)
+        // Si el botón está a menos de 150px del borde izquierdo, abrir hacia la derecha
+        const openRight = rect.left < 150;
+        
+        let leftPosition;
+        if (openRight) {
+            // Abrir hacia la derecha desde el botón
+            leftPosition = rect.left;
+        } else {
+            // Alinear a la derecha del botón
+            leftPosition = rect.left - menuWidth + rect.width;
+        }
+        
+        // Asegurar que no se salga por la derecha de la pantalla
+        if (leftPosition + menuWidth > windowWidth) {
+            leftPosition = windowWidth - menuWidth - 16;
+        }
+        
+        // Asegurar que no sea negativo
+        if (leftPosition < 8) {
+            leftPosition = 8;
+        }
+        
         setOpenMenu({
             id: orderId,
             position: {
-                top: rect.bottom + 8, // 8px de margen
-                left: rect.left - 192 + rect.width // Alinear a la derecha (192px = width del menú)
-            }
+                top: openAbove ? rect.top : rect.bottom + 8,
+                left: leftPosition
+            },
+            openAbove
         });
     };
 
@@ -242,8 +316,8 @@ const OrdersPage = ({ mode = 'order' }) => {
     const canEdit = (order) => {
         if (isSuperadmin) return false; // Superadmin no edita nada
         if (isAdmin) {
-            // Admin no puede editar pedidos en preparación o completados
-            if (order.type === 'order' && (order.status === 'preparado' || order.status === 'completo')) {
+            // Admin no puede editar pedidos completados (sí puede editar los que están preparando)
+            if (order.type === 'order' && order.status === 'completo') {
                 return false;
             }
             return true;
@@ -254,6 +328,12 @@ const OrdersPage = ({ mode = 'order' }) => {
             const isOwn = isSameId(order.salesRepId, user?.id);
             const isPending = order.status === 'espera';
             return isOwn && isPending;
+        }
+        if (isClient) {
+            // Cliente solo edita sus propios presupuestos en espera
+            if (order.type === 'order') return false;
+            const isOwn = isSameId(order.clientId, user?.client?.id);
+            return isOwn && order.status === 'espera';
         }
         return false;
     };
@@ -275,6 +355,13 @@ const OrdersPage = ({ mode = 'order' }) => {
             const isPending = order.status === 'espera';
             return isOwn && isPending;
         }
+        if (isClient) {
+            // Cliente solo elimina sus propios presupuestos en espera
+            if (order.type === 'order') return false; // No elimina pedidos
+            const isOwn = isSameId(order.clientId, user?.client?.id);
+            const isPending = order.status === 'espera';
+            return isOwn && isPending;
+        }
         return false;
     };
 
@@ -285,6 +372,7 @@ const OrdersPage = ({ mode = 'order' }) => {
         if (isVendedor) {
             return isSameId(order.salesRepId, user?.id);
         }
+        if (isClient) return true;
         return false;
     };
 
@@ -297,14 +385,15 @@ const OrdersPage = ({ mode = 'order' }) => {
 
     // PERMISOS: Determinar si puede convertir a pedido
     const canConvertToOrder = (order) => {
-    
         if (mode !== 'budget') return false; // Solo en modo presupuestos
         if (isSuperadmin) return false;
+        if (order.status !== 'espera') return false;
         if (isAdmin) return true;
         if (isVendedor) {
-            const isOwn = isSameId(order.salesRepId, user?.id);
-            const isPending = order.status === 'espera';
-            return isOwn && isPending;
+            return isSameId(order.salesRepId, user?.id);
+        }
+        if (isClient) {
+            return isSameId(order.clientId, user?.client?.id);
         }
         return false;
     };
@@ -333,16 +422,14 @@ const OrdersPage = ({ mode = 'order' }) => {
     };
 
     const handleViewOrder = (order) => {
-        // Vista de solo lectura para TODOS los usuarios
-        setDrawerMode('view'); // Modo view para solo lectura
-        setDrawerType(order.type || mode);
-        setSelectedOrder(order);
-        setIsDrawerOpen(true);
+        // Navegar a la página de detalle
+        const path = order.type === 'order' ? '/pedidos' : '/presupuestos';
+        navigate(`${path}/${order._id}`);
     };
 
     const handleDeleteClick = (order) => {
         setDeleteModal({ isOpen: true, order, loading: false });
-        setOpenMenu({ id: null, position: null }); // Cerrar menú
+        setOpenMenu({ id: null, position: null, openAbove: false }); // Cerrar menú
     };
 
     const handleDeleteConfirm = async () => {
@@ -361,10 +448,18 @@ const OrdersPage = ({ mode = 'order' }) => {
         }
     };
 
-    // Revertir pedido a presupuesto
-    const canRevertToBudget = (order) => {
-        // Solo admin puede revertir pedidos confirmados (no preparados ni completados)
-        return isAdmin && order?.type === 'order' && order?.status === 'confirmado';
+    // Determinar si se puede revertir a estado anterior y a cuál
+    const getRevertInfo = (order) => {
+        if (!isAdmin || order?.type !== 'order') return null;
+        
+        // Definir la cadena de estados y sus reversiones
+        const revertChain = {
+            'completo': { to: 'preparado', label: 'Volver a Preparando', description: 'El pedido volverá a estado "Preparando" y podrá ser editado nuevamente.' },
+            'preparado': { to: 'confirmado', label: 'Volver a Confirmado', description: 'El pedido volverá a estado "Confirmado" y podrá ser editado nuevamente.' },
+            'confirmado': { to: 'budget', label: 'Volver a Presupuesto', description: 'El pedido se revertirá a presupuesto. Volverá a estado "En Espera" y podrá ser editado nuevamente.' }
+        };
+        
+        return revertChain[order?.status] || null;
     };
 
     // Cambiar estado del pedido (preparar/completar)
@@ -396,7 +491,7 @@ const OrdersPage = ({ mode = 'order' }) => {
             setSelectedOrderForStatus(null);
             
             // Mostrar toast de éxito
-            const statusText = status === 'preparado' ? 'En Preparación' : 'Completado';
+            const statusText = status === 'preparado' ? 'Preparando' : 'Completado';
             addToast(`Pedido actualizado a "${statusText}" exitosamente`, 'success');
             
             // Mostrar info de emails enviados si los hubo
@@ -417,6 +512,17 @@ const OrdersPage = ({ mode = 'order' }) => {
     const handleSendEmailClick = (order) => {
         setSelectedOrderForEmail(order);
         setIsSendEmailModalOpen(true);
+    };
+
+    // Enviar WhatsApp con detalle
+    const handleSendWhatsAppClick = (order) => {
+        setSelectedOrderForWhatsApp(order);
+        setIsSendWhatsAppModalOpen(true);
+    };
+
+    const handleViewActivityClick = (order) => {
+        setSelectedOrderForActivity(order);
+        setIsActivityDrawerOpen(true);
     };
 
     const handleSendEmailConfirm = async ({ orderId, notifications }) => {
@@ -443,8 +549,18 @@ const OrdersPage = ({ mode = 'order' }) => {
     };
 
     const handleRevertClick = (order) => {
-        setRevertModal({ isOpen: true, order, loading: false });
-        setOpenMenu({ id: null, position: null }); // Cerrar menú
+        const revertInfo = getRevertInfo(order);
+        if (!revertInfo) return;
+        
+        setRevertModal({ 
+            isOpen: true, 
+            order, 
+            loading: false,
+            targetStatus: revertInfo.to,
+            title: `¿${revertInfo.label}?`,
+            description: revertInfo.description
+        });
+        setOpenMenu({ id: null, position: null, openAbove: false }); // Cerrar menú
     };
 
     const handleRevertConfirm = async () => {
@@ -452,14 +568,20 @@ const OrdersPage = ({ mode = 'order' }) => {
         
         try {
             setRevertModal(prev => ({ ...prev, loading: true }));
-            await revertOrderToBudget(revertModal.order._id);
-            setRevertModal({ isOpen: false, order: null, loading: false });
-            addToast('Pedido revertido a presupuesto exitosamente', 'success');
+            await revertOrderToBudget(revertModal.order._id, revertModal.targetStatus);
+            setRevertModal({ isOpen: false, order: null, loading: false, targetStatus: null, title: '', description: '' });
+            
+            const statusLabels = {
+                'budget': 'presupuesto',
+                'confirmado': 'Confirmado',
+                'preparado': 'Preparando'
+            };
+            addToast(`Pedido revertido a ${statusLabels[revertModal.targetStatus] || revertModal.targetStatus} exitosamente`, 'success');
             fetchOrders(); // Refrescar lista
         } catch (error) {
             console.error('Error reverting order:', error);
             addToast('Error al revertir: ' + (error.response?.data?.message || error.message), 'error');
-            setRevertModal({ isOpen: false, order: null, loading: false });
+            setRevertModal({ isOpen: false, order: null, loading: false, targetStatus: null, title: '', description: '' });
         }
     };
 
@@ -527,14 +649,16 @@ const OrdersPage = ({ mode = 'order' }) => {
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button 
-                        variant="secondary" 
-                        className="px-3! text-[11px] font-bold uppercase tracking-wider"
-                        onClick={() => exportToCSV(orders, mode)}
-                    >
-                        <Download size={14} strokeWidth={2.5} />
-                        Exportar
-                    </Button>
+                    {!isClient && (
+                        <Button
+                            variant="secondary"
+                            className="px-3! text-[11px] font-bold uppercase tracking-wider"
+                            onClick={() => exportToCSV(orders, mode)}
+                        >
+                            <Download size={14} strokeWidth={2.5} />
+                            Exportar
+                        </Button>
+                    )}
                     {!isSuperadmin && (
                         <Button 
                             variant="primary" 
@@ -552,7 +676,7 @@ const OrdersPage = ({ mode = 'order' }) => {
             <div className="card p-0! overflow-hidden border-none shadow-sm ring-1 ring-(--border-color)">
                 {/* Filters Header */}
                 <div className="bg-(--bg-card) p-4 border-b border-(--border-color)">
-                    <div className={`grid grid-cols-1 gap-4 ${isVendedor ? 'md:grid-cols-2' : 'md:grid-cols-3'}`}>
+                    <div className={`grid grid-cols-1 gap-4 ${(isVendedor || isClient) ? 'md:grid-cols-1' : 'md:grid-cols-3'}`}>
                         {/* Search */}
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-(--text-muted)" size={14} strokeWidth={2.5} />
@@ -566,30 +690,30 @@ const OrdersPage = ({ mode = 'order' }) => {
                             />
                         </div>
 
-                        {/* Client Filter - Vendedores solo ven sus clientes asignados */}
-                        <select
-                            className="bg-(--bg-input) border border-(--border-color) rounded-lg px-3 py-2 text-xs font-medium text-(--text-primary) focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900"
-                            value={filters.clientId}
-                            onChange={(e) => setFilters({ ...filters, clientId: e.target.value })}
-                        >
-                            <option value="">{isVendedor ? 'Mis Clientes' : 'Todos los Clientes'}</option>
-                            {clients
-                                .filter(c => !isVendedor || isSameId(c.salesRepId, user?.id))
-                                .map(c => (
+                        {/* Client Filter - Oculto para clientes y vendedores */}
+                        {!isClient && !isVendedor && (
+                            <select
+                                className="bg-(--bg-input) border border-(--border-color) rounded-lg px-3 py-2 text-xs font-medium text-(--text-primary) focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900"
+                                value={filters.clientId}
+                                onChange={(e) => setFilters({ ...filters, clientId: e.target.value })}
+                            >
+                                <option value="">Todos los Clientes</option>
+                                {clients.map(c => (
                                     <option key={c._id} value={c._id}>
                                         {c.businessName}{isSuperadmin && c.companyId?.name ? ` (${c.companyId.name})` : ''}
                                     </option>
                                 ))}
-                        </select>
+                            </select>
+                        )}
 
-                        {/* Seller Filter - Oculto para vendedores */}
-                        {!isVendedor && (
+                        {/* Seller Filter - Solo admin y superadmin */}
+                        {!isVendedor && !isClient && (
                             <select
                                 className="bg-(--bg-input) border border-(--border-color) rounded-lg px-3 py-2 text-xs font-medium text-(--text-primary) focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900"
                                 value={filters.salesRepId}
                                 onChange={(e) => setFilters({ ...filters, salesRepId: e.target.value })}
                             >
-                                <option value="">Todos los Vendedores</option>
+                                <option value="">Todo el Equipo</option>
                                 {sellers.map(s => (
                                     <option key={s._id} value={s._id}>
                                         {s.firstName} {s.lastName}{isSuperadmin && s.companyId?.name ? ` (${s.companyId.name})` : ''}
@@ -600,8 +724,8 @@ const OrdersPage = ({ mode = 'order' }) => {
                     </div>
                 </div>
 
-                {/* Table */}
-                <div className="overflow-x-auto">
+                {/* Vista Desktop - Table */}
+                <div className="hidden md:block overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-(--bg-hover) text-[10px] font-bold text-(--text-muted) uppercase tracking-widest border-y border-(--border-color)">
@@ -639,7 +763,11 @@ const OrdersPage = ({ mode = 'order' }) => {
                                 ))
                             ) : orders.length > 0 ? (
                                 orders.map((order) => (
-                                    <tr key={order._id} className="hover:bg-(--bg-hover) transition-colors group">
+                                    <tr 
+                                        key={order._id} 
+                                        className="hover:bg-(--bg-hover) transition-colors group cursor-pointer"
+                                        onClick={(e) => { e.stopPropagation(); handleViewOrder(order); }}
+                                    >
                                         <td className="px-6 py-4 font-bold text-(--text-primary) text-[13px]">
                                             #{String(order.orderNumber).padStart(5, '0')}
                                         </td>
@@ -662,7 +790,11 @@ const OrdersPage = ({ mode = 'order' }) => {
                                             {order.salesRepId?.firstName} {order.salesRepId?.lastName}
                                         </td>
                                         <td className="px-6 py-4 text-right font-bold text-(--text-primary) text-[13px]">
-                                            ${order.items.reduce((acc, item) => acc + (item.quantity * item.listPrice * (1 - (item.discount || 0) / 100)), 0).toLocaleString()}
+                                            ${(() => {
+                                                const subtotal = order.items.reduce((acc, item) => acc + (item.quantity * item.listPrice * (1 - (item.discount || 0) / 100)), 0);
+                                                const total = subtotal * (1 - (order.discount || 0) / 100);
+                                                return total.toLocaleString();
+                                            })()}
                                         </td>
                                         <td className="px-6 py-4 text-center">
                                             <StatusBadge status={order.status} />
@@ -672,7 +804,7 @@ const OrdersPage = ({ mode = 'order' }) => {
                                                 {/* Botón Convertir a Pedido - Solo para presupuestos */}
                                                 {canConvertToOrder(order) && (
                                                     <button
-                                                        onClick={() => handleConvertClick(order)}
+                                                        onClick={(e) => { e.stopPropagation(); handleConvertClick(order); }}
                                                         className="flex items-center gap-1.5 px-3 py-1.5 bg-success-500 hover:bg-success-600 text-white rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all shadow-sm hover:shadow-md"
                                                     >
                                                         <ArrowRight size={14} strokeWidth={2.5} />
@@ -683,7 +815,7 @@ const OrdersPage = ({ mode = 'order' }) => {
                                                 {/* Botón Preparar - Solo admin y pedidos confirmados */}
                                                 {canPrepareOrder(order) && (
                                                     <button
-                                                        onClick={() => handlePrepareClick(order)}
+                                                        onClick={(e) => { e.stopPropagation(); handlePrepareClick(order); }}
                                                         className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-500 hover:bg-primary-700 text-white rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all shadow-sm hover:shadow-md"
                                                     >
                                                         <Package size={14} strokeWidth={2.5} />
@@ -694,7 +826,7 @@ const OrdersPage = ({ mode = 'order' }) => {
                                                 {/* Botón Completar - Solo admin y pedidos preparados */}
                                                 {canCompleteOrder(order) && (
                                                     <button
-                                                        onClick={() => handleCompleteClick(order)}
+                                                        onClick={(e) => { e.stopPropagation(); handleCompleteClick(order); }}
                                                         className="flex items-center gap-1.5 px-3 py-1.5 bg-success-500 hover:bg-success-600 text-white rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all shadow-sm hover:shadow-md"
                                                     >
                                                         <CheckCircle size={14} strokeWidth={2.5} />
@@ -705,7 +837,7 @@ const OrdersPage = ({ mode = 'order' }) => {
                                                 {/* Botón Ver - Siempre visible si tiene permiso */}
                                                 {canView(order) && (
                                                     <button
-                                                        onClick={() => handleViewOrder(order)}
+                                                        onClick={(e) => { e.stopPropagation(); handleViewOrder(order); }}
                                                         className="p-1.5 rounded-lg text-(--text-muted) hover:text-primary-600 dark:hover:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-all"
                                                         title="Ver detalle"
                                                     >
@@ -713,10 +845,10 @@ const OrdersPage = ({ mode = 'order' }) => {
                                                     </button>
                                                 )}
 
-                                                {/* Menú de 3 puntos - Acciones adicionales */}
+                                                {/* Menú de 3 puntos - Acciones adicionales (todos los roles) */}
                                                 <div>
                                                     <button
-                                                        onClick={(e) => handleOpenMenu(e, order._id)}
+                                                        onClick={(e) => { e.stopPropagation(); handleOpenMenu(e, order._id); }}
                                                         className="p-1.5 rounded-lg text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-hover) transition-all"
                                                     >
                                                         <MoreHorizontal size={18} />
@@ -724,6 +856,7 @@ const OrdersPage = ({ mode = 'order' }) => {
 
                                                     {openMenu.id === order._id && (
                                                         <ActionMenu
+                                                            openAbove={openMenu.openAbove}
                                                             items={[
                                                                 {
                                                                     icon: <Eye size={16} />,
@@ -735,11 +868,16 @@ const OrdersPage = ({ mode = 'order' }) => {
                                                                     label: 'Editar',
                                                                     onClick: () => handleEditOrder(order)
                                                                 }] : []),
-                                                                {
+                                                                ...(isClient ? [] : [{  // Clientes no pueden enviar emails/WhatsApp
                                                                     icon: <Send size={16} />,
                                                                     label: 'Enviar por email',
                                                                     onClick: () => handleSendEmailClick(order)
-                                                                },
+                                                                }]),
+                                                                ...(isClient ? [] : [{  // Clientes no pueden enviar emails/WhatsApp
+                                                                    icon: <MessageCircle size={16} />,
+                                                                    label: 'Enviar WhatsApp',
+                                                                    onClick: () => handleSendWhatsAppClick(order)
+                                                                }]),
                                                                 {
                                                                     icon: <Printer size={16} />,
                                                                     label: 'Imprimir / PDF',
@@ -752,9 +890,14 @@ const OrdersPage = ({ mode = 'order' }) => {
                                                                         }
                                                                     }
                                                                 },
-                                                                ...(canRevertToBudget(order) ? [{
+                                                                {
+                                                                    icon: <History size={16} />,
+                                                                    label: 'Ver Actividad',
+                                                                    onClick: () => handleViewActivityClick(order)
+                                                                },
+                                                                ...(getRevertInfo(order) ? [{
                                                                     icon: <ArrowLeft size={16} />,
-                                                                    label: 'Volver a presupuesto',
+                                                                    label: getRevertInfo(order).label,
                                                                     variant: 'warning',
                                                                     onClick: () => handleRevertClick(order)
                                                                 }] : []),
@@ -766,7 +909,7 @@ const OrdersPage = ({ mode = 'order' }) => {
                                                                 }] : [])
                                                             ]}
                                                             position={openMenu.position}
-                                                            onClose={() => setOpenMenu({ id: null, position: null })}
+                                                            onClose={() => setOpenMenu({ id: null, position: null, openAbove: false })}
                                                         />
                                                     )}
                                                 </div>
@@ -785,6 +928,141 @@ const OrdersPage = ({ mode = 'order' }) => {
                             )}
                         </tbody>
                     </table>
+                </div>
+
+                {/* Vista Mobile - Cards */}
+                <div className="md:hidden">
+                    {loading ? (
+                        <div className="p-6 text-center">
+                            <div className="flex items-center justify-center gap-2 text-(--text-muted) text-[11px] font-bold uppercase tracking-widest">
+                                <div className="w-3.5 h-3.5 border-2 border-(--border-color) border-t-primary-600 dark:border-t-primary-400 rounded-full animate-spin"></div>
+                                Sincronizando...
+                            </div>
+                        </div>
+                    ) : orders.length > 0 ? (
+                        <div className="divide-y divide-(--border-color)">
+                            {orders.map((order) => (
+                                <div 
+                                    key={order._id} 
+                                    className="p-4 hover:bg-(--bg-hover) transition-colors cursor-pointer"
+                                    onClick={() => handleViewOrder(order)}
+                                >
+                                    {/* Header: Numero y Estado */}
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-bold text-(--text-primary) text-[15px]">
+                                                #{String(order.orderNumber).padStart(5, '0')}
+                                            </span>
+                                            {isSuperadmin && (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 border border-primary-100 dark:border-primary-800">
+                                                    <Building2 size={8} />
+                                                    {order.companyId?.name || 'N/A'}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <StatusBadge status={order.status} />
+                                    </div>
+                                    
+                                    {/* Cliente */}
+                                    <div className="mb-2">
+                                        <div className="text-[14px] font-bold text-(--text-primary)">{order.clientId?.businessName}</div>
+                                        <div className="text-[10px] text-(--text-muted) font-bold tracking-tight uppercase">ID: {order.clientId?._id.substring(18).toUpperCase()}</div>
+                                    </div>
+                                    
+                                    {/* Info Grid */}
+                                    <div className="grid grid-cols-2 gap-2 mb-3 text-[12px]">
+                                        <div>
+                                            <span className="text-(--text-muted)">Fecha:</span>
+                                            <span className="ml-1 font-semibold text-(--text-secondary)">{new Date(order.date).toLocaleDateString()}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-(--text-muted)">Asignado a:</span>
+                                            <span className="ml-1 font-semibold text-(--text-secondary)">{order.salesRepId?.firstName} {order.salesRepId?.lastName}</span>
+                                        </div>
+                                        <div className="col-span-2">
+                                            <span className="text-(--text-muted)">Total:</span>
+                                            <span className="ml-1 font-bold text-(--text-primary) text-[14px]">${(() => {
+                                                const subtotal = order.items.reduce((acc, item) => acc + (item.quantity * item.listPrice * (1 - (item.discount || 0) / 100)), 0);
+                                                const total = subtotal * (1 - (order.discount || 0) / 100);
+                                                return total.toLocaleString();
+                                            })()}</span>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Acciones */}
+                                    <div className="flex items-center gap-2 pt-2 border-t border-(--border-color)">
+                                        {canConvertToOrder(order) && (
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); handleConvertClick(order); }}
+                                                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-success-500 hover:bg-success-600 text-white rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all"
+                                            >
+                                                <ArrowRight size={14} strokeWidth={2.5} />
+                                                Convertir
+                                            </button>
+                                        )}
+                                        {canPrepareOrder(order) && (
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); handlePrepareClick(order); }}
+                                                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-primary-500 hover:bg-primary-700 text-white rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all"
+                                            >
+                                                <Package size={14} strokeWidth={2.5} />
+                                                Preparar
+                                            </button>
+                                        )}
+                                        {canCompleteOrder(order) && (
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); handleCompleteClick(order); }}
+                                                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-success-500 hover:bg-success-600 text-white rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all"
+                                            >
+                                                <CheckCircle size={14} strokeWidth={2.5} />
+                                                Completar
+                                            </button>
+                                        )}
+                                        {canView(order) && (
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); handleViewOrder(order); }}
+                                                className="flex items-center justify-center p-2 rounded-lg text-(--text-muted) hover:text-primary-600 dark:hover:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-all"
+                                                title="Ver detalle"
+                                            >
+                                                <Eye size={18} strokeWidth={2.5} />
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); handleOpenMenu(e, order._id); }}
+                                            className="flex items-center justify-center p-2 rounded-lg text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-hover) transition-all"
+                                        >
+                                            <MoreHorizontal size={20} />
+                                        </button>
+                                    </div>
+
+                                    {/* Menu - todos los roles */}
+                                    {openMenu.id === order._id && (
+                                        <ActionMenu
+                                            openAbove={openMenu.openAbove}
+                                            items={[
+                                                { icon: <Eye size={16} />, label: 'Ver detalle', onClick: () => handleViewOrder(order) },
+                                                ...(canEdit(order) ? [{ icon: <Edit2 size={16} />, label: 'Editar', onClick: () => handleEditOrder(order) }] : []),
+                                                ...(isClient ? [] : [{ icon: <Send size={16} />, label: 'Enviar por email', onClick: () => handleSendEmailClick(order) }]),
+                                                ...(isClient ? [] : [{ icon: <MessageCircle size={16} />, label: 'Enviar WhatsApp', onClick: () => handleSendWhatsAppClick(order) }]),
+                                                { icon: <Printer size={16} />, label: 'Imprimir / PDF', onClick: () => { try { generateOrderPDF(order, order.companyId); } catch (error) { addToast('Error al generar PDF: ' + error.message, 'error'); } } },
+                                                { icon: <History size={16} />, label: 'Ver Actividad', onClick: () => handleViewActivityClick(order) },
+                                                ...(getRevertInfo(order) ? [{ icon: <ArrowLeft size={16} />, label: getRevertInfo(order).label, variant: 'warning', onClick: () => handleRevertClick(order) }] : []),
+                                                ...(canDelete(order) ? [{ icon: <Trash2 size={16} />, label: 'Eliminar', variant: 'danger', onClick: () => handleDeleteClick(order) }] : [])
+                                            ]}
+                                            position={openMenu.position}
+                                            onClose={() => setOpenMenu({ id: null, position: null, openAbove: false })}
+                                        />
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="p-6 text-center">
+                            <div className="text-(--text-muted) text-[11px] font-bold uppercase tracking-widest bg-(--bg-hover) w-fit mx-auto px-4 py-2 rounded-lg border border-(--border-color)">
+                                No se encontraron {mode === 'order' ? 'pedidos' : 'presupuestos'}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Footer / Pagination */}
@@ -834,14 +1112,14 @@ const OrdersPage = ({ mode = 'order' }) => {
                 type="danger"
             />
 
-            {/* Revert to Budget Confirmation Modal */}
+            {/* Revert to Previous State Confirmation Modal */}
             <ConfirmModal
                 isOpen={revertModal.isOpen}
-                onClose={() => setRevertModal({ isOpen: false, order: null, loading: false })}
+                onClose={() => setRevertModal({ isOpen: false, order: null, loading: false, targetStatus: null, title: '', description: '' })}
                 onConfirm={handleRevertConfirm}
-                title="¿Volver a Presupuesto?"
-                description={`Está a punto de revertir el pedido #${String(revertModal.order?.orderNumber || '').padStart(5, '0')} a presupuesto. El pedido volverá a estado "espera" y podrá ser editado nuevamente.`}
-                confirmText={revertModal.loading ? 'Revirtiendo...' : 'Sí, volver a presupuesto'}
+                title={revertModal.title || '¿Volver al estado anterior?'}
+                description={`Está a punto de revertir el pedido #${String(revertModal.order?.orderNumber || '').padStart(5, '0')}. ${revertModal.description || ''}`}
+                confirmText={revertModal.loading ? 'Revirtiendo...' : 'Sí, revertir'}
                 cancelText="Cancelar"
                 type="warning"
             />
@@ -869,6 +1147,29 @@ const OrdersPage = ({ mode = 'order' }) => {
                 onConfirm={handleSendEmailConfirm}
                 order={selectedOrderForEmail}
                 loading={sendingEmail}
+            />
+
+            {/* Send WhatsApp Modal */}
+            <SendWhatsAppModal
+                isOpen={isSendWhatsAppModalOpen}
+                onClose={() => {
+                    setIsSendWhatsAppModalOpen(false);
+                    setSelectedOrderForWhatsApp(null);
+                }}
+                order={selectedOrderForWhatsApp}
+            />
+
+            {/* Order Activity Drawer */}
+            <OrderActivityDrawer
+                isOpen={isActivityDrawerOpen}
+                onClose={() => {
+                    setIsActivityDrawerOpen(false);
+                    setSelectedOrderForActivity(null);
+                }}
+                entityType={selectedOrderForActivity?.type}
+                entityId={selectedOrderForActivity?._id}
+                entityNumber={selectedOrderForActivity?.orderNumber}
+                clientName={selectedOrderForActivity?.clientId?.businessName}
             />
         </div>
     );

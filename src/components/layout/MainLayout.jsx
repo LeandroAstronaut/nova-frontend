@@ -17,7 +17,7 @@ const MainLayout = ({ children }) => {
     } = useNavigationGuard();
 
     return (
-        <div className="min-h-screen app-body theme-transition">
+        <div className="relative min-h-screen app-body theme-transition overflow-x-hidden">
             {/* Sidebar */}
             <Sidebar 
                 collapsed={collapsed} 
@@ -29,10 +29,10 @@ const MainLayout = ({ children }) => {
             {/* Main Content */}
             <div
                 className={`
+                    relative z-0
                     min-h-screen flex flex-col
                     transition-all duration-300 ease-out
-                    lg:pl-0
-                    ${collapsed ? 'lg:ml-[80px]' : 'lg:ml-[260px]'}
+                    ${collapsed ? 'lg:ml-[76px]' : 'lg:ml-[260px]'}
                 `}
             >
                 <Header onMenuClick={() => setMobileOpen(true)} />

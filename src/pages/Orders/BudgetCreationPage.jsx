@@ -36,6 +36,10 @@ const BudgetCreationPage = () => {
     const [isQuickViewOpen, setIsQuickViewOpen] = useState(false);
     const [isCartOpen, setIsCartOpen] = useState(false);
 
+    // Detectar si es usuario cliente
+    const isClientUser = user?.role?.name === 'cliente';
+    const clientUserClientId = user?.client?.id;
+
     // Form Data
     const [selectedClient, setSelectedClient] = useState(null);
     const [items, setItems] = useState([]);
@@ -46,6 +50,16 @@ const BudgetCreationPage = () => {
         discount: 0,
         notes: ''
     });
+
+    // Si es usuario cliente, pre-seleccionar su cliente automáticamente
+    useEffect(() => {
+        if (isClientUser && clientUserClientId && clients.length > 0) {
+            const myClient = clients.find(c => c._id === clientUserClientId);
+            if (myClient && !selectedClient) {
+                setSelectedClient(myClient);
+            }
+        }
+    }, [isClientUser, clientUserClientId, clients, selectedClient]);
 
     // Lists
     const [clients, setClients] = useState([]);

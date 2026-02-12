@@ -1,15 +1,36 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, Bell, Menu, ChevronDown, Sun, Moon, LogOut, User, Settings } from 'lucide-react';
+import { Search, Menu, ChevronDown, Sun, Moon, LogOut, User, Settings, Bell } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useNavigate } from 'react-router-dom';
+import NotificationBell from './NotificationBell';
+import { getUnreadCount } from '../../services/activityLogService';
 
 const Header = ({ onMenuClick }) => {
     const { user, logout } = useAuth();
     const { isDarkMode, toggleTheme } = useTheme();
     const navigate = useNavigate();
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+    const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+    const [unreadCount, setUnreadCount] = useState(0);
     const menuRef = useRef(null);
+
+    // Fetch unread count for the bell badge
+    useEffect(() => {
+        const fetchUnreadCount = async () => {
+            try {
+                const count = await getUnreadCount();
+                setUnreadCount(count);
+            } catch (error) {
+                console.error('Error fetching unread count:', error);
+            }
+        };
+        fetchUnreadCount();
+        
+        // Update every 30 seconds
+        const interval = setInterval(fetchUnreadCount, 30000);
+        return () => clearInterval(interval);
+    }, []);
 
     // Cerrar menú al hacer clic fuera
     useEffect(() => {
@@ -85,10 +106,23 @@ const Header = ({ onMenuClick }) => {
                 </button>
 
                 {/* Notifications */}
-                <button className="p-2 hover:bg-(--bg-hover) rounded-lg text-(--text-secondary) relative transition-colors">
+                <button
+                    onClick={() => setIsNotificationOpen(true)}
+                    className="p-2 hover:bg-[var(--bg-hover)] rounded-lg text-[var(--text-secondary)] relative transition-colors"
+                >
                     <Bell size={20} />
-                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-danger-500 rounded-full border-2 border-(--bg-header)"></span>
+                    {unreadCount > 0 && (
+                        <span className="absolute top-1 right-1 min-w-[18px] h-[18px] bg-danger-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-[var(--bg-header)]">
+                            {unreadCount > 9 ? '9+' : unreadCount}
+                        </span>
+                    )}
                 </button>
+
+                <NotificationBell 
+                    isOpen={isNotificationOpen} 
+                    onClose={() => setIsNotificationOpen(false)}
+                    onUnreadCountChange={setUnreadCount}
+                />
 
                 <div className="h-6 w-px bg-(--border-color) mx-1 hidden sm:block"></div>
 

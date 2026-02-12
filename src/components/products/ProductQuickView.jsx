@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import Button from '../common/Button';
 
-const ProductQuickView = ({ isOpen, onClose, product, onAddToCart }) => {
+const ProductQuickView = ({ isOpen, onClose, product, onAddToCart, isClient = false }) => {
     const [quantity, setQuantity] = React.useState(1);
     const [discount, setDiscount] = React.useState(0);
 
@@ -20,9 +20,10 @@ const ProductQuickView = ({ isOpen, onClose, product, onAddToCart }) => {
     React.useEffect(() => {
         if (isOpen) {
             setQuantity(1);
-            setDiscount(0);
+            // Cliente: usar el descuento del producto (no editable)
+            setDiscount(isClient ? (product?.pricing?.discount || 0) : 0);
         }
-    }, [isOpen, product]);
+    }, [isOpen, product, isClient]);
 
     if (!product) return null;
 
@@ -126,9 +127,9 @@ const ProductQuickView = ({ isOpen, onClose, product, onAddToCart }) => {
 
                         {/* Footer - Acciones siempre abajo */}
                         <div className="px-6 py-4 border-t border-[var(--border-color)] bg-[var(--bg-hover)] space-y-4">
-                            <div className="flex items-center gap-3">
+                            <div className="grid grid-cols-2 gap-3">
                                 {/* Quantity Selector */}
-                                <div className="flex-1">
+                                <div className={isClient && discount === 0 ? 'col-span-2' : ''}>
                                     <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">Cantidad</label>
                                     <div className="flex items-center bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl h-11 overflow-hidden">
                                         <button
@@ -152,19 +153,22 @@ const ProductQuickView = ({ isOpen, onClose, product, onAddToCart }) => {
                                     </div>
                                 </div>
 
-                                {/* Discount Input */}
-                                <div className="w-28">
-                                    <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">Descuento</label>
-                                    <div className="flex items-center bg-success-50 dark:bg-success-900/30 border border-success-100 dark:border-success-800 rounded-xl h-11 px-3">
-                                        <input
-                                            type="number"
-                                            value={discount}
-                                            onChange={(e) => setDiscount(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
-                                            className="w-full bg-transparent text-center font-bold text-[15px] text-success-700 dark:text-success-400 outline-none"
-                                        />
-                                        <span className="text-[12px] font-bold text-success-600/50">%</span>
+                                {/* Discount Input — solo para vendedores o clientes con descuento > 0 */}
+                                {(!isClient || discount > 0) && (
+                                    <div>
+                                        <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">Descuento</label>
+                                        <div className="flex items-center bg-success-50 dark:bg-success-900/30 border border-success-100 dark:border-success-800 rounded-xl h-11 px-3">
+                                            <input
+                                                type="number"
+                                                value={discount}
+                                                onChange={(e) => setDiscount(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
+                                                disabled={isClient}
+                                                className="w-full bg-transparent text-center font-bold text-[15px] text-success-700 dark:text-success-400 outline-none disabled:opacity-60"
+                                            />
+                                            <span className="text-[12px] font-bold text-success-600/50">%</span>
+                                        </div>
                                     </div>
-                                </div>
+                                )}
                             </div>
 
                             <Button

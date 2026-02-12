@@ -258,33 +258,12 @@
   
   /* Header */
   .app-header {
-    @apply h-16 bg-[var(--bg-header)] border-b border-[var(--border-color)] px-4 flex items-center justify-between sticky top-0 z-40;
+    @apply h-16 bg-[var(--bg-header)] border-b border-[var(--border-color)] px-4 flex items-center justify-between sticky top-0 z-30;
   }
   
-  /* Sidebar */
+  /* Sidebar - Estilos base mantenidos para compatibilidad */
   .app-sidebar {
-    @apply fixed top-0 left-0 h-full bg-[var(--bg-sidebar)] border-r border-[var(--border-color)] flex flex-col shadow-xl lg:shadow-none transition-transform duration-300 ease-out z-50;
-  }
-  
-  .dark .app-sidebar {
-    @apply shadow-soft-dark;
-  }
-  
-  /* Sidebar Item */
-  .sidebar-item {
-    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 relative;
-  }
-  
-  .sidebar-item-active {
-    @apply bg-primary-50 text-primary-600 shadow-sm;
-  }
-  
-  .dark .sidebar-item-active {
-    @apply bg-primary-900/30 text-primary-400;
-  }
-  
-  .sidebar-item-inactive {
-    @apply text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)];
+    @apply bg-[var(--bg-sidebar)] border-r border-[var(--border-color)];
   }
 }
 

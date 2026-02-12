@@ -1,7 +1,7 @@
 import React from 'react';
 import { Search, User, Building2, Check } from 'lucide-react';
 
-const ClientSelection = ({ clients, searchQuery, onSearch, onSelect, selectedClient }) => {
+const ClientSelection = ({ clients, searchQuery, onSearch, onSelect, selectedClient, readOnly = false, readOnlyMessage = '' }) => {
     // Sort clients: selected one first
     const sortedClients = [...clients].sort((a, b) => {
         if (selectedClient && a._id === selectedClient._id) return -1;
@@ -13,17 +13,25 @@ const ClientSelection = ({ clients, searchQuery, onSearch, onSelect, selectedCli
         <div className="space-y-6">
             {/* Header con Search */}
             <div className="bg-(--bg-card) p-4 rounded-2xl border border-(--border-color) shadow-sm">
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-(--text-muted)" size={16} strokeWidth={2.5} />
-                    <input
-                        type="text"
-                        placeholder="Buscar cliente por nombre o razón social..."
-                        className="w-full pl-10 pr-4 py-2.5 bg-secondary-50 border border-secondary-100 focus:border-primary-300 rounded-xl text-xs  text-secondary-800 transition-all outline-none"
-                        value={searchQuery}
-                        onChange={(e) => onSearch(e.target.value)}
-                        autoFocus
-                    />
-                </div>
+                {readOnly ? (
+                    <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-xl p-3">
+                        <p className="text-[12px] text-violet-700 dark:text-violet-300 font-medium">
+                            {readOnlyMessage || 'Cliente pre-seleccionado para su usuario'}
+                        </p>
+                    </div>
+                ) : (
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-(--text-muted)" size={16} strokeWidth={2.5} />
+                        <input
+                            type="text"
+                            placeholder="Buscar cliente por nombre o razón social..."
+                            className="w-full pl-10 pr-4 py-2.5 bg-secondary-50 border border-secondary-100 focus:border-primary-300 rounded-xl text-xs  text-secondary-800 transition-all outline-none"
+                            value={searchQuery}
+                            onChange={(e) => onSearch(e.target.value)}
+                            autoFocus
+                        />
+                    </div>
+                )}
             </div>
 
             {/* Grid de Clientes */}

@@ -30,6 +30,7 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
     const isAdmin = user?.role?.name === 'admin';
     const isSuperadmin = user?.role?.name === 'superadmin';
     const isVendedor = user?.role?.name === 'vendedor';
+    const isClient = user?.role?.name === 'cliente';
     const isViewMode = mode === 'view';
     const effectiveReadOnly = readOnly || isViewMode; // Solo lectura si es superadmin o modo view
     const canChangeSeller = isAdmin && !effectiveReadOnly; // Solo admin puede cambiar vendedor, y solo si no es solo lectura
@@ -87,8 +88,6 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                 setStep(3); // Go straight to summary when editing
             } else {
                 // Reset for create
-                setStep(1);
-                setSelectedClient(null);
                 setItems([]);
                 setHeader({
                     date: new Date().toISOString().split('T')[0],
@@ -97,6 +96,23 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                     discount: 0,
                     notes: ''
                 });
+
+                if (isClient && user.client) {
+                    // Cliente: pre-seleccionar su cliente y saltear selección y lista de precios
+                    setSelectedClient(user.client);
+                    // Usar la lista del cliente; si la empresa no tiene priceLists, forzar lista 1
+                    const clientPriceList = features.priceLists ? (user.client.priceList || 1) : 1;
+                    setHeader(prev => ({
+                        ...prev,
+                        discount: user.client.discount || 0,
+                        priceList: clientPriceList,
+                        salesRepId: user.client.salesRepId?.toString() || ''
+                    }));
+                    setStep(2); // Siempre ir directo a productos
+                } else {
+                    setStep(1);
+                    setSelectedClient(null);
+                }
             }
             fetchInitialData();
         }
@@ -197,7 +213,8 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
         const price = (priceListNum === 2 ? (pricing.list2 || 0) : (pricing.list1 || 0)) || 0;
 
         const qty = parseInt(quantityToAdd) || 1;
-        const disc = parseFloat(initialDiscount) || 0;
+        // Cliente: usar siempre el descuento del producto, no editable
+        const disc = isClient ? (parseFloat(pricing.discount) || 0) : (parseFloat(initialDiscount) || 0);
         const productId = product._id || Math.random().toString(36).substr(2, 9);
         const existing = items.find(i => i.productId === productId);
 
@@ -348,6 +365,10 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                                     </h2>
                                     <p className="text-[11px] text-[var(--text-muted)] font-medium">
                                         {isViewMode ? 'Mostrando detalle' : (() => {
+                                            if (isClient) {
+                                                // Cliente ve solo 2 pasos: Productos y Resumen
+                                                return `Paso ${step === 2 ? 1 : 2} de 2`;
+                                            }
                                             // Mapear el valor de step al paso lógico que ve el usuario
                                             const stepMap = {
                                                 1: 1,      // Cliente
@@ -403,6 +424,7 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                                             itemsInCart={items}
                                             onProductClick={openQuickView}
                                             onAddDirect={(p) => addItem(p)}
+                                            isClient={isClient}
                                         />
                                     )}
 
@@ -426,6 +448,7 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                                             mode={mode}
                                             canChangeSeller={canChangeSeller}
                                             readOnly={effectiveReadOnly}
+                                            isClient={isClient}
                                             selectedClient={selectedClient}
                                             priceList={header.priceList}
                                             features={features}
@@ -465,7 +488,7 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                                     </Button>
                                 ) : (
                                     <>
-                                        {step > 1 && (
+                                        {step > 1 && !(isClient && step <= 2) && (
                                             <Button
                                                 variant="secondary"
                                                 onClick={() => {
@@ -502,7 +525,7 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                                             <Button
                                                 variant="primary"
                                                 onClick={effectiveReadOnly ? handleCancel : handleSave}
-                                                disabled={loading || (!effectiveReadOnly && !header.salesRepId)}
+                                                disabled={loading || (!effectiveReadOnly && !header.salesRepId && !isClient)}
                                                 className="!px-4 !py-2 !text-sm !bg-success-600 hover:!bg-success-700"
                                             >
                                                 {loading ? 'Guardando...' : (effectiveReadOnly ? 'Cerrar' : (mode === 'edit' ? 'Actualizar' : 'Finalizar'))}
@@ -543,6 +566,7 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                             onClose={() => setIsQuickViewOpen(false)}
                             product={quickViewProduct}
                             onAddToCart={(p, q, d) => addItem(p, q, d)}
+                            isClient={isClient}
                         />
 
                         <ConfirmModal

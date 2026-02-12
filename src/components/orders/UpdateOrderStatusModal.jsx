@@ -61,10 +61,10 @@ const UpdateOrderStatusModal = ({ isOpen, onClose, onConfirm, order, loading, ta
     // Configuración según el estado destino
     const config = {
         preparado: {
-            title: 'Poner en Preparación',
+            title: 'Poner en Preparando',
             icon: Package,
             color: 'bg-info-100 dark:bg-info-900/30 text-info-600 dark:text-info-400',
-            description: 'El pedido pasará a estado "En Preparación"',
+            description: 'El pedido pasará a estado "Preparando"',
             confirmText: 'Preparar Pedido'
         },
         completo: {

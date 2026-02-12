@@ -3,6 +3,10 @@ import { useAuth } from './context/AuthContext';
 import LoginPage from './pages/Auth/LoginPage';
 import Dashboard from './pages/Dashboard';
 import OrdersPage from './pages/Orders/OrdersPage';
+import OrderDetailPage from './pages/Orders/OrderDetailPage';
+import ReceiptsPage from './pages/Receipts/ReceiptsPage';
+import ReceiptDetailPage from './pages/Receipts/ReceiptDetailPage';
+import SellersPage from './pages/Sellers/SellersPage';
 import BudgetCreationPage from './pages/Orders/BudgetCreationPage';
 import CompaniesPage from './pages/Admin/CompaniesPage';
 import MainLayout from './components/layout/MainLayout';
@@ -25,7 +29,7 @@ const ProtectedRoute = ({ children, requireCompany = false }) => {
 
   // Superadmin puede acceder a todo sin compañía
   const isSuperadmin = user?.role?.name === 'superadmin';
-  
+
   // Si requiere compañía y no tiene (y no es superadmin), redirigir
   if (requireCompany && !user?.company && !isSuperadmin) {
     return <Navigate to="/" />;
@@ -61,11 +65,15 @@ function App() {
         />
         {/* Placeholder routes for navigation */}
         <Route path="/pedidos" element={<ProtectedRoute><OrdersPage mode="order" /></ProtectedRoute>} />
+        <Route path="/pedidos/:id" element={<ProtectedRoute><OrderDetailPage /></ProtectedRoute>} />
         <Route path="/presupuestos" element={<ProtectedRoute><OrdersPage mode="budget" /></ProtectedRoute>} />
+        <Route path="/presupuestos/:id" element={<ProtectedRoute><OrderDetailPage /></ProtectedRoute>} />
         <Route path="/presupuestos/nuevo" element={<ProtectedRoute><BudgetCreationWrapper /></ProtectedRoute>} />
-        <Route path="/recibos" element={<ProtectedRoute><div className="card">Módulo de Recibos</div></ProtectedRoute>} />
+        <Route path="/recibos" element={<ProtectedRoute><ReceiptsPage /></ProtectedRoute>} />
+        <Route path="/recibos/:id" element={<ProtectedRoute><ReceiptDetailPage /></ProtectedRoute>} />
         <Route path="/catalogo" element={<ProtectedRoute><div className="card">Módulo de Catálogo</div></ProtectedRoute>} />
         <Route path="/clientes" element={<ProtectedRoute><div className="card">Autogestión de Clientes</div></ProtectedRoute>} />
+        <Route path="/usuarios" element={<ProtectedRoute><SellersPage /></ProtectedRoute>} />
         <Route path="/cuentas" element={<ProtectedRoute><div className="card">Cuentas Corrientes</div></ProtectedRoute>} />
         <Route path="/admin/companies" element={<ProtectedRoute><CompaniesPage /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" />} />

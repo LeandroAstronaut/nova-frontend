@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, History, FileText, ShoppingCart, Mail, MessageCircle, Receipt, User, Trash2, Edit, RotateCcw, Package, ArrowRight, CheckCircle, FileMinus } from 'lucide-react';
-import { getEntityActivity } from '../../services/activityLogService';
+import { 
+    X, History, FileText, ShoppingCart, Mail, MessageCircle, 
+    Receipt, User, Trash2, Edit, RotateCcw, Package, ArrowRight, 
+    CheckCircle, LogIn, LogOut, Shield, Briefcase, Building2
+} from 'lucide-react';
+import { getUserActivity } from '../../services/activityLogService';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import ChangeDetails from '../common/ChangeDetails';
 
 const typeIcons = {
     budget_created: FileText,
@@ -21,17 +24,17 @@ const typeIcons = {
     receipt_created: Receipt,
     receipt_edited: Edit,
     receipt_deleted: Trash2,
+    receipt_cancelled: Trash2,
     client_created: User,
     client_edited: Edit,
-    product_created: ShoppingCart,
-    product_edited: Edit,
-    product_deleted: Trash2,
+    client_deleted: Trash2,
     user_created: User,
     user_edited: Edit,
     user_deleted: Trash2,
-    company_updated: Edit,
-    login: User,
-    logout: User
+    login: LogIn,
+    logout: LogOut,
+    password_changed: Shield,
+    status_changed: CheckCircle
 };
 
 const typeLabels = {
@@ -46,20 +49,19 @@ const typeLabels = {
     email_sent: 'Email enviado',
     whatsapp_sent: 'WhatsApp enviado',
     receipt_created: 'Recibo creado',
-    receipt_cancelled: 'Recibo anulado',
     receipt_edited: 'Recibo editado',
     receipt_deleted: 'Recibo eliminado',
+    receipt_cancelled: 'Recibo anulado',
     client_created: 'Cliente creado',
     client_edited: 'Cliente editado',
-    product_created: 'Producto creado',
-    product_edited: 'Producto editado',
-    product_deleted: 'Producto eliminado',
+    client_deleted: 'Cliente eliminado',
     user_created: 'Usuario creado',
     user_edited: 'Usuario editado',
     user_deleted: 'Usuario eliminado',
-    company_updated: 'Empresa actualizada',
     login: 'Inicio de sesión',
-    logout: 'Cierre de sesión'
+    logout: 'Cierre de sesión',
+    password_changed: 'Contraseña cambiada',
+    status_changed: 'Estado actualizado'
 };
 
 const typeColors = {
@@ -74,20 +76,19 @@ const typeColors = {
     email_sent: 'bg-indigo-100 text-indigo-600',
     whatsapp_sent: 'bg-green-100 text-green-600',
     receipt_created: 'bg-yellow-100 text-yellow-600',
-    receipt_cancelled: 'bg-red-100 text-red-600',
     receipt_edited: 'bg-gray-100 text-gray-600',
     receipt_deleted: 'bg-red-100 text-red-600',
+    receipt_cancelled: 'bg-red-100 text-red-600',
     client_created: 'bg-blue-100 text-blue-600',
     client_edited: 'bg-gray-100 text-gray-600',
-    product_created: 'bg-blue-100 text-blue-600',
-    product_edited: 'bg-gray-100 text-gray-600',
-    product_deleted: 'bg-red-100 text-red-600',
+    client_deleted: 'bg-red-100 text-red-600',
     user_created: 'bg-blue-100 text-blue-600',
     user_edited: 'bg-gray-100 text-gray-600',
     user_deleted: 'bg-red-100 text-red-600',
-    company_updated: 'bg-gray-100 text-gray-600',
     login: 'bg-green-100 text-green-600',
-    logout: 'bg-gray-100 text-gray-600'
+    logout: 'bg-gray-100 text-gray-600',
+    password_changed: 'bg-amber-100 text-amber-600',
+    status_changed: 'bg-purple-100 text-purple-600'
 };
 
 const formatTime = (dateString) => {
@@ -103,22 +104,24 @@ const formatTime = (dateString) => {
     return format(date, 'dd/MM/yyyy HH:mm', { locale: es });
 };
 
-const OrderActivityDrawer = ({ isOpen, onClose, entityType, entityId, entityNumber, clientName }) => {
+const UserActivityDrawer = ({ isOpen, onClose, user, isSuperadmin = false }) => {
     const [activities, setActivities] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [filter, setFilter] = useState('all');
 
     useEffect(() => {
-        if (isOpen && entityType && entityId) {
+        if (isOpen && user?._id) {
             fetchActivities();
         }
-    }, [isOpen, entityType, entityId]);
+    }, [isOpen, user?._id]);
 
     const fetchActivities = async () => {
         try {
             setLoading(true);
             setError(null);
-            const data = await getEntityActivity(entityType, entityId);
+            // Obtener actividad donde el usuario es el actor (userId)
+            const data = await getUserActivity(user._id, 100);
             setActivities(data);
         } catch (err) {
             console.error('Error fetching activities:', err);
@@ -127,6 +130,18 @@ const OrderActivityDrawer = ({ isOpen, onClose, entityType, entityId, entityNumb
             setLoading(false);
         }
     };
+
+    const filteredActivities = activities.filter(activity => {
+        if (filter === 'all') return true;
+        if (filter === 'orders') return activity.type?.includes('order') || activity.type?.includes('budget');
+        if (filter === 'receipts') return activity.type?.includes('receipt');
+        if (filter === 'clients') return activity.type?.includes('client');
+        if (filter === 'auth') return activity.type?.includes('login') || activity.type?.includes('logout') || activity.type?.includes('password');
+        return true;
+    });
+
+    const RoleIcon = user?.roleId?.name === 'admin' ? Shield : 
+                     user?.roleId?.name === 'cliente' ? Building2 : Briefcase;
 
     return createPortal(
         <AnimatePresence>
@@ -158,8 +173,7 @@ const OrderActivityDrawer = ({ isOpen, onClose, entityType, entityId, entityNumb
                                 <div>
                                     <h2 className="text-base font-bold text-[var(--text-primary)]">Historial de Actividad</h2>
                                     <p className="text-[11px] text-[var(--text-muted)] font-medium">
-                                        {entityType === 'order' ? 'Pedido' : entityType === 'budget' ? 'Presupuesto' : 'Recibo'} #{String(entityNumber || '').padStart(5, '0')}
-                                        {clientName && ` • ${clientName}`}
+                                        {user?.firstName} {user?.lastName}
                                     </p>
                                 </div>
                             </div>
@@ -169,6 +183,65 @@ const OrderActivityDrawer = ({ isOpen, onClose, entityType, entityId, entityNumb
                             >
                                 <X size={20} />
                             </button>
+                        </div>
+
+                        {/* User Info Card */}
+                        <div className="px-6 py-4 bg-[var(--bg-hover)] border-b border-[var(--border-color)]">
+                            <div className="flex items-center gap-3">
+                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg ${
+                                    user?.roleId?.name === 'admin' 
+                                        ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600' 
+                                        : user?.roleId?.name === 'cliente'
+                                            ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-600'
+                                            : 'bg-amber-100 dark:bg-amber-900/30 text-amber-600'
+                                }`}>
+                                    <RoleIcon size={24} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-[13px] font-semibold text-[var(--text-primary)]">
+                                        {user?.firstName} {user?.lastName}
+                                    </p>
+                                    <p className="text-[11px] text-[var(--text-muted)]">
+                                        {user?.email} • {user?.roleId?.name === 'admin' ? 'Administrador' : 
+                                                        user?.roleId?.name === 'cliente' ? 'Usuario de Cliente' : 'Vendedor'}
+                                    </p>
+                                    {isSuperadmin && user?.companyId?.name && (
+                                        <p className="text-[10px] text-primary-600 mt-0.5 flex items-center gap-1">
+                                            <Building2 size={10} />
+                                            {user.companyId.name}
+                                        </p>
+                                    )}
+                                </div>
+                                <div className="text-right shrink-0">
+                                    <p className="text-[11px] text-[var(--text-muted)]">Total acciones</p>
+                                    <p className="text-lg font-black text-primary-600">{activities.length}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Filters */}
+                        <div className="px-6 py-3 border-b border-[var(--border-color)] shrink-0">
+                            <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+                                {[
+                                    { key: 'all', label: 'Todas' },
+                                    { key: 'orders', label: 'Pedidos' },
+                                    { key: 'receipts', label: 'Recibos' },
+                                    { key: 'clients', label: 'Clientes' },
+                                    { key: 'auth', label: 'Sesiones' }
+                                ].map((f) => (
+                                    <button
+                                        key={f.key}
+                                        onClick={() => setFilter(f.key)}
+                                        className={`px-3 py-1.5 rounded-lg text-[11px] font-medium whitespace-nowrap transition-colors ${
+                                            filter === f.key
+                                                ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-600'
+                                                : 'bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                                        }`}
+                                    >
+                                        {f.label}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
 
                         {/* Content */}
@@ -191,14 +264,20 @@ const OrderActivityDrawer = ({ isOpen, onClose, entityType, entityId, entityNumb
                                         Reintentar
                                     </button>
                                 </div>
-                            ) : activities.length === 0 ? (
+                            ) : filteredActivities.length === 0 ? (
                                 <div className="h-full flex flex-col items-center justify-center text-center py-12">
                                     <div className="w-20 h-20 bg-[var(--bg-hover)] rounded-2xl flex items-center justify-center mb-4">
                                         <History size={40} className="text-[var(--text-muted)] opacity-50" />
                                     </div>
-                                    <p className="text-[var(--text-muted)] text-sm font-medium">No hay actividad registrada</p>
+                                    <p className="text-[var(--text-muted)] text-sm font-medium">
+                                        {activities.length === 0 
+                                            ? 'No hay actividad registrada' 
+                                            : 'No hay actividad en esta categoría'}
+                                    </p>
                                     <p className="text-[var(--text-muted)] text-xs mt-1">
-                                        Las acciones realizadas aparecerán aquí
+                                        {activities.length === 0 
+                                            ? 'Las acciones realizadas por este usuario aparecerán aquí'
+                                            : 'Prueba con otro filtro'}
                                     </p>
                                 </div>
                             ) : (
@@ -208,7 +287,7 @@ const OrderActivityDrawer = ({ isOpen, onClose, entityType, entityId, entityNumb
                                         {/* Timeline line */}
                                         <div className="absolute left-5 top-2 bottom-2 w-px bg-[var(--border-color)]" />
                                         
-                                        {activities.map((activity, index) => {
+                                        {filteredActivities.map((activity, index) => {
                                             const Icon = typeIcons[activity.type] || History;
                                             const colorClass = typeColors[activity.type] || 'bg-gray-100 text-gray-600';
                                             const label = typeLabels[activity.type] || activity.type;
@@ -246,48 +325,11 @@ const OrderActivityDrawer = ({ isOpen, onClose, entityType, entityId, entityNumb
                                                             <span className="text-[11px] text-[var(--text-muted)]">
                                                                 {formatTime(activity.createdAt)}
                                                             </span>
-                                                            {activity.userId && (
-                                                                <>
-                                                                    <span className="text-[var(--text-muted)]">•</span>
-                                                                    <span className="text-[11px] text-[var(--text-muted)]">
-                                                                        {activity.userId.firstName} {activity.userId.lastName}
-                                                                    </span>
-                                                                </>
-                                                            )}
+                                                            <span className="text-[var(--border-color)]">•</span>
+                                                            <span className="text-[11px] text-[var(--text-muted)]">
+                                                                {format(new Date(activity.createdAt), 'dd/MM/yyyy HH:mm', { locale: es })}
+                                                            </span>
                                                         </div>
-
-                                                        {/* Metadata adicional si existe */}
-                                                        {activity.metadata && Object.keys(activity.metadata).length > 0 && (
-                                                            <div className="mt-2 p-2 bg-[var(--bg-hover)] rounded-lg">
-                                                                {activity.metadata.previousStatus && activity.metadata.newStatus && (
-                                                                    <div className="flex items-center gap-2 text-[11px]">
-                                                                        <span className="text-[var(--text-muted)]">Cambio de estado:</span>
-                                                                        <span className="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-[var(--text-secondary)]">
-                                                                            {activity.metadata.previousStatus}
-                                                                        </span>
-                                                                        <ArrowRight size={12} className="text-[var(--text-muted)]" />
-                                                                        <span className="px-1.5 py-0.5 bg-primary-100 dark:bg-primary-900/30 rounded text-primary-700 dark:text-primary-300">
-                                                                            {activity.metadata.newStatus}
-                                                                        </span>
-                                                                    </div>
-                                                                )}
-                                                                {activity.metadata.recipients && (
-                                                                    <div className="text-[11px] text-[var(--text-muted)]">
-                                                                        Destinatarios: {activity.metadata.recipients.join(', ')}
-                                                                    </div>
-                                                                )}
-                                                                {activity.metadata.amount && (
-                                                                    <div className="text-[11px] text-[var(--text-muted)]">
-                                                                        Monto: ${activity.metadata.amount.toLocaleString('es-AR')}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        )}
-
-                                                        {/* Cambios detallados para ediciones */}
-                                                        {activity.changes && activity.changes.length > 0 && (
-                                                            <ChangeDetails changes={activity.changes} />
-                                                        )}
                                                     </div>
                                                 </motion.div>
                                             );
@@ -298,9 +340,9 @@ const OrderActivityDrawer = ({ isOpen, onClose, entityType, entityId, entityNumb
                         </div>
 
                         {/* Footer */}
-                        <div className="px-6 py-3 border-t border-[var(--border-color)] bg-[var(--bg-hover)]">
+                        <div className="px-6 py-3 border-t border-[var(--border-color)] bg-[var(--bg-hover)] shrink-0">
                             <p className="text-[11px] text-[var(--text-muted)] text-center">
-                                {activities.length} {activities.length === 1 ? 'registro' : 'registros'} de actividad
+                                Mostrando {filteredActivities.length} de {activities.length} registros
                             </p>
                         </div>
                     </motion.div>
@@ -311,4 +353,4 @@ const OrderActivityDrawer = ({ isOpen, onClose, entityType, entityId, entityNumb
     );
 };
 
-export default OrderActivityDrawer;
+export default UserActivityDrawer;

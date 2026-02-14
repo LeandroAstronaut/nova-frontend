@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Package, CheckCircle, Building2, User, Mail, Loader2 } from 'lucide-react';
 import Button from '../common/Button';
@@ -79,7 +80,7 @@ const UpdateOrderStatusModal = ({ isOpen, onClose, onConfirm, order, loading, ta
     const currentConfig = config[targetStatus] || config.preparado;
     const IconComponent = currentConfig.icon;
 
-    return (
+    return createPortal(
         <AnimatePresence>
             {isOpen && (
                 <>
@@ -89,7 +90,7 @@ const UpdateOrderStatusModal = ({ isOpen, onClose, onConfirm, order, loading, ta
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={handleClose}
-                        className="fixed inset-0 bg-secondary-900/50 dark:bg-black/60 backdrop-blur-sm z-[200]"
+                        className="fixed inset-0 bg-secondary-900/50 dark:bg-black/60 backdrop-blur-sm z-[9999]"
                     />
 
                     {/* Modal */}
@@ -98,7 +99,7 @@ const UpdateOrderStatusModal = ({ isOpen, onClose, onConfirm, order, loading, ta
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 20 }}
                         transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                        className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-[var(--bg-card)] rounded-2xl shadow-2xl z-[210] overflow-hidden border border-[var(--border-color)]"
+                        className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-[var(--bg-card)] rounded-2xl shadow-2xl z-[10000] overflow-hidden border border-[var(--border-color)]"
                     >
                         {/* Header */}
                         <div className="px-6 py-4 border-b border-[var(--border-color)] flex items-center justify-between">
@@ -200,7 +201,8 @@ const UpdateOrderStatusModal = ({ isOpen, onClose, onConfirm, order, loading, ta
                     </motion.div>
                 </>
             )}
-        </AnimatePresence>
+        </AnimatePresence>,
+        document.body
     );
 };
 

@@ -15,8 +15,12 @@ import {
     Building2,
     ChevronLeft,
     ChevronRight,
-    Briefcase
+    Briefcase,
+    Settings,
+    UserCircle,
+    HelpCircle
 } from 'lucide-react';
+import SupportDrawer from '../common/SupportDrawer';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigationGuard } from '../../context/NavigationGuardContext';
 
@@ -103,6 +107,7 @@ const Sidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }) => {
     const { requestNavigation } = useNavigationGuard();
     const navigate = useNavigate();
     const [showCollapseTrigger, setShowCollapseTrigger] = useState(false);
+    const [showSupportDrawer, setShowSupportDrawer] = useState(false);
     
     const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
     
@@ -112,21 +117,35 @@ const Sidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }) => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
+    const [logoRev, setLogoRev] = useState(0);
+    
+    // Forzar re-render cuando cambie el logo
+    useEffect(() => {
+        console.log('Sidebar - logo cambió, incrementando rev');
+        setLogoRev(prev => prev + 1);
+    }, [user?.company?.logo]);
+    
     const features = user?.company?.features || {};
     const isSuperadmin = user?.role?.name === 'superadmin';
     const isAdmin = user?.role?.name === 'admin';
     const isClient = user?.role?.name === 'cliente';
 
-    const navItems = [
+    const mainNavItems = [
         { name: 'Dashboard', path: '/', icon: LayoutDashboard, visible: true },
         { name: 'Pedidos', path: '/pedidos', icon: ClipboardList, visible: features.orders !== false },
         { name: 'Presupuestos', path: '/presupuestos', icon: FileEdit, visible: features.orders !== false },
         { name: 'Recibos', path: '/recibos', icon: Receipt, visible: features.receipts === true },
         { name: 'Catálogo', path: '/catalogo', icon: Box, visible: !isClient && features.catalog === true },
         { name: 'Clientes', path: '/clientes', icon: Users, visible: !isClient },
-        { name: 'Usuarios', path: '/usuarios', icon: Briefcase, visible: isAdmin },
+        { name: 'Usuarios', path: '/usuarios', icon: Briefcase, visible: isAdmin || isSuperadmin },
         { name: 'Cuentas Corrientes', path: '/cuentas', icon: Landmark, visible: !isClient && features.currentAccount === true },
         { name: 'Compañías', path: '/admin/companies', icon: Building2, visible: isSuperadmin },
+    ].filter(item => item.visible !== false);
+
+    const secondaryNavItems = [
+        { name: 'Soporte / Sistema', path: null, icon: HelpCircle, isDrawer: true },
+        { name: 'Configuración', path: '/configuracion', icon: Settings, visible: isAdmin },
+        { name: 'Mi Perfil', path: '/perfil', icon: UserCircle, visible: true },
     ].filter(item => item.visible !== false);
 
     const handleLogout = () => {
@@ -154,7 +173,7 @@ const Sidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }) => {
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         transition={{ duration: 0.2 }}
-                        className="fixed inset-0 bg-black/30 dark:bg-black/50 backdrop-blur-sm z-[55] lg:hidden"
+                        className="fixed inset-0 bg-black/30 dark:bg-black/50 backdrop-blur-sm z-[9999] lg:hidden"
                         onClick={() => setMobileOpen(false)}
                     />
                 )}
@@ -190,10 +209,21 @@ const Sidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }) => {
                         `}
                     >
                         {/* Logo Icon */}
-                        <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center text-white shadow-lg shadow-primary-500/25 shrink-0 overflow-hidden group">
-                            <div className="absolute inset-0 bg-gradient-to-tr from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                            <Zap size={20} className="relative fill-current" />
-                        </div>
+                        {user?.company?.logo ? (
+                            <img 
+                                key={`${user.company.logo}-${logoRev}`}
+                                src={user.company.logo} 
+                                alt={user?.company?.name || 'Logo'} 
+                                className="w-10 h-10 rounded-xl object-contain shrink-0 bg-white p-0.5"
+                            />
+                        ) : (
+                            <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-primary-600 text-white shadow-lg shadow-primary-500/25 shrink-0 overflow-hidden group">
+                                <div className="absolute inset-0 bg-gradient-to-tr from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                <div className="w-full h-full flex items-center justify-center">
+                                    <Zap size={20} className="relative fill-current" />
+                                </div>
+                            </div>
+                        )}
                         
                         {/* Logo Text */}
                         <div className={`
@@ -212,24 +242,76 @@ const Sidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }) => {
                     {/* Mobile Close Button */}
                     <button
                         onClick={() => setMobileOpen(false)}
-                        className="lg:hidden absolute right-3 top-1/2 -translate-y-1/2 p-2 hover:bg-(--bg-hover) rounded-lg text-(--text-muted) transition-colors"
+                        className="lg:hidden absolute right-3 top-3 p-2 hover:bg-(--bg-hover) rounded-lg text-(--text-muted) transition-colors"
                     >
                         <X size={20} />
                     </button>
                 </div>
 
                 {/* Navigation Items */}
-                <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-1 no-scrollbar">
-                    {navItems.map((item) => (
-                        <SidebarItem
-                            key={item.path}
-                            to={item.path}
-                            icon={item.icon}
-                            label={item.name}
-                            collapsed={collapsed}
-                            onNavigated={handleNavigated}
-                        />
-                    ))}
+                <nav className="flex-1 overflow-y-auto py-4 px-2 no-scrollbar">
+                    {/* Items principales */}
+                    <div className="space-y-1">
+                        {mainNavItems.map((item) => (
+                            <SidebarItem
+                                key={item.path}
+                                to={item.path}
+                                icon={item.icon}
+                                label={item.name}
+                                collapsed={collapsed}
+                                onNavigated={handleNavigated}
+                            />
+                        ))}
+                    </div>
+
+                    {/* Separador */}
+                    <div className="my-4 px-3">
+                        <div className="border-t border-(--border-color)"></div>
+                    </div>
+
+                    {/* Items secundarios (Soporte, Configuración, Perfil) */}
+                    <div className="space-y-1">
+                        {secondaryNavItems.map((item) => (
+                            item.isDrawer ? (
+                                <button
+                                    key={item.name}
+                                    onClick={() => setShowSupportDrawer(true)}
+                                    className={`
+                                        w-full flex items-center gap-3 px-3 py-2.5 rounded-xl
+                                        text-(--text-secondary) hover:text-primary-600 dark:hover:text-primary-400
+                                        hover:bg-primary-50/50 dark:hover:bg-primary-900/10
+                                        transition-all duration-200 group
+                                        ${collapsed ? 'justify-center' : ''}
+                                    `}
+                                >
+                                    <div className="flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200 group-hover:bg-white dark:group-hover:bg-white/5">
+                                        <item.icon size={18} />
+                                    </div>
+                                    
+                                    {!collapsed && (
+                                        <span className="text-[13px] font-medium tracking-tight">
+                                            {item.name}
+                                        </span>
+                                    )}
+                                    
+                                    {collapsed && (
+                                        <div className="fixed left-[72px] bg-(--bg-card) text-(--text-primary) text-xs font-medium px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 whitespace-nowrap z-[9999] shadow-lg border border-(--border-color) translate-x-2 group-hover:translate-x-0">
+                                            {item.name}
+                                        </div>
+                                    )}
+                                </button>
+                            ) : (
+                                <SidebarItem
+                                    key={item.path}
+                                    to={item.path}
+                                    icon={item.icon}
+                                    label={item.name}
+                                    collapsed={collapsed}
+                                    onNavigated={handleNavigated}
+                                />
+                            )
+                        ))}
+                    </div>
                 </nav>
 
                 {/* Footer */}
@@ -286,6 +368,9 @@ const Sidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }) => {
                     </button>
                 )}
             </motion.aside>
+
+            {/* Support Drawer */}
+            <SupportDrawer isOpen={showSupportDrawer} onClose={() => setShowSupportDrawer(false)} user={user} />
         </>
     );
 };

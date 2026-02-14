@@ -82,3 +82,25 @@ export const getEntityActivity = async (entityType, entityId) => {
     const response = await api.get(`${ACTIVITY_LOGS_URL}/entity/${entityType}/${entityId}`);
     return response.data.data;
 };
+
+/**
+ * Obtener actividad de un usuario específico
+ * @param {string} userId - ID del usuario
+ * @param {number} limit - Límite de resultados
+ * @returns {Promise<Array>} Logs de actividad
+ */
+export const getUserActivity = async (userId, limit = 100) => {
+    const response = await api.get(`${ACTIVITY_LOGS_URL}/user/${userId}`, { params: { limit } });
+    return response.data.data;
+};
+
+/**
+ * Obtener actividad relacionada con un cliente específico
+ * @param {string} clientId - ID del cliente
+ * @param {number} limit - Límite de resultados
+ * @returns {Promise<Array>} Logs de actividad
+ */
+export const getClientActivity = async (clientId, limit = 100) => {
+    const response = await api.get(`${ACTIVITY_LOGS_URL}/client/${clientId}`, { params: { limit } });
+    return response.data.data;
+};

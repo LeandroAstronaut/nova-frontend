@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ArrowRight, Package, Percent, FileText, DollarSign, User, Calendar } from 'lucide-react';
+import { ChevronDown, ArrowRight, Package, Percent, FileText, DollarSign, User, Calendar, Building2, Tag, MapPin, Truck, Phone, Mail, CheckCircle } from 'lucide-react';
 
 const fieldIcons = {
     'items': Package,
@@ -9,6 +9,19 @@ const fieldIcons = {
     'paymentMethod': DollarSign,
     'salesRepId': User,
     'deliveryDate': Calendar,
+    // Campos de cliente
+    'businessName': Building2,
+    'cuit': Tag,
+    'code': Tag,
+    'email': Mail,
+    'phone': Phone,
+    'whatsapp': Phone,
+    'priceList': DollarSign,
+    'contactFirstName': User,
+    'contactLastName': User,
+    'address': MapPin,
+    'shipping': Truck,
+    'active': CheckCircle,
     'default': FileText
 };
 

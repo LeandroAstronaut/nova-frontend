@@ -1,12 +1,19 @@
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import LoginPage from './pages/Auth/LoginPage';
+import ForgotPasswordPage from './pages/Auth/ForgotPasswordPage';
+import ResetPasswordPage from './pages/Auth/ResetPasswordPage';
 import Dashboard from './pages/Dashboard';
 import OrdersPage from './pages/Orders/OrdersPage';
 import OrderDetailPage from './pages/Orders/OrderDetailPage';
 import ReceiptsPage from './pages/Receipts/ReceiptsPage';
 import ReceiptDetailPage from './pages/Receipts/ReceiptDetailPage';
-import SellersPage from './pages/Sellers/SellersPage';
+import UsersPage from './pages/Users/UsersPage';
+import UserDetailPage from './pages/Users/UserDetailPage';
+import ClientsPage from './pages/Clients/ClientsPage';
+import ClientDetailPage from './pages/Clients/ClientDetailPage';
+import SettingsPage from './pages/Settings/SettingsPage';
+import ProfilePage from './pages/Profile/ProfilePage';
 import BudgetCreationPage from './pages/Orders/BudgetCreationPage';
 import CompaniesPage from './pages/Admin/CompaniesPage';
 import MainLayout from './components/layout/MainLayout';
@@ -55,6 +62,8 @@ function App() {
     <div className="theme-transition">
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
         <Route
           path="/"
           element={
@@ -72,8 +81,12 @@ function App() {
         <Route path="/recibos" element={<ProtectedRoute><ReceiptsPage /></ProtectedRoute>} />
         <Route path="/recibos/:id" element={<ProtectedRoute><ReceiptDetailPage /></ProtectedRoute>} />
         <Route path="/catalogo" element={<ProtectedRoute><div className="card">Módulo de Catálogo</div></ProtectedRoute>} />
-        <Route path="/clientes" element={<ProtectedRoute><div className="card">Autogestión de Clientes</div></ProtectedRoute>} />
-        <Route path="/usuarios" element={<ProtectedRoute><SellersPage /></ProtectedRoute>} />
+        <Route path="/clientes" element={<ProtectedRoute><ClientsPage /></ProtectedRoute>} />
+          <Route path="/clientes/:id" element={<ProtectedRoute><ClientDetailPage /></ProtectedRoute>} />
+        <Route path="/usuarios" element={<ProtectedRoute><UsersPage /></ProtectedRoute>} />
+        <Route path="/usuarios/:id" element={<ProtectedRoute><UserDetailPage /></ProtectedRoute>} />
+        <Route path="/configuracion" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+        <Route path="/perfil" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
         <Route path="/cuentas" element={<ProtectedRoute><div className="card">Cuentas Corrientes</div></ProtectedRoute>} />
         <Route path="/admin/companies" element={<ProtectedRoute><CompaniesPage /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" />} />

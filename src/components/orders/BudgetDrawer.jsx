@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     ChevronRight,
@@ -306,7 +307,7 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
     };
 
     if (authLoading) {
-        return (
+        return createPortal(
             <AnimatePresence>
                 {isOpen && (
                     <>
@@ -315,24 +316,25 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             onClick={handleCancel}
-                            className="fixed top-0 left-0 w-screen h-screen bg-secondary-900/40 dark:bg-black/60 backdrop-blur-[2px] z-[150]"
+                            className="fixed top-0 left-0 w-screen h-screen bg-secondary-900/40 dark:bg-black/60 backdrop-blur-[2px] z-[9999]"
                         />
                         <motion.div
                             initial={{ x: '100%' }}
                             animate={{ x: 0 }}
                             exit={{ x: '100%' }}
                             transition={{ type: 'spring', damping: 28, stiffness: 220 }}
-                            className="fixed top-4 right-4 h-[calc(100vh-2rem)] w-full max-w-[900px] bg-[var(--bg-card)] shadow-2xl dark:shadow-soft-lg-dark z-[160] flex items-center justify-center border border-[var(--border-color)] rounded-[1.25rem]"
+                            className="fixed top-4 right-4 h-[calc(100vh-2rem)] w-full max-w-[900px] bg-[var(--bg-card)] shadow-2xl dark:shadow-soft-lg-dark z-[10000] flex items-center justify-center border border-[var(--border-color)] rounded-[1.25rem]"
                         >
                             <Loader2 size={40} className="animate-spin text-primary-600" />
                         </motion.div>
                     </>
                 )}
-            </AnimatePresence>
+            </AnimatePresence>,
+            document.body
         );
     }
 
-    return (
+    return createPortal(
         <AnimatePresence>
             {isOpen && (
                 <>
@@ -582,7 +584,8 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                     </motion.div>
                 </>
             )}
-        </AnimatePresence>
+        </AnimatePresence>,
+        document.body
     );
 };
 

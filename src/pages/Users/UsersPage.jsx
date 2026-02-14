@@ -1,13 +1,81 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Mail, Phone, User, Percent, Shield, Briefcase, Building2 } from 'lucide-react';
-import { getStaffUsers, createStaffUser, toggleStaffStatus } from '../../services/sellerService';
+import { 
+    Plus, Search, Mail, Phone, User, Percent, Shield, Briefcase, Building2, 
+    Eye, MoreHorizontal, Edit2, Activity, CheckCircle, XCircle 
+} from 'lucide-react';
+import { getStaffUsers, createStaffUser, toggleStaffStatus, updateStaffUser } from '../../services/userService';
 import { getClients } from '../../services/orderService';
+import { getAllCompanies } from '../../services/companyService';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import Button from '../../components/common/Button';
 import ConfirmModal from '../../components/common/ConfirmModal';
-import SellerDrawer from '../../components/sellers/SellerDrawer';
+import UserDrawer from '../../components/users/UserDrawer';
+import UserActivityDrawer from '../../components/users/UserActivityDrawer';
+import UserEditDrawer from '../../components/users/UserEditDrawer';
+
+// Action Menu Component
+const ActionMenu = ({ items, onClose, position, openAbove = false }) => {
+    const menuRef = useRef(null);
+
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (menuRef.current && !menuRef.current.contains(e.target)) {
+                onClose();
+            }
+        };
+        const handleEscape = (e) => {
+            if (e.key === 'Escape') {
+                onClose();
+            }
+        };
+        
+        document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('keydown', handleEscape);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('keydown', handleEscape);
+        };
+    }, [onClose]);
+
+    return (
+        <div
+            ref={menuRef}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+                position: 'fixed',
+                top: openAbove ? position.top - 200 : position.top,
+                left: Math.min(position.left, window.innerWidth - 200),
+                zIndex: 300
+            }}
+            className="w-48 bg-[var(--bg-card)] rounded-xl shadow-2xl border border-[var(--border-color)] py-1 animate-in fade-in zoom-in-95 duration-100"
+        >
+            {items.map((item, index) => (
+                <button
+                    key={index}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        item.onClick();
+                        onClose();
+                    }}
+                    className={`w-full px-4 py-2.5 flex items-center gap-3 text-left text-sm transition-colors ${
+                        item.variant === 'danger' 
+                            ? 'text-danger-600 hover:bg-danger-50 dark:hover:bg-danger-900/20' 
+                            : item.variant === 'success'
+                                ? 'text-success-600 hover:bg-success-50 dark:hover:bg-success-900/20'
+                                : 'text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
+                    }`}
+                >
+                    <span className={item.variant === 'danger' ? 'text-danger-600' : item.variant === 'success' ? 'text-success-600' : 'text-[var(--text-muted)]'}>
+                        {item.icon}
+                    </span>
+                    {item.label}
+                </button>
+            ))}
+        </div>
+    );
+};
 
 const StatusBadge = ({ active }) => {
     const styles = active 
@@ -56,22 +124,42 @@ const RoleBadge = ({ roleName }) => {
     );
 };
 
-const SellersPage = () => {
+const UsersPage = () => {
     const navigate = useNavigate();
     const { user } = useAuth();
     const { addToast } = useToast();
     
     const isAdmin = user?.role?.name === 'admin';
+    const isSuperadmin = user?.role?.name === 'superadmin';
+    const features = user?.company?.features || {};
+    const maxUsers = features.maxUsers || 3;
+    const clientUsersEnabled = features.clientUsers || false;
 
     const [users, setUsers] = useState([]);
     const [clients, setClients] = useState([]);
+    const [companies, setCompanies] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     
-    // Modales
+    // Modales y drawers
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [selectedUser, setSelectedUser] = useState(null);
     const [statusModal, setStatusModal] = useState({ isOpen: false, user: null, loading: false });
+    
+    // Action Menu state
+    const [openMenu, setOpenMenu] = useState({ id: null, position: null, openAbove: false });
+    
+    // Activity Drawer state
+    const [isActivityDrawerOpen, setIsActivityDrawerOpen] = useState(false);
+    const [activityUser, setActivityUser] = useState(null);
+    
+    // Edit Drawer state
+    const [isEditDrawerOpen, setIsEditDrawerOpen] = useState(false);
+    const [editUser, setEditUser] = useState(null);
+    
+    // Calcular si alcanzó el límite (solo usuarios activos)
+    const activeUsersCount = users.filter(u => u.active).length;
+    const hasReachedLimit = activeUsersCount >= maxUsers;
 
     useEffect(() => {
         fetchData();
@@ -80,12 +168,20 @@ const SellersPage = () => {
     const fetchData = async () => {
         try {
             setLoading(true);
-            const [usersData, clientsData] = await Promise.all([
+            const promises = [
                 getStaffUsers(),
                 getClients()
-            ]);
+            ];
+            // Si es superadmin, también cargar compañías
+            if (isSuperadmin) {
+                promises.push(getAllCompanies());
+            }
+            const [usersData, clientsData, companiesData] = await Promise.all(promises);
             setUsers(usersData);
             setClients(clientsData);
+            if (isSuperadmin && companiesData) {
+                setCompanies(companiesData);
+            }
         } catch (error) {
             console.error('Error fetching data:', error);
             addToast('Error al cargar datos', 'error');
@@ -103,6 +199,20 @@ const SellersPage = () => {
         } catch (error) {
             console.error('Error creating user:', error);
             addToast('Error al crear usuario: ' + (error.response?.data?.message || error.message), 'error');
+            throw error;
+        }
+    };
+
+    const handleEditUser = async (userData) => {
+        try {
+            await updateStaffUser(editUser._id, userData);
+            addToast('Usuario actualizado exitosamente', 'success');
+            setIsEditDrawerOpen(false);
+            setEditUser(null);
+            fetchData();
+        } catch (error) {
+            console.error('Error updating user:', error);
+            addToast('Error al actualizar usuario: ' + (error.response?.data?.message || error.message), 'error');
             throw error;
         }
     };
@@ -127,8 +237,38 @@ const SellersPage = () => {
         }
     };
 
-    // Filtrar usuarios por búsqueda
+    const handleOpenMenu = (e, userId) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const windowHeight = window.innerHeight;
+        const menuHeight = 180; // Altura estimada del menú
+        
+        const openAbove = (rect.bottom + menuHeight) > windowHeight;
+        
+        setOpenMenu({
+            id: userId,
+            position: {
+                top: rect.bottom + 8,
+                left: rect.left - 160 + rect.width
+            },
+            openAbove
+        });
+    };
+
+    const handleViewActivity = (user) => {
+        setActivityUser(user);
+        setIsActivityDrawerOpen(true);
+    };
+
+    const handleEdit = (user) => {
+        setEditUser(user);
+        setIsEditDrawerOpen(true);
+    };
+
+    // Filtrar usuarios: excluir clientes si la feature no está habilitada + búsqueda
     const filteredUsers = users.filter(u => {
+        if (!clientUsersEnabled && u.roleId?.name === 'cliente') {
+            return false;
+        }
         if (!searchTerm) return true;
         const term = searchTerm.toLowerCase();
         return (
@@ -140,8 +280,8 @@ const SellersPage = () => {
         );
     });
 
-    // Si no es admin, no mostrar nada
-    if (!isAdmin) {
+    // Si no es admin ni superadmin, no mostrar nada
+    if (!isAdmin && !isSuperadmin) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh]">
                 <div className="text-(--text-muted) text-center">
@@ -162,18 +302,26 @@ const SellersPage = () => {
                         Usuarios
                     </h1>
                     <p className="text-[13px] text-(--text-secondary) mt-0.5 font-medium">
-                        Gestione vendedores, administradores y usuarios de clientes.
+                        {clientUsersEnabled 
+                            ? 'Gestione vendedores, administradores y usuarios de clientes.'
+                            : 'Gestione vendedores y administradores.'}
                     </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col items-end gap-1">
                     <Button 
                         variant="primary" 
                         onClick={() => setIsDrawerOpen(true)}
+                        disabled={!isSuperadmin && hasReachedLimit}
                         className="text-[11px] font-bold uppercase tracking-wider shadow-md shadow-primary-100 dark:shadow-primary-900/30"
                     >
                         <Plus size={14} strokeWidth={2.5} />
                         Nuevo Usuario
                     </Button>
+                    {!isSuperadmin && hasReachedLimit && (
+                        <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+                            Alcanzó el límite de {maxUsers} usuarios para su plan
+                        </span>
+                    )}
                 </div>
             </div>
 
@@ -181,15 +329,17 @@ const SellersPage = () => {
             <div className="card p-0! overflow-hidden border-none shadow-sm ring-1 ring-(--border-color)">
                 {/* Filters */}
                 <div className="bg-(--bg-card) p-4 border-b border-(--border-color)">
-                    <div className="relative max-w-md">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-(--text-muted)" size={14} strokeWidth={2.5} />
-                        <input
-                            type="text"
-                            placeholder="Buscar por nombre, email, rol o cliente..."
-                            className="w-full pl-9 pr-4 py-2 bg-(--bg-input) border border-(--border-color) rounded-lg text-xs font-medium text-(--text-primary) placeholder:text-(--text-muted) focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
+                    <div className="flex justify-end">
+                        <div className="relative w-full max-w-xs">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-(--text-muted)" size={14} strokeWidth={2.5} />
+                            <input
+                                type="text"
+                                placeholder="Buscar..."
+                                className="w-full pl-9 pr-4 py-2 bg-(--bg-input) border border-(--border-color) rounded-lg text-xs font-medium text-(--text-primary) placeholder:text-(--text-muted) focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
                     </div>
                 </div>
 
@@ -201,6 +351,7 @@ const SellersPage = () => {
                                 <th className="px-6 py-3">Usuario</th>
                                 <th className="px-6 py-3">Rol</th>
                                 <th className="px-6 py-3">Contacto</th>
+                                {isSuperadmin && <th className="px-6 py-3">Compañía</th>}
                                 <th className="px-6 py-3 text-center">Comisión</th>
                                 <th className="px-6 py-3 text-center">Estado</th>
                                 <th className="px-6 py-3 text-right">Acciones</th>
@@ -210,7 +361,7 @@ const SellersPage = () => {
                             {loading ? (
                                 Array(5).fill(0).map((_, i) => (
                                     <tr key={i}>
-                                        <td colSpan={6} className="px-6 py-6 text-center">
+                                        <td colSpan={isSuperadmin ? 7 : 6} className="px-6 py-6 text-center">
                                             <div className="flex items-center justify-center gap-2 text-(--text-muted)">
                                                 <div className="w-3.5 h-3.5 border-2 border-(--border-color) border-t-primary-600 rounded-full animate-spin"></div>
                                                 Cargando...
@@ -222,7 +373,8 @@ const SellersPage = () => {
                                 filteredUsers.map((u) => (
                                     <tr 
                                         key={u._id} 
-                                        className="hover:bg-(--bg-hover) transition-colors group"
+                                        onClick={() => navigate(`/usuarios/${u._id}`)}
+                                        className="hover:bg-(--bg-hover) transition-colors group cursor-pointer"
                                     >
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
@@ -266,32 +418,70 @@ const SellersPage = () => {
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg ${
-                                                u.roleId?.name === 'cliente'
-                                                    ? 'bg-(--bg-hover) text-(--text-muted)'
-                                                    : 'bg-primary-50 dark:bg-primary-900/30'
-                                            }`}>
-                                                <Percent size={12} className={u.roleId?.name === 'cliente' ? '' : 'text-primary-600'} />
-                                                <span className={`text-[13px] font-bold ${u.roleId?.name === 'cliente' ? '' : 'text-primary-600'}`}>
-                                                    {u.commission || 0}%
+                                        {isSuperadmin && (
+                                            <td className="px-6 py-4">
+                                                <span className="text-[12px] font-medium text-(--text-secondary)">
+                                                    {u.companyId?.name || 'Sin compañía'}
                                                 </span>
-                                            </div>
+                                            </td>
+                                        )}
+                                        <td className="px-6 py-4 text-center">
+                                            {(u.roleId?.name === 'vendedor' || u.roleId?.name === 'admin') ? (
+                                                <div className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-primary-50 dark:bg-primary-900/30">
+                                                    <span className="text-[13px] font-bold text-primary-600">
+                                                        {u.commission || 0}%
+                                                    </span>
+                                                </div>
+                                            ) : (
+                                                <span className="text-[12px] text-(--text-muted)">-</span>
+                                            )}
                                         </td>
                                         <td className="px-6 py-4 text-center">
                                             <StatusBadge active={u.active} />
                                         </td>
                                         <td className="px-6 py-4 text-right">
-                                            <button
-                                                onClick={() => handleToggleStatus(u)}
-                                                className={`px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all ${
-                                                    u.active 
-                                                        ? 'text-danger-600 hover:bg-danger-50 dark:hover:bg-danger-900/20' 
-                                                        : 'text-success-600 hover:bg-success-50 dark:hover:bg-success-900/20'
-                                                }`}
-                                            >
-                                                {u.active ? 'Desactivar' : 'Activar'}
-                                            </button>
+                                            <div className="flex items-center justify-end">
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleOpenMenu(e, u._id);
+                                                    }}
+                                                    className="p-2 rounded-lg text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-hover) transition-all"
+                                                >
+                                                    <MoreHorizontal size={18} />
+                                                </button>
+
+                                                {openMenu.id === u._id && (
+                                                    <ActionMenu
+                                                        openAbove={openMenu.openAbove}
+                                                        items={[
+                                                            {
+                                                                icon: <Eye size={16} />,
+                                                                label: 'Ver detalle',
+                                                                onClick: () => navigate(`/usuarios/${u._id}`)
+                                                            },
+                                                            {
+                                                                icon: <Edit2 size={16} />,
+                                                                label: 'Editar',
+                                                                onClick: () => handleEdit(u)
+                                                            },
+                                                            {
+                                                                icon: <Activity size={16} />,
+                                                                label: 'Ver actividad',
+                                                                onClick: () => handleViewActivity(u)
+                                                            },
+                                                            {
+                                                                icon: u.active ? <XCircle size={16} /> : <CheckCircle size={16} />,
+                                                                label: u.active ? 'Desactivar' : 'Activar',
+                                                                variant: u.active ? 'danger' : 'success',
+                                                                onClick: () => handleToggleStatus(u)
+                                                            }
+                                                        ]}
+                                                        position={openMenu.position}
+                                                        onClose={() => setOpenMenu({ id: null, position: null, openAbove: false })}
+                                                    />
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 ))
@@ -321,7 +511,6 @@ const SellersPage = () => {
                         <div className="divide-y divide-(--border-color)">
                             {filteredUsers.map((u) => (
                                 <div key={u._id} className="p-4 hover:bg-(--bg-hover) transition-colors">
-                                    {/* Header: Avatar y Estado */}
                                     <div className="flex items-center justify-between mb-3">
                                         <div className="flex items-center gap-3">
                                             <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${
@@ -345,7 +534,6 @@ const SellersPage = () => {
                                         <StatusBadge active={u.active} />
                                     </div>
                                     
-                                    {/* Info Grid */}
                                     <div className="grid grid-cols-2 gap-2 mb-3 text-[12px]">
                                         <div className="flex items-center gap-1 text-(--text-secondary)">
                                             <RoleBadge roleName={u.roleId?.name} />
@@ -356,29 +544,47 @@ const SellersPage = () => {
                                                 {u.phone}
                                             </div>
                                         )}
-                                        {u.roleId?.name === 'cliente' && u.clientId && (
+                                        {clientUsersEnabled && u.roleId?.name === 'cliente' && u.clientId && (
                                             <div className="col-span-2 flex items-center gap-1 text-(--text-secondary)">
                                                 <Building2 size={12} className="text-violet-600" />
                                                 <span className="font-medium">{u.clientId.businessName}</span>
                                             </div>
                                         )}
                                         <div className="flex items-center gap-1 text-(--text-secondary)">
-                                            <Percent size={12} className={u.roleId?.name === 'cliente' ? 'text-(--text-muted)' : 'text-primary-600'} />
-                                            <span className={u.roleId?.name === 'cliente' ? '' : 'font-bold'}>{u.commission || 0}%</span> comisión
+                                            <Percent size={12} className="text-primary-600" />
+                                            <span className="font-bold">{u.commission || 0}%</span> comisión
                                         </div>
                                     </div>
                                     
-                                    {/* Acciones */}
+                                    {/* Acciones Mobile */}
                                     <div className="flex items-center justify-end gap-2 pt-2 border-t border-(--border-color)">
                                         <button
+                                            onClick={() => navigate(`/usuarios/${u._id}`)}
+                                            className="p-2 text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg transition-colors"
+                                        >
+                                            <Eye size={18} />
+                                        </button>
+                                        <button
+                                            onClick={() => handleEdit(u)}
+                                            className="p-2 text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-hover) rounded-lg transition-colors"
+                                        >
+                                            <Edit2 size={18} />
+                                        </button>
+                                        <button
+                                            onClick={() => handleViewActivity(u)}
+                                            className="p-2 text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-hover) rounded-lg transition-colors"
+                                        >
+                                            <Activity size={18} />
+                                        </button>
+                                        <button
                                             onClick={() => handleToggleStatus(u)}
-                                            className={`px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all ${
+                                            className={`p-2 rounded-lg transition-colors ${
                                                 u.active 
                                                     ? 'text-danger-600 hover:bg-danger-50 dark:hover:bg-danger-900/20' 
                                                     : 'text-success-600 hover:bg-success-50 dark:hover:bg-success-900/20'
                                             }`}
                                         >
-                                            {u.active ? 'Desactivar' : 'Activar'}
+                                            {u.active ? <XCircle size={18} /> : <CheckCircle size={18} />}
                                         </button>
                                     </div>
                                 </div>
@@ -401,16 +607,43 @@ const SellersPage = () => {
                 </div>
             </div>
 
-            {/* User Drawer */}
-            <SellerDrawer
+            {/* User Drawer - Crear */}
+            <UserDrawer
                 isOpen={isDrawerOpen}
                 onClose={() => {
                     setIsDrawerOpen(false);
                     setSelectedUser(null);
                 }}
-                onSave={selectedUser ? () => {} : handleCreateUser}
-                user={selectedUser}
+                onSave={handleCreateUser}
+                user={null}
                 clients={clients}
+                features={user?.company?.features || {}}
+                companies={companies}
+                isSuperadmin={isSuperadmin}
+                currentUser={user}
+            />
+
+            {/* Edit Drawer */}
+            <UserEditDrawer
+                isOpen={isEditDrawerOpen}
+                onClose={() => {
+                    setIsEditDrawerOpen(false);
+                    setEditUser(null);
+                }}
+                onSave={handleEditUser}
+                user={editUser}
+                isSuperadmin={isSuperadmin}
+            />
+
+            {/* Activity Drawer */}
+            <UserActivityDrawer
+                isOpen={isActivityDrawerOpen}
+                onClose={() => {
+                    setIsActivityDrawerOpen(false);
+                    setActivityUser(null);
+                }}
+                user={activityUser}
+                isSuperadmin={isSuperadmin}
             />
 
             {/* Status Toggle Modal */}
@@ -435,4 +668,5 @@ const SellersPage = () => {
     );
 };
 
-export default SellersPage;
+// UsersPage component - Manage system users
+export default UsersPage;

@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertCircle, AlertTriangle, Info, X } from 'lucide-react';
 import Button from './Button';
@@ -31,7 +32,7 @@ const ConfirmModal = ({
         }
     };
 
-    return (
+    return createPortal(
         <AnimatePresence>
             {isOpen && (
                 <>
@@ -41,12 +42,11 @@ const ConfirmModal = ({
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={onClose}
-                        className="fixed inset-0 bg-secondary-900/50 dark:bg-black/60 backdrop-blur-sm"
-                        style={{ zIndex: 200 }}
+                        className="fixed inset-0 bg-secondary-900/50 dark:bg-black/60 backdrop-blur-sm z-[9999]"
                     />
 
                     {/* Modal Container */}
-                    <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 200 }}>
+                    <div className="fixed inset-0 flex items-center justify-center p-4 z-[10000]">
                         <motion.div
                             initial={{ opacity: 0, scale: 0.95, y: 20 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -105,7 +105,8 @@ const ConfirmModal = ({
                     </div>
                 </>
             )}
-        </AnimatePresence>
+        </AnimatePresence>,
+        document.body
     );
 };
 

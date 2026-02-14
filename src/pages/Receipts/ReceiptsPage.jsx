@@ -68,11 +68,6 @@ const ReceiptsPage = () => {
     const [clients, setClients] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
-    const [filters, setFilters] = useState({
-        clientId: '',
-        status: '',
-        type: ''
-    });
 
     // Modales
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -84,13 +79,13 @@ const ReceiptsPage = () => {
 
     useEffect(() => {
         fetchData();
-    }, [filters]);
+    }, []);
 
     const fetchData = async () => {
         try {
             setLoading(true);
             const [receiptData, clientData] = await Promise.all([
-                getReceipts(filters),
+                getReceipts(),
                 getClients()
             ]);
             setReceipts(receiptData);
@@ -182,13 +177,16 @@ const ReceiptsPage = () => {
         }
     };
 
-    // Filtrar recibos por búsqueda
+    // Filtrar recibos por búsqueda en todas las columnas
     const filteredReceipts = receipts.filter(receipt => {
         if (!searchTerm) return true;
         const term = searchTerm.toLowerCase();
         return (
             receipt.receiptNumber?.toString().includes(term) ||
-            receipt.clientId?.businessName?.toLowerCase().includes(term)
+            receipt.clientId?.businessName?.toLowerCase().includes(term) ||
+            receipt.type?.toLowerCase().includes(term) ||
+            receipt.status?.toLowerCase().includes(term) ||
+            receipt.amount?.toString().includes(term)
         );
     });
 
@@ -223,45 +221,17 @@ const ReceiptsPage = () => {
             <div className="card p-0! overflow-hidden border-none shadow-sm ring-1 ring-(--border-color)">
                 {/* Filters */}
                 <div className="bg-(--bg-card) p-4 border-b border-(--border-color)">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <div className="relative">
+                    <div className="flex justify-end">
+                        <div className="relative w-full max-w-xs">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-(--text-muted)" size={14} strokeWidth={2.5} />
                             <input
                                 type="text"
-                                placeholder="Buscar por número..."
+                                placeholder="Buscar..."
                                 className="w-full pl-9 pr-4 py-2 bg-(--bg-input) border border-(--border-color) rounded-lg text-xs font-medium text-(--text-primary) placeholder:text-(--text-muted) focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />
                         </div>
-                        <select
-                            className="bg-(--bg-input) border border-(--border-color) rounded-lg px-3 py-2 text-xs font-medium text-(--text-primary)"
-                            value={filters.clientId}
-                            onChange={(e) => setFilters({ ...filters, clientId: e.target.value })}
-                        >
-                            <option value="">Todos los Clientes</option>
-                            {clients.map(c => (
-                                <option key={c._id} value={c._id}>{c.businessName}</option>
-                            ))}
-                        </select>
-                        <select
-                            className="bg-(--bg-input) border border-(--border-color) rounded-lg px-3 py-2 text-xs font-medium text-(--text-primary)"
-                            value={filters.status}
-                            onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-                        >
-                            <option value="">Todos los Estados</option>
-                            <option value="activo">Activo</option>
-                            <option value="anulado">Anulado</option>
-                        </select>
-                        <select
-                            className="bg-(--bg-input) border border-(--border-color) rounded-lg px-3 py-2 text-xs font-medium text-(--text-primary)"
-                            value={filters.type}
-                            onChange={(e) => setFilters({ ...filters, type: e.target.value })}
-                        >
-                            <option value="">Todos los Tipos</option>
-                            <option value="ingreso">Ingreso</option>
-                            <option value="egreso">Egreso</option>
-                        </select>
                     </div>
                 </div>
 

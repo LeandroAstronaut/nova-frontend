@@ -667,6 +667,7 @@ const OrderDetailPage = () => {
                     }
                 }}
                 budget={order}
+                isClient={isClient}
             />
 
             <UpdateOrderStatusModal

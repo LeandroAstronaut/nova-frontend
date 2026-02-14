@@ -1,10 +1,11 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Trash2, ShoppingBag, Minus, Plus, Package, ShoppingCart } from 'lucide-react';
 import Button from '../../components/common/Button';
 
 const CartDrawer = ({ isOpen, onClose, items, updateItem, removeItem, onCheckout, total }) => {
-    return (
+    return createPortal(
         <AnimatePresence>
             {isOpen && (
                 <>
@@ -14,7 +15,7 @@ const CartDrawer = ({ isOpen, onClose, items, updateItem, removeItem, onCheckout
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={onClose}
-                        className="fixed inset-0 bg-secondary-900/50 dark:bg-black/60 backdrop-blur-sm z-[150]"
+                        className="fixed inset-0 bg-secondary-900/50 dark:bg-black/60 backdrop-blur-sm z-[9999]"
                     />
 
                     {/* Drawer - Estilo consistente */}
@@ -23,7 +24,7 @@ const CartDrawer = ({ isOpen, onClose, items, updateItem, removeItem, onCheckout
                         animate={{ x: 0 }}
                         exit={{ x: '100%' }}
                         transition={{ type: 'spring', damping: 28, stiffness: 220 }}
-                        className="fixed top-4 right-4 h-[calc(100vh-2rem)] w-full max-w-[420px] bg-[var(--bg-card)] shadow-2xl dark:shadow-soft-lg-dark z-[160] flex flex-col border border-[var(--border-color)] rounded-2xl overflow-hidden"
+                        className="fixed top-4 right-4 h-[calc(100vh-2rem)] w-full max-w-[420px] bg-[var(--bg-card)] shadow-2xl dark:shadow-soft-lg-dark z-[10000] flex flex-col border border-[var(--border-color)] rounded-2xl overflow-hidden"
                     >
                         {/* Header - Estilo consistente */}
                         <div className="px-6 py-4 border-b border-[var(--border-color)] flex items-center justify-between shrink-0 bg-[var(--bg-card)]">
@@ -167,7 +168,8 @@ const CartDrawer = ({ isOpen, onClose, items, updateItem, removeItem, onCheckout
                     </motion.div>
                 </>
             )}
-        </AnimatePresence>
+        </AnimatePresence>,
+        document.body
     );
 };
 

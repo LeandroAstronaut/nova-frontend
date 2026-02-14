@@ -159,11 +159,7 @@ const OrdersPage = ({ mode = 'order' }) => {
     const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
     const [isSearching, setIsSearching] = useState(false);
 
-    // Filters & Sorting State
-    const [filters, setFilters] = useState({
-        clientId: '',
-        salesRepId: '',
-    });
+    // Sorting State
     const [sort, setSort] = useState({
         sortBy: 'orderNumber',
         order: 'desc'
@@ -261,7 +257,7 @@ const OrdersPage = ({ mode = 'order' }) => {
 
     useEffect(() => {
         fetchOrders();
-    }, [mode, filters, sort, debouncedSearchTerm]);
+    }, [mode, sort, debouncedSearchTerm]);
 
     // Debounce para el término de búsqueda (esperar 500ms después de dejar de tipear)
     useEffect(() => {
@@ -293,7 +289,6 @@ const OrdersPage = ({ mode = 'order' }) => {
         try {
             setLoading(true);
             const data = await getOrders(mode, {
-                ...filters,
                 ...sort,
                 search: debouncedSearchTerm
             });
@@ -303,7 +298,7 @@ const OrdersPage = ({ mode = 'order' }) => {
         } finally {
             setLoading(false);
         }
-    }, [mode, filters, sort, debouncedSearchTerm]);
+    }, [mode, sort, debouncedSearchTerm]);
 
     const handleSort = (field) => {
         setSort(prev => ({
@@ -676,51 +671,18 @@ const OrdersPage = ({ mode = 'order' }) => {
             <div className="card p-0! overflow-hidden border-none shadow-sm ring-1 ring-(--border-color)">
                 {/* Filters Header */}
                 <div className="bg-(--bg-card) p-4 border-b border-(--border-color)">
-                    <div className={`grid grid-cols-1 gap-4 ${(isVendedor || isClient) ? 'md:grid-cols-1' : 'md:grid-cols-3'}`}>
-                        {/* Search */}
-                        <div className="relative">
+                    <div className="flex justify-end">
+                        <div className="relative w-full max-w-xs">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-(--text-muted)" size={14} strokeWidth={2.5} />
                             <input
                                 type="text"
-                                placeholder="Buscar por número..."
+                                placeholder="Buscar..."
                                 className="w-full pl-9 pr-4 py-2 bg-(--bg-input) border border-(--border-color) rounded-lg text-xs font-medium text-(--text-primary) placeholder:text-(--text-muted) focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900 focus:bg-(--bg-card) transition-all"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && fetchOrders()}
                             />
                         </div>
-
-                        {/* Client Filter - Oculto para clientes y vendedores */}
-                        {!isClient && !isVendedor && (
-                            <select
-                                className="bg-(--bg-input) border border-(--border-color) rounded-lg px-3 py-2 text-xs font-medium text-(--text-primary) focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900"
-                                value={filters.clientId}
-                                onChange={(e) => setFilters({ ...filters, clientId: e.target.value })}
-                            >
-                                <option value="">Todos los Clientes</option>
-                                {clients.map(c => (
-                                    <option key={c._id} value={c._id}>
-                                        {c.businessName}{isSuperadmin && c.companyId?.name ? ` (${c.companyId.name})` : ''}
-                                    </option>
-                                ))}
-                            </select>
-                        )}
-
-                        {/* Seller Filter - Solo admin y superadmin */}
-                        {!isVendedor && !isClient && (
-                            <select
-                                className="bg-(--bg-input) border border-(--border-color) rounded-lg px-3 py-2 text-xs font-medium text-(--text-primary) focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900"
-                                value={filters.salesRepId}
-                                onChange={(e) => setFilters({ ...filters, salesRepId: e.target.value })}
-                            >
-                                <option value="">Todo el Equipo</option>
-                                {sellers.map(s => (
-                                    <option key={s._id} value={s._id}>
-                                        {s.firstName} {s.lastName}{isSuperadmin && s.companyId?.name ? ` (${s.companyId.name})` : ''}
-                                    </option>
-                                ))}
-                            </select>
-                        )}
                     </div>
                 </div>
 
@@ -1098,6 +1060,7 @@ const OrdersPage = ({ mode = 'order' }) => {
                 onConfirm={handleConvertConfirm}
                 budget={selectedBudget}
                 loading={converting}
+                isClient={isClient}
             />
 
             {/* Delete Confirmation Modal */}

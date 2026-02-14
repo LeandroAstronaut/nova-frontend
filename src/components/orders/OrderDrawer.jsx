@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     X,
@@ -183,7 +184,7 @@ const OrderDrawer = ({ isOpen, onClose, onSave, order = null, forcedType = 'budg
         }
     };
 
-    return (
+    return createPortal(
         <AnimatePresence>
             {isOpen && (
                 <>
@@ -193,7 +194,7 @@ const OrderDrawer = ({ isOpen, onClose, onSave, order = null, forcedType = 'budg
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={onClose}
-                        className="fixed top-0 left-0 w-screen h-screen bg-secondary-900/40 dark:bg-black/60 backdrop-blur-[2px] z-[150]"
+                        className="fixed top-0 left-0 w-screen h-screen bg-secondary-900/40 dark:bg-black/60 backdrop-blur-[2px] z-[9999]"
                     />
 
                     {/* Drawer */}
@@ -202,7 +203,7 @@ const OrderDrawer = ({ isOpen, onClose, onSave, order = null, forcedType = 'budg
                         animate={{ x: 0 }}
                         exit={{ x: '100%' }}
                         transition={{ type: 'spring', damping: 28, stiffness: 220 }}
-                        className="fixed top-4 right-4 h-[calc(100vh-2rem)] w-full max-w-[540px] bg-[var(--bg-card)] shadow-2xl dark:shadow-soft-lg-dark z-[160] flex flex-col border border-[var(--border-color)] rounded-[1.25rem] overflow-hidden"
+                        className="fixed top-4 right-4 h-[calc(100vh-2rem)] w-full max-w-[540px] bg-[var(--bg-card)] shadow-2xl dark:shadow-soft-lg-dark z-[10000] flex flex-col border border-[var(--border-color)] rounded-[1.25rem] overflow-hidden"
                     >
                         {/* Header */}
                         <div className="px-6 py-5 border-b border-[var(--border-color)] flex items-center justify-between bg-[var(--bg-card)]/80 backdrop-blur-md sticky top-0 z-10">
@@ -559,7 +560,8 @@ const OrderDrawer = ({ isOpen, onClose, onSave, order = null, forcedType = 'budg
                     </motion.div>
                 </>
             )}
-        </AnimatePresence>
+        </AnimatePresence>,
+        document.body
     );
 };
 

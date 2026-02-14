@@ -75,3 +75,20 @@ export const resetPassword = async (token, password) => {
     const response = await api.post(`/users/reset-password/${token}`, { password });
     return response.data;
 };
+
+
+// ========== CAMBIO DE CONTRASEÑA (usuario logueado) ==========
+
+/**
+ * Cambiar contraseña del usuario logueado
+ * @param {string} currentPassword - Contraseña actual
+ * @param {string} newPassword - Nueva contraseña
+ * @returns {Promise<Object>} Resultado
+ */
+export const changePassword = async (currentPassword, newPassword) => {
+    const response = await api.put('/users/change-password', { 
+        currentPassword, 
+        newPassword 
+    });
+    return response.data;
+};

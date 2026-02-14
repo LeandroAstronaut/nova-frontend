@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Bell, Check, CheckCheck, X, FileText, ShoppingCart, Mail, MessageCircle, Receipt, User, Trash2, Edit, RotateCcw, Package, ArrowRight, FileMinus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getActivityLogs, getUnreadCount, markAsRead, markAllAsRead } from '../../services/activityLogService';
@@ -185,13 +186,17 @@ const NotificationBell = ({ isOpen, onClose, onUnreadCountChange }) => {
                 navigate('/recibos');
             }
         } else if (notification.entityType === 'client') {
-            navigate('/clientes');
+            if (notification.entityId) {
+                navigate(`/clientes/${notification.entityId}`);
+            } else {
+                navigate('/clientes');
+            }
         }
         
         onClose();
     };
 
-    return (
+    return createPortal(
         <AnimatePresence>
             {isOpen && (
                 <>
@@ -201,7 +206,7 @@ const NotificationBell = ({ isOpen, onClose, onUnreadCountChange }) => {
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={onClose}
-                        className="fixed inset-0 bg-secondary-900/50 dark:bg-black/60 backdrop-blur-sm z-[999]"
+                        className="fixed inset-0 bg-secondary-900/50 dark:bg-black/60 backdrop-blur-sm z-[99999]"
                     />
 
                     {/* Drawer - Estilo consistente con CartDrawer */}
@@ -210,7 +215,7 @@ const NotificationBell = ({ isOpen, onClose, onUnreadCountChange }) => {
                         animate={{ x: 0 }}
                         exit={{ x: '100%' }}
                         transition={{ type: 'spring', damping: 28, stiffness: 220 }}
-                        className="fixed top-4 right-4 h-[calc(100vh-2rem)] w-full max-w-[420px] bg-[var(--bg-card)] shadow-2xl dark:shadow-soft-lg-dark z-[1000] flex flex-col border border-[var(--border-color)] rounded-2xl overflow-hidden"
+                        className="fixed top-4 right-4 h-[calc(100vh-2rem)] w-full max-w-[420px] bg-[var(--bg-card)] shadow-2xl dark:shadow-soft-lg-dark z-[100000] flex flex-col border border-[var(--border-color)] rounded-2xl overflow-hidden"
                     >
                         {/* Header - Estilo consistente */}
                         <div className="px-6 py-4 border-b border-[var(--border-color)] flex items-center justify-between shrink-0 bg-[var(--bg-card)]">
@@ -261,7 +266,7 @@ const NotificationBell = ({ isOpen, onClose, onUnreadCountChange }) => {
                                         
                                         // Determinar si mostrar cambios (solo para ediciones)
                                         const showChanges = notification.changes && notification.changes.length > 0 && 
-                                            (notification.type === 'budget_edited' || notification.type === 'order_edited');
+                                            (notification.type === 'budget_edited' || notification.type === 'order_edited' || notification.type === 'client_edited');
 
                                         return (
                                             <motion.div
@@ -337,7 +342,8 @@ const NotificationBell = ({ isOpen, onClose, onUnreadCountChange }) => {
                     </motion.div>
                 </>
             )}
-        </AnimatePresence>
+        </AnimatePresence>,
+        document.body
     );
 };
 

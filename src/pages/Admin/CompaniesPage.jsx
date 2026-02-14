@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { 
     Building2, Plus, Edit2, Trash2, Power, Check, X, 
     Package, FileText, Receipt, Users, Landmark, ShoppingCart, 
-    Search, Download, MoreHorizontal, ChevronUp, ChevronDown
+    Search, Download, MoreHorizontal, ChevronUp, ChevronDown,
+    Briefcase, Shield, Mail, Phone
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { companyService } from '../../services/companyService';
@@ -25,20 +27,18 @@ const StatusBadge = ({ active }) => {
     );
 };
 
-const FeatureBadge = ({ active, icon: Icon, label, onClick }) => (
-    <button
-        onClick={onClick}
+const FeatureBadge = ({ active, icon: Icon, label }) => (
+    <span
         className={`
-            flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider transition-all border
+            inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider border
             ${active 
-                ? 'bg-success-50 text-success-700 border-success-100 hover:bg-success-100' 
-                : 'bg-secondary-50 text-secondary-500 border-secondary-100 hover:bg-secondary-100'}
+                ? 'bg-success-50 text-success-700 border-success-100' 
+                : 'bg-secondary-50 text-secondary-400 border-secondary-100'}
         `}
-        title={`${label} - Click para ${active ? 'desactivar' : 'activar'}`}
     >
         <Icon size={9} />
         {label}
-    </button>
+    </span>
 );
 
 const PlanBadge = ({ plan }) => {
@@ -58,20 +58,22 @@ const PlanBadge = ({ plan }) => {
 
 // Función para exportar a CSV
 const exportToCSV = (data) => {
-    const headers = ['Nombre', 'Email', 'Slug', 'Plan', 'Estado', 'Max Usuarios', 'Pedidos', 'Catálogo', 'Recibos', 'Ctas.Corrientes', 'Stock', 'Listas'];
+    const headers = ['Nombre', 'Email', 'Slug', 'Plan', 'Estado', 'Usuarios Activos', 'Max Usuarios', 'Pedidos', 'Catálogo', 'Recibos', 'Ctas.Corrientes', 'Stock', 'Listas', 'Usr.Cliente'];
     const rows = data.map(company => [
         company.name,
         company.email,
         company.slug,
         company.plan,
         company.active ? 'Activa' : 'Inactiva',
+        company.activeUsersCount || 0,
         company.features.maxUsers,
         company.features.orders ? 'Sí' : 'No',
         company.features.catalog ? 'Sí' : 'No',
         company.features.receipts ? 'Sí' : 'No',
         company.features.currentAccount ? 'Sí' : 'No',
         company.features.stock ? 'Sí' : 'No',
-        company.features.priceLists ? 'Sí' : 'No'
+        company.features.priceLists ? 'Sí' : 'No',
+        company.features.clientUsers ? 'Sí' : 'No'
     ]);
     
     const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
@@ -112,6 +114,7 @@ const CompaniesPage = () => {
             receipts: false,
             currentAccount: false,
             orders: true,
+            clientUsers: false,
             maxUsers: 3
         }
     });
@@ -228,22 +231,16 @@ const CompaniesPage = () => {
         }
     };
 
-    const handleToggleStatus = async (company) => {
+    const handleToggleStatus = async () => {
         try {
-            await companyService.toggleStatus(company._id);
-            showToast(`Compañía ${company.active ? 'desactivada' : 'activada'}`, 'success');
+            await companyService.toggleStatus(editingCompany._id);
+            const newStatus = !editingCompany.active;
+            showToast(`Compañía ${newStatus ? 'activada' : 'desactivada'}`, 'success');
+            setEditingCompany(prev => ({ ...prev, active: newStatus }));
+            setFormData(prev => ({ ...prev, active: newStatus }));
             fetchCompanies();
         } catch (error) {
             showToast('Error al cambiar estado', 'error');
-        }
-    };
-
-    const handleToggleFeature = async (company, feature) => {
-        try {
-            await companyService.toggleFeature(company._id, feature);
-            fetchCompanies();
-        } catch (error) {
-            showToast('Error al cambiar feature', 'error');
         }
     };
 
@@ -262,6 +259,7 @@ const CompaniesPage = () => {
                 receipts: false,
                 currentAccount: false,
                 orders: true,
+                clientUsers: false,
                 maxUsers: 3
             }
         });
@@ -278,17 +276,17 @@ const CompaniesPage = () => {
             {/* Header Area */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-xl font-bold text-[var(--text-primary)] leading-tight">
+                    <h1 className="text-xl font-bold text-(--text-primary) leading-tight">
                         Gestión de Compañías
                     </h1>
-                    <p className="text-[13px] text-[var(--text-secondary)] mt-0.5 font-medium">
+                    <p className="text-[13px] text-(--text-secondary) mt-0.5 font-medium">
                         Administre todas las compañías del sistema y sus configuraciones de módulos.
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
                     <Button 
                         variant="secondary" 
-                        className="!px-3 text-[11px] font-bold uppercase tracking-wider"
+                        className="px-3! text-[11px] font-bold uppercase tracking-wider"
                         onClick={() => exportToCSV(companies)}
                     >
                         <Download size={14} strokeWidth={2.5} />
@@ -309,73 +307,70 @@ const CompaniesPage = () => {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="card !p-4">
                     <div className="text-2xl font-bold text-primary-600">{companies.length}</div>
-                    <div className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Total Compañías</div>
+                    <div className="text-[10px] text-(--text-muted) uppercase tracking-wider font-bold">Total Compañías</div>
                 </div>
                 <div className="card !p-4">
                     <div className="text-2xl font-bold text-success-600">
                         {companies.filter(c => c.active).length}
                     </div>
-                    <div className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Activas</div>
+                    <div className="text-[10px] text-(--text-muted) uppercase tracking-wider font-bold">Activas</div>
                 </div>
                 <div className="card !p-4">
                     <div className="text-2xl font-bold text-warning-600">
                         {companies.filter(c => !c.active).length}
                     </div>
-                    <div className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Inactivas</div>
+                    <div className="text-[10px] text-(--text-muted) uppercase tracking-wider font-bold">Inactivas</div>
                 </div>
                 <div className="card !p-4">
                     <div className="text-2xl font-bold text-primary-600">
                         {companies.filter(c => c.plan === 'premium').length}
                     </div>
-                    <div className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Premium</div>
+                    <div className="text-[10px] text-(--text-muted) uppercase tracking-wider font-bold">Premium</div>
                 </div>
             </div>
 
             {/* Main Content Card */}
-            <div className="card !p-0 overflow-hidden border-none shadow-sm ring-1 ring-[var(--border-color)]">
+            <div className="card p-0! overflow-hidden border-none shadow-sm ring-1 ring-(--border-color)">
                 {/* Filters Header */}
-                <div className="bg-[var(--bg-card)] p-4 border-b border-[var(--border-color)]">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {/* Search */}
-                        <div className="relative md:col-span-3">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={14} strokeWidth={2.5} />
-                            <input
-                                type="text"
-                                placeholder="Buscar por nombre o slug..."
-                                className="w-full pl-9 pr-4 py-2 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-xs font-medium text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900 focus:bg-[var(--bg-card)] transition-all"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                            />
-                        </div>
+                <div className="bg-(--bg-card) p-4 border-b border-(--border-color)">
+                    <div className="relative max-w-md">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-(--text-muted)" size={14} strokeWidth={2.5} />
+                        <input
+                            type="text"
+                            placeholder="Buscar por nombre o slug..."
+                            className="w-full pl-9 pr-4 py-2 bg-(--bg-input) border border-(--border-color) rounded-lg text-xs font-medium text-(--text-primary) placeholder:text-(--text-muted) focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
                     </div>
                 </div>
 
-                {/* Table */}
-                <div className="overflow-x-auto">
+                {/* Vista Desktop - Table */}
+                <div className="hidden md:block overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead>
-                            <tr className="bg-[var(--bg-hover)] text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest border-y border-[var(--border-color)]">
+                            <tr className="bg-(--bg-hover) text-[10px] font-bold text-(--text-muted) uppercase tracking-widest border-y border-(--border-color)">
                                 <th className="px-6 py-3 cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('name')}>
                                     <div className="flex items-center">Compañía <SortIcon field="name" /></div>
                                 </th>
                                 <th className="px-6 py-3 cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('plan')}>
                                     <div className="flex items-center">Plan <SortIcon field="plan" /></div>
                                 </th>
-                                <th className="px-6 py-3">Módulos</th>
+                                <th className="px-6 py-3">Módulos Activos</th>
                                 <th className="px-6 py-3 text-center cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('features.maxUsers')}>
                                     <div className="flex items-center justify-center">Usuarios <SortIcon field="features.maxUsers" /></div>
                                 </th>
                                 <th className="px-6 py-3 text-center">Estado</th>
-                                <th className="px-6 py-3"></th>
+                                <th className="px-6 py-3 text-right">Acciones</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-[var(--border-color)]">
+                        <tbody className="divide-y divide-(--border-color)">
                             {loading ? (
                                 Array(5).fill(0).map((_, i) => (
                                     <tr key={i}>
                                         <td colSpan="6" className="px-6 py-6 text-center">
-                                            <div className="flex items-center justify-center gap-2 text-[var(--text-muted)] text-[11px] font-bold uppercase tracking-widest">
-                                                <div className="w-3.5 h-3.5 border-2 border-[var(--border-color)] border-t-primary-600 dark:border-t-primary-400 rounded-full animate-spin"></div>
+                                            <div className="flex items-center justify-center gap-2 text-(--text-muted) text-[11px] font-bold uppercase tracking-widest">
+                                                <div className="w-3.5 h-3.5 border-2 border-(--border-color) border-t-primary-600 dark:border-t-primary-400 rounded-full animate-spin"></div>
                                                 Cargando...
                                             </div>
                                         </td>
@@ -383,10 +378,14 @@ const CompaniesPage = () => {
                                 ))
                             ) : filteredCompanies.length > 0 ? (
                                 filteredCompanies.map((company) => (
-                                    <tr key={company._id} className="hover:bg-[var(--bg-hover)] transition-colors group">
+                                    <tr 
+                                        key={company._id} 
+                                        className="hover:bg-(--bg-hover) transition-colors group cursor-pointer"
+                                        onClick={() => handleEdit(company)}
+                                    >
                                         <td className="px-6 py-4">
-                                            <div className="text-[13px] font-bold text-[var(--text-primary)]">{company.name}</div>
-                                            <div className="text-[10px] text-[var(--text-muted)] font-bold tracking-tight uppercase">/{company.slug}</div>
+                                            <div className="text-[13px] font-bold text-(--text-primary)">{company.name}</div>
+                                            <div className="text-[10px] text-(--text-muted) font-bold tracking-tight uppercase">/{company.slug}</div>
                                             <div className="text-[11px] text-primary-600 dark:text-primary-400 mt-0.5">{company.email}</div>
                                         </td>
                                         <td className="px-6 py-4">
@@ -394,69 +393,52 @@ const CompaniesPage = () => {
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex flex-wrap gap-1 max-w-[280px]">
-                                                <FeatureBadge 
-                                                    active={company.features.orders} 
-                                                    icon={ShoppingCart} 
-                                                    label="Pedidos"
-                                                    onClick={() => handleToggleFeature(company, 'orders')}
-                                                />
-                                                <FeatureBadge 
-                                                    active={company.features.catalog} 
-                                                    icon={Package} 
-                                                    label="Catálogo"
-                                                    onClick={() => handleToggleFeature(company, 'catalog')}
-                                                />
-                                                <FeatureBadge 
-                                                    active={company.features.receipts} 
-                                                    icon={Receipt} 
-                                                    label="Recibos"
-                                                    onClick={() => handleToggleFeature(company, 'receipts')}
-                                                />
-                                                <FeatureBadge 
-                                                    active={company.features.currentAccount} 
-                                                    icon={Landmark} 
-                                                    label="Ctas.Ctes"
-                                                    onClick={() => handleToggleFeature(company, 'currentAccount')}
-                                                />
-                                                <FeatureBadge 
-                                                    active={company.features.stock} 
-                                                    icon={Building2} 
-                                                    label="Stock"
-                                                    onClick={() => handleToggleFeature(company, 'stock')}
-                                                />
-                                                <FeatureBadge 
-                                                    active={company.features.priceLists} 
-                                                    icon={FileText} 
-                                                    label="Listas"
-                                                    onClick={() => handleToggleFeature(company, 'priceLists')}
-                                                />
+                                                {company.features.orders && (
+                                                    <FeatureBadge active={true} icon={ShoppingCart} label="Pedidos" />
+                                                )}
+                                                {company.features.catalog && (
+                                                    <FeatureBadge active={true} icon={Package} label="Catálogo" />
+                                                )}
+                                                {company.features.receipts && (
+                                                    <FeatureBadge active={true} icon={Receipt} label="Recibos" />
+                                                )}
+                                                {company.features.currentAccount && (
+                                                    <FeatureBadge active={true} icon={Landmark} label="Ctas.Ctes" />
+                                                )}
+                                                {company.features.stock && (
+                                                    <FeatureBadge active={true} icon={Building2} label="Stock" />
+                                                )}
+                                                {company.features.priceLists && (
+                                                    <FeatureBadge active={true} icon={FileText} label="Listas" />
+                                                )}
+                                                {company.features.clientUsers && (
+                                                    <FeatureBadge active={true} icon={Users} label="Usr.Cliente" />
+                                                )}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-center">
-                                            <span className="text-[12px] font-semibold text-[var(--text-secondary)]">
-                                                {company.features.maxUsers}
+                                            <span className="text-[12px] font-semibold text-(--text-secondary)">
+                                                <span className={company.activeUsersCount >= company.features.maxUsers ? 'text-danger-600 font-bold' : ''}>
+                                                    {company.activeUsersCount || 0}
+                                                </span>
+                                                <span className="text-(--text-muted)">/{company.features.maxUsers}</span>
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 text-center">
-                                            <button
-                                                onClick={() => handleToggleStatus(company)}
-                                                className="transition-transform active:scale-95"
-                                            >
-                                                <StatusBadge active={company.active} />
-                                            </button>
+                                            <StatusBadge active={company.active} />
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <button
-                                                    onClick={() => handleEdit(company)}
-                                                    className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-primary-600 dark:hover:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-all"
+                                                    onClick={(e) => { e.stopPropagation(); handleEdit(company); }}
+                                                    className="p-1.5 rounded-lg text-(--text-muted) hover:text-primary-600 dark:hover:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-all"
                                                     title="Editar"
                                                 >
                                                     <Edit2 size={16} strokeWidth={2.5} />
                                                 </button>
                                                 <button
-                                                    onClick={() => setDeleteModal({ open: true, company })}
-                                                    className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-danger-600 dark:hover:text-danger-400 hover:bg-danger-50 dark:hover:bg-danger-900/30 transition-all"
+                                                    onClick={(e) => { e.stopPropagation(); setDeleteModal({ open: true, company }); }}
+                                                    className="p-1.5 rounded-lg text-(--text-muted) hover:text-danger-600 dark:hover:text-danger-400 hover:bg-danger-50 dark:hover:bg-danger-900/30 transition-all"
                                                     title="Eliminar"
                                                 >
                                                     <Trash2 size={16} strokeWidth={2.5} />
@@ -468,7 +450,7 @@ const CompaniesPage = () => {
                             ) : (
                                 <tr>
                                     <td colSpan="6" className="px-6 py-12 text-center">
-                                        <div className="text-[var(--text-muted)] text-[11px] font-bold uppercase tracking-widest bg-[var(--bg-hover)] w-fit mx-auto px-4 py-2 rounded-lg border border-[var(--border-color)]">
+                                        <div className="text-(--text-muted) text-[11px] font-bold uppercase tracking-widest bg-(--bg-hover) w-fit mx-auto px-4 py-2 rounded-lg border border-(--border-color)">
                                             No se encontraron compañías
                                         </div>
                                     </td>
@@ -478,21 +460,97 @@ const CompaniesPage = () => {
                     </table>
                 </div>
 
+                {/* Vista Mobile - Cards */}
+                <div className="md:hidden">
+                    {loading ? (
+                        <div className="p-6 text-center">
+                            <div className="flex items-center justify-center gap-2 text-(--text-muted) text-[11px] font-bold uppercase tracking-widest">
+                                <div className="w-3.5 h-3.5 border-2 border-(--border-color) border-t-primary-600 dark:border-t-primary-400 rounded-full animate-spin"></div>
+                                Cargando...
+                            </div>
+                        </div>
+                    ) : filteredCompanies.length > 0 ? (
+                        <div className="divide-y divide-(--border-color)">
+                            {filteredCompanies.map((company) => (
+                                <div 
+                                    key={company._id} 
+                                    className="p-4 hover:bg-(--bg-hover) transition-colors cursor-pointer"
+                                    onClick={() => handleEdit(company)}
+                                >
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div>
+                                            <div className="text-[14px] font-bold text-(--text-primary)">{company.name}</div>
+                                            <div className="text-[10px] text-(--text-muted)">/{company.slug}</div>
+                                        </div>
+                                        <StatusBadge active={company.active} />
+                                    </div>
+                                    <div className="mb-3">
+                                        <PlanBadge plan={company.plan} />
+                                    </div>
+                                    <div className="flex flex-wrap gap-1 mb-3">
+                                        {company.features.orders && (
+                                            <FeatureBadge active={true} icon={ShoppingCart} label="Pedidos" />
+                                        )}
+                                        {company.features.catalog && (
+                                            <FeatureBadge active={true} icon={Package} label="Catálogo" />
+                                        )}
+                                        {company.features.receipts && (
+                                            <FeatureBadge active={true} icon={Receipt} label="Recibos" />
+                                        )}
+                                        {company.features.currentAccount && (
+                                            <FeatureBadge active={true} icon={Landmark} label="Ctas.Ctes" />
+                                        )}
+                                        {company.features.stock && (
+                                            <FeatureBadge active={true} icon={Building2} label="Stock" />
+                                        )}
+                                        {company.features.priceLists && (
+                                            <FeatureBadge active={true} icon={FileText} label="Listas" />
+                                        )}
+                                        {company.features.clientUsers && (
+                                            <FeatureBadge active={true} icon={Users} label="Usr.Cliente" />
+                                        )}
+                                    </div>
+                                    <div className="flex items-center justify-between text-[12px]">
+                                        <span className="text-(--text-muted)">
+                                            Usuarios: 
+                                            <span className={company.activeUsersCount >= company.features.maxUsers ? 'text-danger-600 font-bold' : 'font-semibold'}>
+                                                {company.activeUsersCount || 0}/{company.features.maxUsers}
+                                            </span>
+                                        </span>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); setDeleteModal({ open: true, company }); }}
+                                            className="p-1.5 rounded-lg text-(--text-muted) hover:text-danger-600"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="p-6 text-center">
+                            <div className="text-(--text-muted) text-[11px] font-bold uppercase tracking-widest bg-(--bg-hover) w-fit mx-auto px-4 py-2 rounded-lg border border-(--border-color)">
+                                No se encontraron compañías
+                            </div>
+                        </div>
+                    )}
+                </div>
+
                 {/* Footer / Pagination */}
-                <div className="px-6 py-3 border-t border-[var(--border-color)] bg-[var(--bg-hover)] flex items-center justify-between">
-                    <span className="text-[10px] text-[var(--text-muted)] font-bold uppercase tracking-widest">
+                <div className="px-6 py-3 border-t border-(--border-color) bg-(--bg-hover) flex items-center justify-between">
+                    <span className="text-[10px] text-(--text-muted) font-bold uppercase tracking-widest">
                         Total {filteredCompanies.length} registros
                     </span>
                     <div className="flex gap-1">
-                        <Button variant="secondary" className="!px-3 !py-1 !text-[10px] font-bold uppercase tracking-wider">Anterior</Button>
-                        <Button variant="secondary" className="!px-3 !py-1 !text-[10px] font-bold uppercase tracking-wider">Siguiente</Button>
+                        <Button variant="secondary" className="px-3! py-1! text-[10px]! font-bold uppercase tracking-wider">Anterior</Button>
+                        <Button variant="secondary" className="px-3! py-1! text-[10px]! font-bold uppercase tracking-wider">Siguiente</Button>
                     </div>
                 </div>
             </div>
 
             {/* Create/Edit Drawer */}
-            <AnimatePresence>
-                {showDrawer && (
+            {showDrawer && createPortal(
+                <AnimatePresence>
                     <>
                         {/* Backdrop */}
                         <motion.div
@@ -500,7 +558,7 @@ const CompaniesPage = () => {
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             onClick={() => setShowDrawer(false)}
-                            className="fixed top-0 left-0 w-screen h-screen bg-secondary-900/40 dark:bg-black/60 backdrop-blur-[2px] z-[150]"
+                            className="fixed inset-0 bg-secondary-900/50 dark:bg-black/60 backdrop-blur-sm z-[9999]"
                         />
 
                         {/* Drawer */}
@@ -509,86 +567,148 @@ const CompaniesPage = () => {
                             animate={{ x: 0 }}
                             exit={{ x: '100%' }}
                             transition={{ type: 'spring', damping: 28, stiffness: 220 }}
-                            className="fixed top-4 right-4 h-[calc(100vh-2rem)] w-full max-w-[540px] bg-[var(--bg-card)] shadow-2xl dark:shadow-soft-lg-dark z-[160] flex flex-col border border-[var(--border-color)] rounded-[1.25rem] overflow-hidden"
+                            className="fixed top-4 right-4 h-[calc(100vh-2rem)] w-full max-w-[480px] bg-(--bg-card) shadow-2xl z-[10000] flex flex-col border border-(--border-color) rounded-2xl overflow-hidden"
                         >
                             {/* Header */}
-                            <div className="px-6 py-5 border-b border-[var(--border-color)] flex items-center justify-between bg-[var(--bg-card)]/80 backdrop-blur-md sticky top-0 z-10">
-                                <h2 className="text-[17px] font-bold text-[var(--text-primary)] tracking-tight">
-                                    {editingCompany ? 'Editar Compañía' : 'Nueva Compañía'}
-                                </h2>
-                                <button onClick={() => setShowDrawer(false)} className="p-2 hover:bg-[var(--bg-hover)] rounded-xl transition-all">
-                                    <X size={20} className="text-[var(--text-muted)]" strokeWidth={2.5} />
+                            <div className="px-6 py-4 border-b border-(--border-color) flex items-center justify-between shrink-0">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-primary-600 dark:text-primary-400">
+                                        <Building2 size={20} />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-base font-bold text-(--text-primary)">
+                                            {editingCompany ? 'Editar Compañía' : 'Nueva Compañía'}
+                                        </h2>
+                                        <p className="text-[11px] text-(--text-muted)">
+                                            {editingCompany ? 'Modifique los datos de la compañía' : 'Complete los datos de la nueva compañía'}
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setShowDrawer(false)}
+                                    className="p-2 hover:bg-(--bg-hover) rounded-lg text-(--text-muted) hover:text-(--text-primary) transition-colors"
+                                >
+                                    <X size={20} />
                                 </button>
                             </div>
                             
                             {/* Body */}
-                            <div className="flex-1 overflow-y-auto p-6 space-y-6 no-scrollbar">
-                                <form id="company-form" onSubmit={handleSubmit} className="space-y-6">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="label">Nombre</label>
-                                            <Input
+                            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+                                <form id="company-form" onSubmit={handleSubmit} className="space-y-5">
+                                    {/* Nombre */}
+                                    <div>
+                                        <label className="block text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-2">
+                                            Nombre *
+                                        </label>
+                                        <div className="relative">
+                                            <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-(--text-muted)" size={16} />
+                                            <input
+                                                type="text"
                                                 name="name"
                                                 value={formData.name}
                                                 onChange={handleInputChange}
                                                 placeholder="Nombre de la compañía"
                                                 required
+                                                className="w-full pl-10 pr-3 py-2.5 bg-(--bg-input) border border-(--border-color) rounded-lg text-sm text-(--text-primary) placeholder:text-(--text-muted) focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900"
                                             />
                                         </div>
-                                        <div>
-                                            <label className="label">Email</label>
-                                            <Input
+                                    </div>
+
+                                    {/* Email */}
+                                    <div>
+                                        <label className="block text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-2">
+                                            Email *
+                                        </label>
+                                        <div className="relative">
+                                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-(--text-muted)" size={16} />
+                                            <input
                                                 type="email"
                                                 name="email"
                                                 value={formData.email}
                                                 onChange={handleInputChange}
                                                 placeholder="empresa@ejemplo.com"
                                                 required
+                                                className="w-full pl-10 pr-3 py-2.5 bg-(--bg-input) border border-(--border-color) rounded-lg text-sm text-(--text-primary) placeholder:text-(--text-muted) focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900"
                                             />
                                         </div>
                                     </div>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="label">Slug</label>
-                                            <Input
+                                    {/* Slug */}
+                                    <div>
+                                        <label className="block text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-2">
+                                            Slug *
+                                        </label>
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-(--text-muted) text-sm">/</span>
+                                            <input
+                                                type="text"
                                                 name="slug"
                                                 value={formData.slug}
                                                 onChange={handleInputChange}
                                                 placeholder="nombre-compania"
                                                 required
                                                 disabled={!!editingCompany}
+                                                className={`w-full pl-8 pr-3 py-2.5 bg-(--bg-input) border border-(--border-color) rounded-lg text-sm text-(--text-primary) placeholder:text-(--text-muted) focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900 ${editingCompany ? 'opacity-60 cursor-not-allowed' : ''}`}
                                             />
                                         </div>
-                                        <div>
-                                            <label className="label">Plan</label>
-                                            <select
-                                                name="plan"
-                                                value={formData.plan}
-                                                onChange={handleInputChange}
-                                                className="input"
-                                            >
-                                                <option value="basico">Básico</option>
-                                                <option value="estandar">Estándar</option>
-                                                <option value="premium">Premium</option>
-                                            </select>
+                                        {editingCompany && (
+                                            <p className="text-[10px] text-(--text-muted) mt-1">El slug no se puede modificar</p>
+                                        )}
+                                    </div>
+
+                                    {/* Plan */}
+                                    <div>
+                                        <label className="block text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-2">
+                                            Plan *
+                                        </label>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {[
+                                                { key: 'basico', label: 'Básico', color: 'secondary' },
+                                                { key: 'estandar', label: 'Estándar', color: 'primary' },
+                                                { key: 'premium', label: 'Premium', color: 'warning' }
+                                            ].map(({ key, label, color }) => (
+                                                <button
+                                                    key={key}
+                                                    type="button"
+                                                    onClick={() => setFormData(prev => ({ ...prev, plan: key }))}
+                                                    className={`flex flex-col items-center gap-1 px-2 py-3 rounded-lg border-2 transition-all ${
+                                                        formData.plan === key
+                                                            ? `border-${color}-500 bg-${color}-50 dark:bg-${color}-900/20`
+                                                            : 'border-(--border-color) hover:border-(--border-color) hover:bg-(--bg-hover)'
+                                                    }`}
+                                                >
+                                                    <span className={`text-[11px] font-bold text-center leading-tight ${formData.plan === key ? `text-${color}-600` : 'text-(--text-secondary)'}`}>
+                                                        {label}
+                                                    </span>
+                                                </button>
+                                            ))}
                                         </div>
                                     </div>
 
+                                    {/* Máximo de Usuarios */}
                                     <div>
-                                        <label className="label">Máximo de Usuarios</label>
-                                        <Input
-                                            type="number"
-                                            name="features.maxUsers"
-                                            value={formData.features.maxUsers}
-                                            onChange={handleInputChange}
-                                            min="1"
-                                            max="100"
-                                        />
+                                        <label className="block text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-2">
+                                            Máximo de Usuarios
+                                        </label>
+                                        <div className="relative">
+                                            <Users className="absolute left-3 top-1/2 -translate-y-1/2 text-(--text-muted)" size={16} />
+                                            <input
+                                                type="number"
+                                                name="features.maxUsers"
+                                                value={formData.features.maxUsers}
+                                                onChange={handleInputChange}
+                                                min="1"
+                                                max="100"
+                                                className="w-full pl-10 pr-3 py-2.5 bg-(--bg-input) border border-(--border-color) rounded-lg text-sm text-(--text-primary) focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900"
+                                            />
+                                        </div>
                                     </div>
 
+                                    {/* Módulos Habilitados */}
                                     <div>
-                                        <label className="label mb-3">Módulos Habilitados</label>
+                                        <label className="block text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
+                                            Módulos Habilitados
+                                        </label>
                                         <div className="grid grid-cols-2 gap-3">
                                             {[
                                                 { key: 'orders', label: 'Pedidos', icon: ShoppingCart },
@@ -597,6 +717,7 @@ const CompaniesPage = () => {
                                                 { key: 'currentAccount', label: 'Ctas. Corrientes', icon: Landmark },
                                                 { key: 'stock', label: 'Stock', icon: Building2 },
                                                 { key: 'priceLists', label: 'Listas de Precio', icon: FileText },
+                                                { key: 'clientUsers', label: 'Usuarios Cliente', icon: Users },
                                             ].map(({ key, label, icon: Icon }) => (
                                                 <label
                                                     key={key}
@@ -604,7 +725,7 @@ const CompaniesPage = () => {
                                                         flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all
                                                         ${formData.features[key] 
                                                             ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' 
-                                                            : 'border-[var(--border-color)] hover:bg-[var(--bg-hover)]'}
+                                                            : 'border-(--border-color) hover:bg-(--bg-hover)'}
                                                     `}
                                                 >
                                                     <input
@@ -614,8 +735,8 @@ const CompaniesPage = () => {
                                                         onChange={handleInputChange}
                                                         className="hidden"
                                                     />
-                                                    <Icon size={18} className={formData.features[key] ? 'text-primary-600' : 'text-[var(--text-muted)]'} />
-                                                    <span className={`text-sm ${formData.features[key] ? 'font-semibold text-primary-700' : 'text-[var(--text-secondary)]'}`}>
+                                                    <Icon size={18} className={formData.features[key] ? 'text-primary-600' : 'text-(--text-muted)'} />
+                                                    <span className={`text-sm ${formData.features[key] ? 'font-semibold text-primary-700' : 'text-(--text-secondary)'}`}>
                                                         {label}
                                                     </span>
                                                     {formData.features[key] && <Check size={14} className="text-primary-600 ml-auto" />}
@@ -624,23 +745,47 @@ const CompaniesPage = () => {
                                         </div>
                                     </div>
 
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            type="checkbox"
-                                            name="active"
-                                            checked={formData.active}
-                                            onChange={handleInputChange}
-                                            className="w-4 h-4 rounded border-[var(--border-color)] text-primary-600 focus:ring-primary-500"
-                                        />
-                                        <label className="text-sm text-[var(--text-secondary)]">
-                                            Compañía activa
-                                        </label>
-                                    </div>
+                                    {/* Estado Activo - Solo en edición */}
+                                    {editingCompany && (
+                                        <div className="pt-4 border-t border-(--border-color)">
+                                            <label className="block text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
+                                                Estado de la Compañía
+                                            </label>
+                                            <div className="flex items-center justify-between p-4 bg-(--bg-hover) rounded-lg">
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${formData.active ? 'bg-success-100 text-success-600' : 'bg-danger-100 text-danger-600'}`}>
+                                                        <Power size={20} />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-sm font-semibold text-(--text-primary)">
+                                                            {formData.active ? 'Compañía Activa' : 'Compañía Inactiva'}
+                                                        </p>
+                                                        <p className="text-[11px] text-(--text-muted)">
+                                                            {formData.active 
+                                                                ? 'Los usuarios pueden iniciar sesión' 
+                                                                : 'Los usuarios no pueden iniciar sesión'}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleToggleStatus}
+                                                    className={`px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all ${
+                                                        formData.active 
+                                                            ? 'bg-danger-100 text-danger-600 hover:bg-danger-200' 
+                                                            : 'bg-success-100 text-success-600 hover:bg-success-200'
+                                                    }`}
+                                                >
+                                                    {formData.active ? 'Desactivar' : 'Activar'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </form>
                             </div>
 
                             {/* Footer */}
-                            <div className="p-6 border-t border-[var(--border-color)] bg-[var(--bg-card)]/80 backdrop-blur-md flex gap-3">
+                            <div className="px-6 py-4 border-t border-(--border-color) bg-(--bg-hover) flex gap-3">
                                 <Button
                                     type="button"
                                     variant="secondary"
@@ -660,8 +805,9 @@ const CompaniesPage = () => {
                             </div>
                         </motion.div>
                     </>
-                )}
-            </AnimatePresence>
+                </AnimatePresence>,
+                document.body
+            )}
 
             {/* Delete Confirmation */}
             <ConfirmModal
@@ -669,9 +815,9 @@ const CompaniesPage = () => {
                 onClose={() => setDeleteModal({ open: false, company: null })}
                 onConfirm={handleDelete}
                 title="Eliminar Compañía"
-                message={`¿Estás seguro de eliminar "${deleteModal.company?.name}"? Esta acción no se puede deshacer y eliminará todos los datos asociados.`}
+                description={`¿Estás seguro de eliminar "${deleteModal.company?.name}"? Esta acción no se puede deshacer y eliminará todos los datos asociados.`}
                 confirmText="Eliminar"
-                variant="danger"
+                type="danger"
             />
         </div>
     );

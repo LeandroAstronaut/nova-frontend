@@ -1,10 +1,29 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, User, Mail, Lock, Calendar, Percent, FileText, Phone, Shield, Briefcase, Building2 } from 'lucide-react';
 import Button from '../common/Button';
 
-const SellerDrawer = ({ isOpen, onClose, onSave, user = null, clients = [] }) => {
+const UserDrawer = ({ isOpen, onClose, onSave, user = null, clients = [], features = {}, companies = [], isSuperadmin = false }) => {
     const isEditing = !!user;
+
+    // Obtener información de cupo de la compañía seleccionada
+    const getSelectedCompanyQuota = () => {
+        if (!formData.companyId) return null;
+        const company = companies.find(c => c._id === formData.companyId);
+        if (!company) return null;
+        
+        const maxUsers = company.features?.maxUsers || 0;
+        const activeUsers = company.activeUsersCount || 0;
+        const available = maxUsers - activeUsers;
+        
+        return {
+            maxUsers,
+            activeUsers,
+            available,
+            hasQuota: available > 0
+        };
+    };
     
     const [formData, setFormData] = useState({
         firstName: '',
@@ -13,6 +32,7 @@ const SellerDrawer = ({ isOpen, onClose, onSave, user = null, clients = [] }) =>
         password: '',
         role: 'vendedor', // 'vendedor' | 'admin' | 'cliente'
         clientId: '', // Solo para rol 'cliente'
+        companyId: '', // Solo para superadmin
         phone: '',
         whatsapp: '',
         birthDate: '',
@@ -32,6 +52,7 @@ const SellerDrawer = ({ isOpen, onClose, onSave, user = null, clients = [] }) =>
                     password: '', // No mostrar contraseña existente
                     role: user.roleId?.name || 'vendedor',
                     clientId: user.clientId?._id || '',
+                    companyId: user.companyId?._id || '',
                     phone: user.phone || '',
                     whatsapp: user.whatsapp || '',
                     birthDate: user.birthDate ? new Date(user.birthDate).toISOString().split('T')[0] : '',
@@ -46,6 +67,7 @@ const SellerDrawer = ({ isOpen, onClose, onSave, user = null, clients = [] }) =>
                     password: '',
                     role: 'vendedor',
                     clientId: '',
+                    companyId: '',
                     phone: '',
                     whatsapp: '',
                     birthDate: '',
@@ -74,6 +96,10 @@ const SellerDrawer = ({ isOpen, onClose, onSave, user = null, clients = [] }) =>
         // Validar que se seleccionó un cliente si el rol es 'cliente'
         if (formData.role === 'cliente' && !formData.clientId) {
             newErrors.clientId = 'Debe seleccionar un cliente';
+        }
+        // Validar que superadmin seleccionó una compañía
+        if (isSuperadmin && !isEditing && !formData.companyId) {
+            newErrors.companyId = 'Debe seleccionar una compañía';
         }
         if (formData.commission && (formData.commission < 0 || formData.commission > 100)) {
             newErrors.commission = 'La comisión debe estar entre 0 y 100';
@@ -141,7 +167,7 @@ const SellerDrawer = ({ isOpen, onClose, onSave, user = null, clients = [] }) =>
     const roleConfig = getRoleConfig(currentRole);
     const RoleIcon = roleConfig.icon;
 
-    return (
+    return createPortal(
         <AnimatePresence>
             {isOpen && (
                 <>
@@ -151,7 +177,7 @@ const SellerDrawer = ({ isOpen, onClose, onSave, user = null, clients = [] }) =>
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={onClose}
-                        className="fixed inset-0 bg-secondary-900/50 dark:bg-black/60 backdrop-blur-sm z-[200]"
+                        className="fixed inset-0 bg-secondary-900/50 dark:bg-black/60 backdrop-blur-sm z-[9999]"
                     />
 
                     {/* Drawer */}
@@ -160,7 +186,7 @@ const SellerDrawer = ({ isOpen, onClose, onSave, user = null, clients = [] }) =>
                         animate={{ x: 0 }}
                         exit={{ x: '100%' }}
                         transition={{ type: 'spring', damping: 28, stiffness: 220 }}
-                        className="fixed top-4 right-4 h-[calc(100vh-2rem)] w-full max-w-[480px] bg-[var(--bg-card)] shadow-2xl z-[210] flex flex-col border border-[var(--border-color)] rounded-2xl overflow-hidden"
+                        className="fixed top-4 right-4 h-[calc(100vh-2rem)] w-full max-w-[480px] bg-[var(--bg-card)] shadow-2xl z-[10000] flex flex-col border border-[var(--border-color)] rounded-2xl overflow-hidden"
                     >
                         {/* Header */}
                         <div className="px-6 py-4 border-b border-[var(--border-color)] flex items-center justify-between shrink-0">
@@ -187,14 +213,72 @@ const SellerDrawer = ({ isOpen, onClose, onSave, user = null, clients = [] }) =>
 
                         {/* Content */}
                         <div className="flex-1 overflow-y-auto p-6 space-y-5">
+                            {/* Selector de Compañía (solo superadmin en creación) */}
+                            {!isEditing && isSuperadmin && (
+                                <div>
+                                    <label className="block text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2">
+                                        Compañía *
+                                    </label>
+                                    <div className="relative">
+                                        <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={16} />
+                                        <select
+                                            value={formData.companyId}
+                                            onChange={(e) => setFormData({ ...formData, companyId: e.target.value })}
+                                            className={`w-full pl-10 pr-3 py-2.5 bg-[var(--bg-input)] border rounded-lg text-sm appearance-none ${
+                                                errors.companyId ? 'border-danger-500' : 'border-[var(--border-color)]'
+                                            }`}
+                                        >
+                                            <option value="">Seleccione una compañía...</option>
+                                            {companies.map((company) => {
+                                                const maxUsers = company.features?.maxUsers || 0;
+                                                const activeUsers = company.activeUsersCount || 0;
+                                                const hasQuota = activeUsers < maxUsers;
+                                                return (
+                                                    <option key={company._id} value={company._id}>
+                                                        {company.name} ({activeUsers}/{maxUsers})
+                                                    </option>
+                                                );
+                                            })}
+                                        </select>
+                                    </div>
+                                    {errors.companyId && <p className="text-danger-500 text-xs mt-1">{errors.companyId}</p>}
+                                    
+                                    {/* Info de cupo de la compañía seleccionada */}
+                                    {formData.companyId && (() => {
+                                        const quota = getSelectedCompanyQuota();
+                                        if (!quota) return null;
+                                        return (
+                                            <div className={`mt-2 p-2 rounded-lg text-xs ${
+                                                quota.hasQuota 
+                                                    ? 'bg-success-50 text-success-700 border border-success-200' 
+                                                    : 'bg-danger-50 text-danger-700 border border-danger-200'
+                                            }`}>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="font-medium">
+                                                        {quota.hasQuota 
+                                                            ? `✓ Cupo disponible: ${quota.available} de ${quota.maxUsers}` 
+                                                            : `✗ Sin cupo: ${quota.activeUsers}/${quota.maxUsers} usuarios`}
+                                                    </span>
+                                                </div>
+                                                {!quota.hasQuota && (
+                                                    <p className="mt-1 text-[10px] opacity-80">
+                                                        Esta compañía alcanzó su límite de usuarios. Como superadmin puedes crear usuarios igualmente.
+                                                    </p>
+                                                )}
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+                            )}
+
                             {/* Selector de Rol (solo en creación) */}
                             {!isEditing && (
                                 <div>
                                     <label className="block text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2">
                                         Tipo de Usuario *
                                     </label>
-                                    <div className="grid grid-cols-3 gap-2">
-                                        {['vendedor', 'admin', 'cliente'].map((role) => {
+                                    <div className={`grid gap-2 ${features.clientUsers ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                                        {['vendedor', 'admin', ...(features.clientUsers ? ['cliente'] : [])].map((role) => {
                                             const config = getRoleConfig(role);
                                             const Icon = config.icon;
                                             const isSelected = formData.role === role;
@@ -342,7 +426,7 @@ const SellerDrawer = ({ isOpen, onClose, onSave, user = null, clients = [] }) =>
                                             value={formData.phone}
                                             onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                                             className="w-full pl-10 pr-3 py-2.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-sm"
-                                            placeholder="(11) 1234-5678"
+                                            placeholder="549341123456"
                                         />
                                     </div>
                                 </div>
@@ -357,7 +441,7 @@ const SellerDrawer = ({ isOpen, onClose, onSave, user = null, clients = [] }) =>
                                             value={formData.whatsapp}
                                             onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
                                             className="w-full pl-10 pr-3 py-2.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-sm"
-                                            placeholder="(11) 1234-5678"
+                                            placeholder="549341123456"
                                         />
                                     </div>
                                 </div>
@@ -379,32 +463,28 @@ const SellerDrawer = ({ isOpen, onClose, onSave, user = null, clients = [] }) =>
                                         />
                                     </div>
                                 </div>
-                                <div>
-                                    <label className="block text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2">
-                                        Comisión (%)
-                                    </label>
-                                    <div className="relative">
-                                        <Percent className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={16} />
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            max="100"
-                                            value={formData.commission}
-                                            onChange={(e) => setFormData({ ...formData, commission: e.target.value })}
-                                            disabled={formData.role === 'cliente'}
-                                            className={`w-full pl-10 pr-3 py-2.5 bg-[var(--bg-input)] border rounded-lg text-sm ${
-                                                errors.commission ? 'border-danger-500' : 'border-[var(--border-color)]'
-                                            } ${formData.role === 'cliente' ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                            placeholder="0"
-                                        />
+                                {formData.role !== 'cliente' && (
+                                    <div>
+                                        <label className="block text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2">
+                                            Comisión (%)
+                                        </label>
+                                        <div className="relative">
+                                            <Percent className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={16} />
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                max="100"
+                                                value={formData.commission}
+                                                onChange={(e) => setFormData({ ...formData, commission: e.target.value })}
+                                                className={`w-full pl-10 pr-3 py-2.5 bg-[var(--bg-input)] border rounded-lg text-sm ${
+                                                    errors.commission ? 'border-danger-500' : 'border-[var(--border-color)]'
+                                                }`}
+                                                placeholder="0"
+                                            />
+                                        </div>
+                                        {errors.commission && <p className="text-danger-500 text-xs mt-1">{errors.commission}</p>}
                                     </div>
-                                    {errors.commission && <p className="text-danger-500 text-xs mt-1">{errors.commission}</p>}
-                                    {formData.role === 'cliente' && (
-                                        <p className="text-[10px] text-[var(--text-muted)] mt-1">
-                                            Los usuarios de cliente no tienen comisión
-                                        </p>
-                                    )}
-                                </div>
+                                )}
                             </div>
 
                             {/* Notas */}
@@ -462,8 +542,9 @@ const SellerDrawer = ({ isOpen, onClose, onSave, user = null, clients = [] }) =>
                     </motion.div>
                 </>
             )}
-        </AnimatePresence>
+        </AnimatePresence>,
+        document.body
     );
 };
 
-export default SellerDrawer;
+export default UserDrawer;

@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ArrowRight, Mail, Building2, User, Loader2 } from 'lucide-react';
 import Button from '../common/Button';
@@ -29,12 +30,23 @@ const Toggle = ({ checked, onChange, disabled, icon: Icon, label, email }) => (
     </div>
 );
 
-const ConvertToOrderModal = ({ isOpen, onClose, onConfirm, budget, loading }) => {
+const ConvertToOrderModal = ({ isOpen, onClose, onConfirm, budget, loading, isClient = false }) => {
     const [notifications, setNotifications] = useState({
         company: true,      // Siempre activo, no se puede desactivar
-        seller: true,       // Opcional
-        client: true        // Opcional
+        seller: true,       // Opcional (obligatorio si es cliente)
+        client: !isClient   // Solo opcional si NO es cliente
     });
+    
+    // Resetear estado cuando se abre el modal
+    React.useEffect(() => {
+        if (isOpen) {
+            setNotifications({
+                company: true,
+                seller: true,
+                client: !isClient
+            });
+        }
+    }, [isOpen, isClient]);
 
     const handleConfirm = () => {
         onConfirm({
@@ -47,7 +59,7 @@ const ConvertToOrderModal = ({ isOpen, onClose, onConfirm, budget, loading }) =>
         if (!loading) onClose();
     };
 
-    return (
+    return createPortal(
         <AnimatePresence>
             {isOpen && (
                 <>
@@ -57,7 +69,7 @@ const ConvertToOrderModal = ({ isOpen, onClose, onConfirm, budget, loading }) =>
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={handleClose}
-                        className="fixed inset-0 bg-secondary-900/50 dark:bg-black/60 backdrop-blur-sm z-[200]"
+                        className="fixed inset-0 bg-secondary-900/50 dark:bg-black/60 backdrop-blur-sm z-[9999]"
                     />
 
                     {/* Modal */}
@@ -66,7 +78,7 @@ const ConvertToOrderModal = ({ isOpen, onClose, onConfirm, budget, loading }) =>
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 20 }}
                         transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                        className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-[var(--bg-card)] rounded-2xl shadow-2xl z-[210] overflow-hidden border border-[var(--border-color)]"
+                        className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-[var(--bg-card)] rounded-2xl shadow-2xl z-[10000] overflow-hidden border border-[var(--border-color)]"
                     >
                         {/* Header */}
                         <div className="px-6 py-4 border-b border-[var(--border-color)] flex items-center justify-between">
@@ -93,11 +105,14 @@ const ConvertToOrderModal = ({ isOpen, onClose, onConfirm, budget, loading }) =>
                         {/* Content */}
                         <div className="p-6 space-y-4">
                             <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed">
-                                Al convertir este presupuesto en pedido, se enviarán notificaciones por email a las siguientes direcciones:
+                                {isClient 
+                                    ? 'Al convertir este presupuesto en pedido, se notificará automáticamente a la empresa y al vendedor asignado.'
+                                    : 'Al convertir este presupuesto en pedido, se enviarán notificaciones por email a las siguientes direcciones:'
+                                }
                             </p>
 
                             <div className="space-y-3">
-                                {/* Company - Siempre activo */}
+                                {/* Company - Siempre activo (obligatorio para cliente) */}
                                 <Toggle
                                     checked={notifications.company}
                                     onChange={() => {}}
@@ -107,16 +122,17 @@ const ConvertToOrderModal = ({ isOpen, onClose, onConfirm, budget, loading }) =>
                                     email={budget?.companyId?.email || 'configurado@empresa.com'}
                                 />
 
-                                {/* Seller */}
+                                {/* Seller - Obligatorio si es cliente (siempre activado y disabled) */}
                                 <Toggle
                                     checked={notifications.seller}
                                     onChange={(checked) => setNotifications(prev => ({ ...prev, seller: checked }))}
+                                    disabled={isClient}
                                     icon={User}
                                     label="Email vendedor"
                                     email={budget?.salesRepId?.email || 'vendedor@empresa.com'}
                                 />
 
-                                {/* Client */}
+                                {/* Client - Opcional siempre (el cliente decide si quiere recibir copia) */}
                                 <Toggle
                                     checked={notifications.client}
                                     onChange={(checked) => setNotifications(prev => ({ ...prev, client: checked }))}
@@ -165,7 +181,8 @@ const ConvertToOrderModal = ({ isOpen, onClose, onConfirm, budget, loading }) =>
                     </motion.div>
                 </>
             )}
-        </AnimatePresence>
+        </AnimatePresence>,
+        document.body
     );
 };
 

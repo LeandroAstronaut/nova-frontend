@@ -31,9 +31,7 @@ export const login = async (email, password) => {
 };
 
 export const loginWithCompany = async (tempToken, userId) => {
-    console.log('loginWithCompany - tempToken:', tempToken, 'userId:', userId);
     const response = await authService.post('/auth/login-with-company', { tempToken, userId });
-    console.log('loginWithCompany - response:', response.data);
     if (response.data.token) {
         localStorage.setItem('token', response.data.token);
     }

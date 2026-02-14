@@ -4,7 +4,7 @@ import {
     Building2, Plus, Edit2, Trash2, Power, Check, X, 
     Package, FileText, Receipt, Users, Landmark, ShoppingCart, 
     Search, Download, MoreHorizontal, ChevronUp, ChevronDown,
-    Briefcase, Shield, Mail, Phone
+    Briefcase, Shield, Mail, Phone, Percent
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { companyService } from '../../services/companyService';
@@ -414,6 +414,9 @@ const CompaniesPage = () => {
                                                 {company.features.clientUsers && (
                                                     <FeatureBadge active={true} icon={Users} label="Usr.Cliente" />
                                                 )}
+                                                {company.features.commissionCalculation && (
+                                                    <FeatureBadge active={true} icon={Percent} label="Comisiones" />
+                                                )}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-center">
@@ -508,6 +511,9 @@ const CompaniesPage = () => {
                                         )}
                                         {company.features.clientUsers && (
                                             <FeatureBadge active={true} icon={Users} label="Usr.Cliente" />
+                                        )}
+                                        {company.features.commissionCalculation && (
+                                            <FeatureBadge active={true} icon={Percent} label="Comisiones" />
                                         )}
                                     </div>
                                     <div className="flex items-center justify-between text-[12px]">
@@ -718,6 +724,7 @@ const CompaniesPage = () => {
                                                 { key: 'stock', label: 'Stock', icon: Building2 },
                                                 { key: 'priceLists', label: 'Listas de Precio', icon: FileText },
                                                 { key: 'clientUsers', label: 'Usuarios Cliente', icon: Users },
+                                                { key: 'commissionCalculation', label: 'Cálculo de Comisiones', icon: Percent },
                                             ].map(({ key, label, icon: Icon }) => (
                                                 <label
                                                     key={key}

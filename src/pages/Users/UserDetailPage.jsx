@@ -6,12 +6,13 @@ import {
     FileText, Clock, LogIn, Activity
 } from 'lucide-react';
 import { getStaffUser, updateStaffUser, toggleStaffStatus } from '../../services/userService';
+import { getClients } from '../../services/clientService';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import Button from '../../components/common/Button';
 import ConfirmModal from '../../components/common/ConfirmModal';
 import UserActivityDrawer from '../../components/users/UserActivityDrawer';
-import UserEditDrawer from '../../components/users/UserEditDrawer';
+import UserDrawer from '../../components/users/UserDrawer';
 
 const RoleBadge = ({ roleName }) => {
     const configs = {
@@ -103,6 +104,7 @@ const UserDetailPage = () => {
     const { addToast } = useToast();
 
     const [user, setUser] = useState(null);
+    const [clients, setClients] = useState([]);
     const [loading, setLoading] = useState(true);
     const [statusModal, setStatusModal] = useState({ isOpen: false, loading: false });
     const [isActivityDrawerOpen, setIsActivityDrawerOpen] = useState(false);
@@ -113,6 +115,7 @@ const UserDetailPage = () => {
 
     useEffect(() => {
         fetchUser();
+        fetchClients();
     }, [id]);
 
     const fetchUser = async () => {
@@ -126,6 +129,15 @@ const UserDetailPage = () => {
             navigate(-1);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchClients = async () => {
+        try {
+            const data = await getClients();
+            setClients(data);
+        } catch (error) {
+            console.error('Error fetching clients:', error);
         }
     };
 
@@ -442,12 +454,14 @@ const UserDetailPage = () => {
             />
 
             {/* Edit Drawer */}
-            <UserEditDrawer
+            <UserDrawer
                 isOpen={isEditDrawerOpen}
                 onClose={() => setIsEditDrawerOpen(false)}
                 onSave={handleEditUser}
                 user={user}
                 isSuperadmin={isSuperadmin}
+                features={user?.companyId?.features || {}}
+                clients={clients}
             />
 
             {/* Status Toggle Modal */}

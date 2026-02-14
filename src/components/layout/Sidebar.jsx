@@ -121,7 +121,6 @@ const Sidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }) => {
     
     // Forzar re-render cuando cambie el logo
     useEffect(() => {
-        console.log('Sidebar - logo cambió, incrementando rev');
         setLogoRev(prev => prev + 1);
     }, [user?.company?.logo]);
     
@@ -187,7 +186,7 @@ const Sidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }) => {
                 onMouseEnter={() => setShowCollapseTrigger(true)}
                 onMouseLeave={() => setShowCollapseTrigger(false)}
                 className={`
-                    fixed inset-y-0 left-0 z-[60] pointer-events-auto
+                    fixed inset-y-0 left-0 z-[10000] lg:z-[60] pointer-events-auto
                     bg-(--bg-card) border-r border-(--border-color)
                     flex flex-col h-screen
                     transition-all duration-300 ease-out

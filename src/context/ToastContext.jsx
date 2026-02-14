@@ -57,7 +57,7 @@ export const ToastProvider = ({ children }) => {
         <ToastContext.Provider value={{ addToast, removeToast }}>
             {children}
             {/* Container de toasts - Top Center */}
-            <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] flex flex-col gap-3 w-full max-w-sm px-4 pointer-events-none">
+            <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[99999] flex flex-col gap-3 w-full max-w-sm px-4 pointer-events-none">
                 <AnimatePresence mode="popLayout">
                     {toasts.map((toast) => {
                         const Icon = icons[toast.type];

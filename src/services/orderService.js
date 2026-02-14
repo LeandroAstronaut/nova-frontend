@@ -85,6 +85,11 @@ export const updateOrderStatus = async (orderId, status, notificationSettings) =
     return response.data;
 };
 
+export const updateOrderCommission = async (orderId, commissionData) => {
+    const response = await api.put(`/orders/${orderId}/commission`, commissionData);
+    return response.data;
+};
+
 export default {
     getOrders,
     createOrder,

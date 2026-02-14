@@ -23,7 +23,16 @@ const BudgetSummary = ({
     isClient = false,
     selectedClient = null,
     priceList = 1,
-    features = {}
+    features = {},
+    // Commission editing props
+    commissionRate = 0,
+    setCommissionRate = null,
+    commissionAmount = 0,
+    canEditCommission = false,
+    orderStatus = null,
+    // Discount permissions
+    canEditProductDiscount = true,
+    canEditBudgetDiscount = true
 }) => {
     return (
         <div className="space-y-6">
@@ -91,7 +100,7 @@ const BudgetSummary = ({
                                         value={discountGlobal}
                                         onChange={(e) => setDiscountGlobal(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
                                         placeholder="0"
-                                        disabled={readOnly || isClient}
+                                        disabled={readOnly || isClient || !canEditBudgetDiscount}
                                     />
                                     <span className="text-xs font-bold text-success-600/50 dark:text-success-400/50">%</span>
                                 </div>
@@ -109,7 +118,7 @@ const BudgetSummary = ({
                                     value={discountGlobal}
                                     onChange={(e) => setDiscountGlobal(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
                                     placeholder="0"
-                                    disabled={readOnly || isClient}
+                                    disabled={readOnly || isClient || !canEditBudgetDiscount}
                                 />
                                 <span className="text-xs font-bold text-success-600/50 dark:text-success-400/50">%</span>
                             </div>
@@ -191,7 +200,7 @@ const BudgetSummary = ({
                                                                         className="w-8 bg-transparent text-center text-xs font-bold text-success-700 dark:text-success-400 disabled:opacity-60"
                                                                         value={item.discount || 0}
                                                                         onChange={(e) => updateItem(item.productId, 'discount', Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
-                                                                        disabled={isClient}
+                                                                        disabled={isClient || !canEditProductDiscount}
                                                                     />
                                                                     <span className="text-[10px] font-bold text-success-600/50 dark:text-success-400/50">%</span>
                                                                 </div>
@@ -247,6 +256,55 @@ const BudgetSummary = ({
                                 </div>
                             </div>
                         </div>
+                        
+                        {/* Commission Editing - Solo admin/superadmin y si no está completo */}
+                        {canEditCommission && features.commissionCalculation && orderStatus !== 'completo' && (
+                            <div className="pt-4 border-t border-(--border-color) space-y-3">
+                                <h4 className="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider">
+                                    Configuración de Comisión
+                                </h4>
+                                <div className="flex items-center gap-3">
+                                    <div className="flex-1">
+                                        <label className="text-[10px] text-(--text-muted) mb-1 block">Porcentaje</label>
+                                        <div className="flex items-center gap-1 px-3 py-2 bg-success-50 dark:bg-success-900/30 rounded-lg border border-success-100 dark:border-success-800">
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                max="100"
+                                                step="0.1"
+                                                value={commissionRate}
+                                                onChange={(e) => setCommissionRate(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
+                                                className="flex-1 bg-transparent text-sm font-bold text-success-700 dark:text-success-400 outline-none"
+                                            />
+                                            <span className="text-xs font-bold text-success-600/50 dark:text-success-400/50">%</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex-1">
+                                        <label className="text-[10px] text-(--text-muted) mb-1 block">Monto</label>
+                                        <div className="px-3 py-2 bg-(--bg-hover) border border-(--border-color) rounded-lg text-sm font-bold text-success-600 dark:text-success-400">
+                                            ${Number(commissionAmount || 0).toLocaleString('es-AR')}
+                                        </div>
+                                    </div>
+                                </div>
+                                <p className="text-[10px] text-(--text-muted) italic">
+                                    * Esta comisión se aplicará al vendedor asignado
+                                </p>
+                            </div>
+                        )}
+                        
+                        {/* Commission Display (solo lectura) */}
+                        {(orderStatus === 'completo' || !canEditCommission) && commissionAmount > 0 && features.commissionCalculation && (
+                            <div className="pt-4 border-t border-(--border-color)">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider">
+                                        Comisión ({commissionRate}%)
+                                    </span>
+                                    <span className="text-sm font-bold text-success-600 dark:text-success-400">
+                                        ${Number(commissionAmount || 0).toLocaleString('es-AR')}
+                                    </span>
+                                </div>
+                            </div>
+                        )}
                         
                         <p className="text-[10px] text-center text-(--text-muted) font-medium leading-relaxed italic pt-3 border-t border-(--border-color)">
                             * Los precios no incluyen IVA

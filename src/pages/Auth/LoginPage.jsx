@@ -73,12 +73,9 @@ const LoginPage = () => {
     };
 
     const handleSelectCompany = async (userId) => {
-        console.log('handleSelectCompany - userId:', userId);
         setIsLoading(true);
         try {
-            console.log('Llamando selectCompany...');
-            const result = await selectCompany(userId);
-            console.log('selectCompany result:', result);
+            await selectCompany(userId);
             addToast('¡Bienvenido de nuevo!', 'success');
             navigate('/');
         } catch (err) {

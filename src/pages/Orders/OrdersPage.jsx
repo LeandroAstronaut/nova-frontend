@@ -146,12 +146,41 @@ const ActionMenu = ({ items, onClose, position, openAbove = false }) => {
 
 const OrdersPage = ({ mode = 'order' }) => {
     const navigate = useNavigate();
-    const { user } = useAuth();
+    const { user, updateUserContext } = useAuth();
     const { addToast } = useToast();
     const isSuperadmin = user?.role?.name === 'superadmin';
     const isAdmin = user?.role?.name === 'admin';
     const isVendedor = user?.role?.name === 'vendedor';
     const isClient = user?.role?.name === 'cliente';
+
+    // Check if commission display is enabled for current user
+    const hasCommissionFeature = user?.company?.features?.commissionCalculation === true;
+    const canViewCommission = (isAdmin || isSuperadmin || user?.canViewCommission === true) && hasCommissionFeature;
+    
+    // Refrescar datos del usuario al montar y cuando vuelve al foco
+    // Esto asegura que los permisos (como canViewCommission) estén actualizados
+    useEffect(() => {
+        // Refrescar inmediatamente al montar
+        updateUserContext?.();
+        
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                updateUserContext?.();
+            }
+        };
+        
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }, [updateUserContext]);
+    
+    // Refrescar usuario cada 30 segundos mientras está en esta página
+    useEffect(() => {
+        const intervalId = setInterval(() => {
+            updateUserContext?.();
+        }, 30000);
+        
+        return () => clearInterval(intervalId);
+    }, [updateUserContext]);
     
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -707,6 +736,9 @@ const OrdersPage = ({ mode = 'order' }) => {
                                 </th>
                                 <th className="px-6 py-3">Vendedor</th>
                                 <th className="px-6 py-3 text-right cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors">Total</th>
+                                {canViewCommission && (
+                                    <th className="px-6 py-3 text-right">Comisión</th>
+                                )}
                                 <th className="px-6 py-3 text-center">Estado</th>
                                 <th className="px-6 py-3 text-right">Acciones</th>
                             </tr>
@@ -715,7 +747,7 @@ const OrdersPage = ({ mode = 'order' }) => {
                             {loading ? (
                                 Array(5).fill(0).map((_, i) => (
                                     <tr key={i}>
-                                        <td colSpan={isSuperadmin ? 8 : 7} className="px-6 py-6 text-center">
+                                        <td colSpan={isSuperadmin ? (canViewCommission ? 9 : 8) : (canViewCommission ? 8 : 7)} className="px-6 py-6 text-center">
                                             <div className="flex items-center justify-center gap-2 text-(--text-muted) text-[11px] font-bold uppercase tracking-widest">
                                                 <div className="w-3.5 h-3.5 border-2 border-(--border-color) border-t-primary-600 dark:border-t-primary-400 rounded-full animate-spin"></div>
                                                 Sincronizando...
@@ -758,6 +790,22 @@ const OrdersPage = ({ mode = 'order' }) => {
                                                 return total.toLocaleString();
                                             })()}
                                         </td>
+                                        {canViewCommission && (
+                                            <td className="px-6 py-4 text-right text-[13px]">
+                                                {order.commissionAmount ? (
+                                                    <span className="font-semibold text-success-600 dark:text-success-400">
+                                                        ${order.commissionAmount.toLocaleString()}
+                                                        {order.commissionRate && (
+                                                            <span className="text-[10px] text-(--text-muted) ml-1">
+                                                                ({order.commissionRate}%)
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-(--text-muted)">-</span>
+                                                )}
+                                            </td>
+                                        )}
                                         <td className="px-6 py-4 text-center">
                                             <StatusBadge status={order.status} />
                                         </td>
@@ -881,7 +929,7 @@ const OrdersPage = ({ mode = 'order' }) => {
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan={isSuperadmin ? 8 : 7} className="px-6 py-12 text-center">
+                                    <td colSpan={isSuperadmin ? (canViewCommission ? 9 : 8) : (canViewCommission ? 8 : 7)} className="px-6 py-12 text-center">
                                         <div className="text-(--text-muted) text-[11px] font-bold uppercase tracking-widest bg-(--bg-hover) w-fit mx-auto px-4 py-2 rounded-lg border border-(--border-color)">
                                             No se encontraron {mode === 'order' ? 'pedidos' : 'presupuestos'}
                                         </div>
@@ -949,6 +997,19 @@ const OrdersPage = ({ mode = 'order' }) => {
                                                 return total.toLocaleString();
                                             })()}</span>
                                         </div>
+                                        {canViewCommission && order.commissionAmount && (
+                                            <div className="col-span-2">
+                                                <span className="text-(--text-muted)">Comisión:</span>
+                                                <span className="ml-1 font-bold text-success-600 text-[14px]">
+                                                    ${order.commissionAmount.toLocaleString()}
+                                                    {order.commissionRate && (
+                                                        <span className="text-[10px] text-(--text-muted) ml-1">
+                                                            ({order.commissionRate}%)
+                                                        </span>
+                                                    )}
+                                                </span>
+                                            </div>
+                                        )}
                                     </div>
                                     
                                     {/* Acciones */}

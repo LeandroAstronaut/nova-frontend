@@ -34,10 +34,6 @@ export const AuthProvider = ({ children }) => {
     }, []);
 
     const loginUser = (userData) => {
-        console.log('AuthContext.loginUser - userData:', userData);
-        console.log('AuthContext.loginUser - company:', userData.user?.company);
-        console.log('AuthContext.loginUser - logo:', userData.user?.company?.logo);
-        
         // Si requiere selección de compañía
         if (userData.requiresSelection) {
             setPendingSelection(true);
@@ -58,14 +54,14 @@ export const AuthProvider = ({ children }) => {
     };
 
     const selectCompany = async (userId) => {
-        console.log('AuthContext.selectCompany - tempToken exists:', !!tempToken, 'userId:', userId);
+
         if (!tempToken) {
             throw new Error('No hay sesión pendiente');
         }
         
         try {
             const data = await loginWithCompany(tempToken, userId);
-            console.log('AuthContext.selectCompany - data received:', data);
+
             
             if (!data.success) {
                 throw new Error(data.message || 'Error al seleccionar compañía');
@@ -116,16 +112,15 @@ export const AuthProvider = ({ children }) => {
     // Función para actualizar el contexto del usuario (útil después de cambios)
     const updateUserContext = async () => {
         try {
-            console.log('AuthContext.updateUserContext - llamando getMe...');
+
             const userData = await getMe();
-            console.log('AuthContext.updateUserContext - userData:', userData);
-            console.log('AuthContext.updateUserContext - company.logo:', userData.user?.company?.logo);
+
             // Normalizar el formato del role
             const user = { ...userData.user };
             if (typeof user.role === 'string') {
                 user.role = { name: user.role };
             }
-            console.log('AuthContext.updateUserContext - setUser llamado con user:', user);
+
             setUser(user);
             return user;
         } catch (error) {
@@ -133,6 +128,39 @@ export const AuthProvider = ({ children }) => {
             throw error;
         }
     };
+
+    // Refrescar datos del usuario cuando la ventana vuelve a tener foco
+    // y cada 5 minutos para mantener permisos actualizados
+    useEffect(() => {
+        if (!user) return;
+
+        const refreshUser = () => {
+            // Solo refrescar si hay un token válido
+            const token = localStorage.getItem('token');
+            if (token) {
+                updateUserContext().catch(() => {
+                    // Silenciar errores - si falla, mantener datos actuales
+                });
+            }
+        };
+
+        // Refrescar al volver a la pestaña
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                refreshUser();
+            }
+        };
+
+        // Refrescar cada 5 minutos
+        const intervalId = setInterval(refreshUser, 5 * 60 * 1000);
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            clearInterval(intervalId);
+        };
+    }, [user]);
 
     return (
         <AuthContext.Provider value={{ 

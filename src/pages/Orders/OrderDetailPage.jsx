@@ -19,7 +19,9 @@ import {
     DollarSign,
     FileText,
     Check,
-    Download
+    Download,
+    Percent,
+    X
 } from 'lucide-react';
 import { getOrders, convertBudgetToOrder, deleteOrder, revertOrderToBudget, updateOrderStatus, sendOrderEmail } from '../../services/orderService';
 import { generateOrderPDF } from '../../utils/pdfGenerator';
@@ -97,6 +99,11 @@ const OrderDetailPage = () => {
     const isAdmin = user?.role?.name === 'admin';
     const isVendedor = user?.role?.name === 'vendedor';
     const isClient = user?.role?.name === 'cliente';
+
+    // Check if commission display is enabled
+    const hasCommissionFeature = user?.company?.features?.commissionCalculation === true;
+    const canViewCommission = (isAdmin || isSuperadmin || user?.canViewCommission === true) && hasCommissionFeature;
+    const canEditCommission = (isAdmin || isSuperadmin) && hasCommissionFeature;
 
     useEffect(() => {
         fetchOrder();
@@ -572,12 +579,44 @@ const OrderDetailPage = () => {
                                     value={order.priceList === 2 ? 'Lista 2' : 'Lista 1'}
                                     icon={DollarSign}
                                 />
+                                {order.discount > 0 && (
+                                    <InfoRow 
+                                        label="Descuento" 
+                                        value={`${order.discount}%`}
+                                        icon={Percent}
+                                    />
+                                )}
                                 {order.paymentMethod && (
                                     <InfoRow 
                                         label="Método de Pago" 
                                         value={order.paymentMethod}
                                         icon={Check}
                                     />
+                                )}
+                                {canViewCommission && (
+                                    <div className="flex items-start gap-3 py-3 border-b border-(--border-color) last:border-0">
+                                        <div className="w-8 h-8 rounded-lg bg-(--bg-hover) flex items-center justify-center shrink-0">
+                                            <Percent size={16} className="text-(--text-muted)" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <p className="text-[11px] font-medium text-(--text-muted) uppercase tracking-wider">Comisión</p>
+                                            <div className="flex items-center gap-2 mt-0.5">
+                                                {order.commissionAmount ? (
+                                                    <p className="text-[13px] font-semibold text-success-600 dark:text-success-400">
+                                                        ${order.commissionAmount.toLocaleString('es-AR')}
+                                                        {order.commissionRate && (
+                                                            <span className="text-[11px] text-(--text-muted) ml-1">
+                                                                ({order.commissionRate}%)
+                                                            </span>
+                                                        )}
+                                                    </p>
+                                                ) : (
+                                                    <p className="text-[13px] font-semibold text-(--text-muted)">-</p>
+                                                )}
+
+                                            </div>
+                                        </div>
+                                    </div>
                                 )}
                             </div>
 
@@ -734,6 +773,7 @@ const OrderDetailPage = () => {
                 confirmText={revertModal.loading ? 'Revirtiendo...' : 'Sí, revertir'}
                 type="warning"
             />
+
         </div>
     );
 };

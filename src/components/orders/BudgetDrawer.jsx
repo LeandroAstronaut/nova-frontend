@@ -35,6 +35,10 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
     const isViewMode = mode === 'view';
     const effectiveReadOnly = readOnly || isViewMode; // Solo lectura si es superadmin o modo view
     const canChangeSeller = isAdmin && !effectiveReadOnly; // Solo admin puede cambiar vendedor, y solo si no es solo lectura
+    
+    // Permisos de edición de descuentos
+    const canEditProductDiscount = isAdmin || isSuperadmin || user?.canEditProductDiscount !== false;
+    const canEditBudgetDiscount = isAdmin || isSuperadmin || user?.canEditBudgetDiscount !== false;
 
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
@@ -55,6 +59,9 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
         discount: 0,
         notes: ''
     });
+    
+    // Commission state - se carga del order al editar, o del vendedor al crear
+    const [commissionRate, setCommissionRate] = useState(0);
 
     // Lists
     const [clients, setClients] = useState([]);
@@ -86,6 +93,8 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                     discount: order.discount || 0,
                     notes: order.notes || ''
                 });
+                // Cargar comisión del order (si existe) o del vendedor
+                setCommissionRate(order.commissionRate || 0);
                 setStep(3); // Go straight to summary when editing
             } else {
                 // Reset for create
@@ -109,10 +118,12 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                         priceList: clientPriceList,
                         salesRepId: user.client.salesRepId?.toString() || ''
                     }));
+                    setCommissionRate(0); // Clientes no tienen comisión
                     setStep(2); // Siempre ir directo a productos
                 } else {
                     setStep(1);
                     setSelectedClient(null);
+                    setCommissionRate(0);
                 }
             }
             fetchInitialData();
@@ -256,6 +267,11 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
         const sub = calculateSubtotal() || 0;
         return sub * (1 - (Number(header.discount || 0) / 100)) || 0;
     };
+    
+    const calculateCommissionAmount = () => {
+        const total = calculateTotal();
+        return total * (Number(commissionRate || 0) / 100);
+    };
 
     const openQuickView = (product) => {
         setQuickViewProduct(product);
@@ -271,6 +287,11 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                 items,
                 type
             };
+            
+            // Incluir commissionRate en el payload (solo para admin/superadmin)
+            if (isAdmin || isSuperadmin) {
+                data.commissionRate = commissionRate;
+            }
             
             if ((mode === 'edit' || mode === 'view') && order) {
                 await updateOrder(order._id, data);
@@ -454,6 +475,15 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                                             selectedClient={selectedClient}
                                             priceList={header.priceList}
                                             features={features}
+                                            // Commission props
+                                            commissionRate={commissionRate}
+                                            setCommissionRate={setCommissionRate}
+                                            commissionAmount={calculateCommissionAmount()}
+                                            canEditCommission={(isAdmin || isSuperadmin) && mode === 'edit'}
+                                            orderStatus={order?.status}
+                                            // Discount permissions
+                                            canEditProductDiscount={canEditProductDiscount}
+                                            canEditBudgetDiscount={canEditBudgetDiscount}
                                         />
                                     )}
                                 </AnimatePresence>

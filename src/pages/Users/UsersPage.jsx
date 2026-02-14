@@ -5,7 +5,7 @@ import {
     Eye, MoreHorizontal, Edit2, Activity, CheckCircle, XCircle 
 } from 'lucide-react';
 import { getStaffUsers, createStaffUser, toggleStaffStatus, updateStaffUser } from '../../services/userService';
-import { getClients } from '../../services/orderService';
+import { getClients } from '../../services/clientService';
 import { getAllCompanies } from '../../services/companyService';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -13,7 +13,7 @@ import Button from '../../components/common/Button';
 import ConfirmModal from '../../components/common/ConfirmModal';
 import UserDrawer from '../../components/users/UserDrawer';
 import UserActivityDrawer from '../../components/users/UserActivityDrawer';
-import UserEditDrawer from '../../components/users/UserEditDrawer';
+
 
 // Action Menu Component
 const ActionMenu = ({ items, onClose, position, openAbove = false }) => {
@@ -624,7 +624,7 @@ const UsersPage = () => {
             />
 
             {/* Edit Drawer */}
-            <UserEditDrawer
+            <UserDrawer
                 isOpen={isEditDrawerOpen}
                 onClose={() => {
                     setIsEditDrawerOpen(false);
@@ -633,6 +633,9 @@ const UsersPage = () => {
                 onSave={handleEditUser}
                 user={editUser}
                 isSuperadmin={isSuperadmin}
+                features={user?.company?.features || {}}
+                clients={clients}
+                currentUser={user}
             />
 
             {/* Activity Drawer */}

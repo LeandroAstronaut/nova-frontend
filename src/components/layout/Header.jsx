@@ -45,7 +45,6 @@ const Header = ({ onMenuClick }) => {
 
     // Forzar re-render cuando cambie el logo
     useEffect(() => {
-        console.log('Header - logo cambió, incrementando rev');
         setLogoRev(prev => prev + 1);
     }, [user?.company?.logo]);
 
@@ -121,9 +120,6 @@ const Header = ({ onMenuClick }) => {
     };
 
     const currentCompany = companies.find(c => c.isCurrent);
-
-    console.log('Header - user:', user);
-    console.log('Header - user?.company?.logo:', user?.company?.logo);
 
     return (
         <>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, User, Mail, Lock, Calendar, Percent, FileText, Phone, Shield, Briefcase, Building2 } from 'lucide-react';
+import { X, User, Mail, Lock, Calendar, Percent, FileText, Phone, Shield, Briefcase, Building2, Tag } from 'lucide-react';
 import Button from '../common/Button';
 
 const UserDrawer = ({ isOpen, onClose, onSave, user = null, clients = [], features = {}, companies = [], isSuperadmin = false }) => {
@@ -37,6 +37,9 @@ const UserDrawer = ({ isOpen, onClose, onSave, user = null, clients = [], featur
         whatsapp: '',
         birthDate: '',
         commission: '',
+        canViewCommission: true,
+        canEditProductDiscount: true,
+        canEditBudgetDiscount: true,
         notes: ''
     });
     const [errors, setErrors] = useState({});
@@ -57,6 +60,9 @@ const UserDrawer = ({ isOpen, onClose, onSave, user = null, clients = [], featur
                     whatsapp: user.whatsapp || '',
                     birthDate: user.birthDate ? new Date(user.birthDate).toISOString().split('T')[0] : '',
                     commission: user.commission || '',
+                    canViewCommission: user.canViewCommission ?? true,
+                    canEditProductDiscount: user.canEditProductDiscount ?? true,
+                    canEditBudgetDiscount: user.canEditBudgetDiscount ?? true,
                     notes: user.notes || ''
                 });
             } else {
@@ -72,6 +78,9 @@ const UserDrawer = ({ isOpen, onClose, onSave, user = null, clients = [], featur
                     whatsapp: '',
                     birthDate: '',
                     commission: '',
+                    canViewCommission: true,
+                    canEditProductDiscount: true,
+                    canEditBudgetDiscount: true,
                     notes: ''
                 });
             }
@@ -486,6 +495,96 @@ const UserDrawer = ({ isOpen, onClose, onSave, user = null, clients = [], featur
                                     </div>
                                 )}
                             </div>
+
+                            {/* Toggle: Ver comisiones (solo para vendedores/admin, cuando el módulo está activo) */}
+                            {formData.role !== 'cliente' && features.commissionCalculation && (
+                                <div className="p-4 bg-[var(--bg-hover)] rounded-xl border border-[var(--border-color)]">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-primary-600">
+                                                <Percent size={16} />
+                                            </div>
+                                            <div>
+                                                <p className="text-[13px] font-semibold text-[var(--text-primary)]">Ver comisiones</p>
+                                                <p className="text-[11px] text-[var(--text-muted)]">El usuario puede ver sus comisiones en pedidos y presupuestos</p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setFormData({ ...formData, canViewCommission: !formData.canViewCommission })}
+                                            className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${
+                                                formData.canViewCommission ? 'bg-primary-500' : 'bg-[var(--border-color)]'
+                                            }`}
+                                        >
+                                            <div
+                                                className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${
+                                                    formData.canViewCommission ? 'translate-x-7' : 'translate-x-1'
+                                                }`}
+                                            />
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Toggle: Editar descuento de productos (solo para vendedores/admin) */}
+                            {formData.role !== 'cliente' && (
+                                <div className="p-4 bg-[var(--bg-hover)] rounded-xl border border-[var(--border-color)]">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center text-orange-600">
+                                                <Tag size={16} />
+                                            </div>
+                                            <div>
+                                                <p className="text-[13px] font-semibold text-[var(--text-primary)]">Editar descuento de productos</p>
+                                                <p className="text-[11px] text-[var(--text-muted)]">El usuario puede editar descuentos en los productos de los presupuestos</p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setFormData({ ...formData, canEditProductDiscount: !formData.canEditProductDiscount })}
+                                            className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${
+                                                formData.canEditProductDiscount ? 'bg-primary-500' : 'bg-[var(--border-color)]'
+                                            }`}
+                                        >
+                                            <div
+                                                className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${
+                                                    formData.canEditProductDiscount ? 'translate-x-7' : 'translate-x-1'
+                                                }`}
+                                            />
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Toggle: Editar descuento de presupuestos (solo para vendedores/admin) */}
+                            {formData.role !== 'cliente' && (
+                                <div className="p-4 bg-[var(--bg-hover)] rounded-xl border border-[var(--border-color)]">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center text-violet-600">
+                                                <Percent size={16} />
+                                            </div>
+                                            <div>
+                                                <p className="text-[13px] font-semibold text-[var(--text-primary)]">Editar descuento de presupuestos</p>
+                                                <p className="text-[11px] text-[var(--text-muted)]">El usuario puede editar el descuento global de los presupuestos</p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setFormData({ ...formData, canEditBudgetDiscount: !formData.canEditBudgetDiscount })}
+                                            className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${
+                                                formData.canEditBudgetDiscount ? 'bg-primary-500' : 'bg-[var(--border-color)]'
+                                            }`}
+                                        >
+                                            <div
+                                                className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${
+                                                    formData.canEditBudgetDiscount ? 'translate-x-7' : 'translate-x-1'
+                                                }`}
+                                            />
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Notas */}
                             <div>

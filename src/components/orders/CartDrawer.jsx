@@ -89,7 +89,7 @@ const CartDrawer = ({ isOpen, onClose, items, updateItem, removeItem, onCheckout
                             ) : (
                                 items.map((item) => (
                                     <motion.div
-                                        key={item.productId}
+                                        key={item.lineId}
                                         layout
                                         initial={{ opacity: 0, y: 10 }}
                                         animate={{ opacity: 1, y: 0 }}
@@ -106,7 +106,7 @@ const CartDrawer = ({ isOpen, onClose, items, updateItem, removeItem, onCheckout
                                                         <p className="text-[11px] text-[var(--text-muted)]">{item.code}</p>
                                                     </div>
                                                     <button
-                                                        onClick={() => removeItem(item.productId)}
+                                                        onClick={() => removeItem(item.lineId)}
                                                         className="p-1.5 text-[var(--text-muted)] hover:text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-900/20 rounded-lg transition-colors"
                                                     >
                                                         <Trash2 size={16} />
@@ -142,7 +142,7 @@ const CartDrawer = ({ isOpen, onClose, items, updateItem, removeItem, onCheckout
                                                                 <div className="space-y-1">
                                                                     <div className="flex items-center p-0.5 bg-[var(--bg-hover)] rounded-lg border border-[var(--border-color)]">
                                                                         <button
-                                                                            onClick={() => updateItem(item.productId, 'quantity', getValidQuantity(item.productId, item.quantity, -step))}
+                                                                            onClick={() => updateItem(item.lineId, 'quantity', getValidQuantity(item.productId, item.quantity, -step))}
                                                                             disabled={item.quantity <= (sellOnlyFullPackages ? unitsPerPackage : minOrderQuantity)}
                                                                             className="w-7 h-7 flex items-center justify-center text-[var(--text-muted)] hover:text-primary-600 hover:bg-[var(--bg-card)] rounded-md transition-colors disabled:opacity-40"
                                                                         >
@@ -154,11 +154,11 @@ const CartDrawer = ({ isOpen, onClose, items, updateItem, removeItem, onCheckout
                                                                             value={item.quantity}
                                                                             onChange={(e) => {
                                                                                 const val = parseInt(e.target.value) || 0;
-                                                                                updateItem(item.productId, 'quantity', getValidQuantity(item.productId, val, 0));
+                                                                                updateItem(item.lineId, 'quantity', getValidQuantity(item.productId, val, 0));
                                                                             }}
                                                                         />
                                                                         <button
-                                                                            onClick={() => updateItem(item.productId, 'quantity', getValidQuantity(item.productId, item.quantity, step))}
+                                                                            onClick={() => updateItem(item.lineId, 'quantity', getValidQuantity(item.productId, item.quantity, step))}
                                                                             className="w-7 h-7 flex items-center justify-center text-[var(--text-muted)] hover:text-primary-600 hover:bg-[var(--bg-card)] rounded-md transition-colors"
                                                                         >
                                                                             <Plus size={14} />
@@ -181,7 +181,7 @@ const CartDrawer = ({ isOpen, onClose, items, updateItem, removeItem, onCheckout
                                                                 type="number"
                                                                 className="w-8 bg-transparent text-center text-xs font-bold text-success-700 dark:text-success-400 focus:outline-none"
                                                                 value={item.discount || 0}
-                                                                onChange={(e) => updateItem(item.productId, 'discount', Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
+                                                                onChange={(e) => updateItem(item.lineId, 'discount', Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
                                                             />
                                                             <span className="text-[10px] font-bold text-success-600/50">%</span>
                                                         </div>
@@ -229,7 +229,7 @@ const CartDrawer = ({ isOpen, onClose, items, updateItem, removeItem, onCheckout
                                 </Button>
 
                                 <button
-                                    onClick={() => items.forEach(i => removeItem(i.productId))}
+                                    onClick={() => items.forEach(i => removeItem(i.lineId))}
                                     className="w-full text-center text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider hover:text-danger-500 transition-colors py-1"
                                 >
                                     Limpiar Carrito

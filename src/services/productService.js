@@ -141,6 +141,57 @@ export const getBrands = async () => {
     return response.data;
 };
 
+/**
+ * Subir imagen a un producto
+ * @param {string} productId - ID del producto
+ * @param {File} file - Archivo de imagen
+ * @returns {Promise<Object>} Resultado con la imagen subida
+ */
+export const uploadProductImage = async (productId, file) => {
+    const formData = new FormData();
+    formData.append('image', file);
+
+    const response = await api.post(`/products/${productId}/images`, formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data',
+        },
+    });
+    return response.data;
+};
+
+/**
+ * Eliminar imagen de un producto
+ * @param {string} productId - ID del producto
+ * @param {number} imageIndex - Índice de la imagen a eliminar
+ * @returns {Promise<Object>} Resultado
+ */
+export const deleteProductImage = async (productId, imageIndex) => {
+    const response = await api.delete(`/products/${productId}/images/${imageIndex}`);
+    return response.data;
+};
+
+/**
+ * Establecer imagen de portada
+ * @param {string} productId - ID del producto
+ * @param {number} imageIndex - Índice de la imagen de portada
+ * @returns {Promise<Object>} Resultado
+ */
+export const setCoverImage = async (productId, imageIndex) => {
+    const response = await api.patch(`/products/${productId}/cover-image`, { imageIndex });
+    return response.data;
+};
+
+/**
+ * Reordenar imágenes de un producto
+ * @param {string} productId - ID del producto
+ * @param {Array<number>} newOrder - Array de índices en el nuevo orden
+ * @returns {Promise<Object>} Resultado
+ */
+export const reorderProductImages = async (productId, newOrder) => {
+    const response = await api.patch(`/products/${productId}/images/reorder`, { newOrder });
+    return response.data;
+};
+
 export default {
     getProducts,
     getProductById,
@@ -154,4 +205,8 @@ export default {
     getCategories,
     getSubcategories,
     getBrands,
+    uploadProductImage,
+    deleteProductImage,
+    setCoverImage,
+    reorderProductImages,
 };

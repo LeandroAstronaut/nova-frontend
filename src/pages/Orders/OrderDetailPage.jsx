@@ -22,9 +22,10 @@ import {
     Download,
     Percent,
     X,
-    Tag
+    Tag,
+    RefreshCw
 } from 'lucide-react';
-import { getOrders, convertBudgetToOrder, deleteOrder, revertOrderToBudget, updateOrderStatus, sendOrderEmail } from '../../services/orderService';
+import { getOrders, convertBudgetToOrder, deleteOrder, revertOrderToBudget, updateOrderStatus, sendOrderEmail, checkPriceChanges, updateOrderPrices } from '../../services/orderService';
 import { generateOrderPDF } from '../../utils/pdfGenerator';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -90,6 +91,11 @@ const OrderDetailPage = () => {
     const [isSendEmailModalOpen, setIsSendEmailModalOpen] = useState(false);
     const [isSendWhatsAppModalOpen, setIsSendWhatsAppModalOpen] = useState(false);
     const [isActivityDrawerOpen, setIsActivityDrawerOpen] = useState(false);
+    const [isUpdatePricesModalOpen, setIsUpdatePricesModalOpen] = useState(false);
+    const [hasPriceChanges, setHasPriceChanges] = useState(false);
+    const [priceChangesCount, setPriceChangesCount] = useState(0);
+    const [checkingPriceChanges, setCheckingPriceChanges] = useState(false);
+    const [updatingPrices, setUpdatingPrices] = useState(false);
     const [deleteModal, setDeleteModal] = useState({ isOpen: false, loading: false });
     const [revertModal, setRevertModal] = useState({ isOpen: false, loading: false, targetStatus: null, title: '', description: '' });
     
@@ -310,6 +316,58 @@ const OrderDetailPage = () => {
         setIsEditDrawerOpen(false);
     };
 
+    // Verificar si hay cambios de precios
+    const checkForPriceChanges = async () => {
+        if (!order?._id) return;
+        
+        try {
+            setCheckingPriceChanges(true);
+            const result = await checkPriceChanges(order._id);
+            setHasPriceChanges(result.hasChanges);
+            setPriceChangesCount(result.count);
+        } catch (error) {
+            console.error('Error checking price changes:', error);
+        } finally {
+            setCheckingPriceChanges(false);
+        }
+    };
+
+    // Actualizar precios del pedido/presupuesto
+    const handleUpdatePrices = async () => {
+        if (!order?._id) return;
+        
+        try {
+            setUpdatingPrices(true);
+            await updateOrderPrices(order._id);
+            addToast('Precios actualizados exitosamente', 'success');
+            fetchOrder();
+            setHasPriceChanges(false);
+            setPriceChangesCount(0);
+        } catch (error) {
+            console.error('Error updating prices:', error);
+            addToast('Error al actualizar precios: ' + (error.response?.data?.message || error.message), 'error');
+        } finally {
+            setUpdatingPrices(false);
+            setIsUpdatePricesModalOpen(false);
+        }
+    };
+
+    // Verificar cambios de precios cuando cambia el pedido
+    useEffect(() => {
+        if (order?._id) {
+            checkForPriceChanges();
+        }
+    }, [order?._id, order?.items?.length]);
+
+    // Determinar si se puede mostrar el botón de actualizar precios
+    const canShowUpdatePricesButton = () => {
+        if (!order) return false;
+        if (isClient) return false;
+        if (isVendedor && order.type !== 'budget') return false;
+        if (isAdmin && order.status === 'completo') return false;
+        return hasPriceChanges;
+    };
+
     if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center">
@@ -396,7 +454,23 @@ const OrderDetailPage = () => {
                         </Button>
                     )}
 
-                    {/* Botón PDF */}
+                    {/* Botón Actualizar Precios - solo si hay cambios */}
+                    {canShowUpdatePricesButton() && (
+                        <Button
+                            variant="secondary"
+                            onClick={() => setIsUpdatePricesModalOpen(true)}
+                            className="px-3! text-[11px] font-bold uppercase tracking-wider bg-warning-50! text-warning-600! border-warning-200! hover:bg-warning-100!"
+                            title={`${priceChangesCount} producto${priceChangesCount > 1 ? 's' : ''} con precios actualizados`}
+                        >
+                            <RefreshCw size={14} strokeWidth={2.5} className={checkingPriceChanges ? 'animate-spin' : ''} />
+                            Actualizar Precios
+                            <span className="ml-1 px-1.5 py-0.5 bg-warning-600 text-white text-[9px] rounded-full">
+                                {priceChangesCount}
+                            </span>
+                        </Button>
+                    )}
+
+                    {/* Botón PDF -->
                     <Button 
                         variant="secondary" 
                         onClick={handlePrintPDF}
@@ -823,6 +897,33 @@ const OrderDetailPage = () => {
                 entityId={order._id}
                 entityNumber={order.orderNumber}
                 clientName={order.clientId?.businessName}
+            />
+
+            {/* Modal para actualizar precios */}
+            <ConfirmModal
+                isOpen={isUpdatePricesModalOpen}
+                onClose={() => setIsUpdatePricesModalOpen(false)}
+                onConfirm={handleUpdatePrices}
+                title="Actualizar Precios"
+                description={
+                    <div className="space-y-3">
+                        <p>¿Estás seguro que deseas actualizar los precios de los productos a los valores actuales?</p>
+                        <div className="bg-(--bg-hover) rounded-lg p-3 text-xs space-y-1">
+                            <p className="font-medium text-(--text-primary)">Esta acción hará lo siguiente:</p>
+                            <ul className="list-disc list-inside text-(--text-secondary) space-y-0.5">
+                                <li>Actualizará los precios de lista/oferta según la configuración actual</li>
+                                <li>Recalculará el estado de oferta de cada producto</li>
+                                <li>Recalculará los totales con la configuración actual de la empresa</li>
+                                <li>No modificará los descuentos individuales de cada producto</li>
+                            </ul>
+                        </div>
+                        <p className="text-xs text-(--text-muted)">Esta acción no se puede deshacer.</p>
+                    </div>
+                }
+                confirmText={updatingPrices ? 'Actualizando...' : 'Actualizar Precios'}
+                cancelText="Cancelar"
+                type="warning"
+                isLoading={updatingPrices}
             />
 
             <ConfirmModal

@@ -90,6 +90,16 @@ export const updateOrderCommission = async (orderId, commissionData) => {
     return response.data;
 };
 
+export const checkPriceChanges = async (orderId) => {
+    const response = await api.get(`/orders/${orderId}/price-changes`);
+    return response.data;
+};
+
+export const updateOrderPrices = async (orderId) => {
+    const response = await api.post(`/orders/${orderId}/update-prices`);
+    return response.data;
+};
+
 export default {
     getOrders,
     createOrder,

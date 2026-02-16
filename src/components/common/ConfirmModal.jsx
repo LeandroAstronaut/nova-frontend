@@ -12,10 +12,9 @@ const ConfirmModal = ({
     description,
     confirmText = 'Confirmar',
     cancelText = 'Cancelar',
-    type = 'warning' // 'danger', 'warning', 'info'
+    type = 'warning', // 'danger', 'warning', 'info'
+    isLoading = false
 }) => {
-    if (!isOpen) return null;
-
     const getIcon = () => {
         switch (type) {
             case 'danger': return <AlertCircle size={20} className="text-danger-600" />;
@@ -68,7 +67,8 @@ const ConfirmModal = ({
                                 </div>
                                 <button
                                     onClick={onClose}
-                                    className="p-2 hover:bg-(--bg-hover) rounded-lg text-(--text-muted) transition-colors"
+                                    disabled={isLoading}
+                                    className="p-2 hover:bg-(--bg-hover) rounded-lg text-(--text-muted) transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     <X size={18} />
                                 </button>
@@ -86,16 +86,15 @@ const ConfirmModal = ({
                                 <Button
                                     variant="secondary"
                                     onClick={onClose}
+                                    disabled={isLoading}
                                     className="!px-4 !py-2.5 !h-10 !text-xs font-bold"
                                 >
                                     {cancelText}
                                 </Button>
                                 <Button
                                     variant={type === 'danger' ? 'danger' : 'primary'}
-                                    onClick={() => {
-                                        onConfirm();
-                                        onClose();
-                                    }}
+                                    onClick={onConfirm}
+                                    disabled={isLoading}
                                     className="!px-4 !py-2.5 !h-10 !text-xs font-bold"
                                 >
                                     {confirmText}

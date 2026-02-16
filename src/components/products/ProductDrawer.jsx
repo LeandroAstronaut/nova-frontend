@@ -17,9 +17,15 @@ import {
     Image as ImageIcon,
     AlertCircle,
     ChevronDown,
-    AlertTriangle
+    Upload,
+    Trash2,
+    Star,
+    GripVertical,
+    Loader2,
+    Plus
 } from 'lucide-react';
 import Button from '../common/Button';
+import ConfirmModal from '../common/ConfirmModal';
 import { 
     createProduct, 
     updateProduct, 
@@ -27,7 +33,10 @@ import {
     checkBarcodeExists,
     getCategories,
     getSubcategories,
-    getBrands
+    getBrands,
+    uploadProductImage,
+    deleteProductImage,
+    setCoverImage
 } from '../../services/productService';
 import { useToast } from '../../context/ToastContext';
 
@@ -111,53 +120,21 @@ const AutocompleteInput = ({
 
 // Confirm Close Modal Component
 const ConfirmCloseModal = ({ isOpen, onClose, onConfirm, hasChanges }) => {
-    if (!isOpen) return null;
-    
-    return createPortal(
-        <AnimatePresence>
-            <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[170] flex items-center justify-center p-4"
-                onClick={onClose}
-            >
-                <motion.div
-                    initial={{ scale: 0.95, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.95, opacity: 0 }}
-                    className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-color)] shadow-2xl max-w-md w-full p-6"
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    <div className="flex items-center gap-3 mb-4">
-                        <div className="w-12 h-12 bg-warning-100 dark:bg-warning-900/30 rounded-xl flex items-center justify-center">
-                            <AlertTriangle className="text-warning-600 dark:text-warning-400" size={24} />
-                        </div>
-                        <div>
-                            <h3 className="text-lg font-bold text-[var(--text-primary)]">
-                                {hasChanges ? '¿Descartar cambios?' : '¿Cerrar formulario?'}
-                            </h3>
-                        </div>
-                    </div>
-                    
-                    <p className="text-[var(--text-secondary)] text-sm mb-6">
-                        {hasChanges 
-                            ? 'Ha realizado cambios en el producto. Si cierra ahora, perderá toda la información ingresada.' 
-                            : '¿Está seguro que desea cerrar el formulario?'}
-                    </p>
-                    
-                    <div className="flex items-center justify-end gap-3">
-                        <Button variant="secondary" onClick={onClose}>
-                            {hasChanges ? 'Continuar editando' : 'Cancelar'}
-                        </Button>
-                        <Button variant="danger" onClick={onConfirm}>
-                            {hasChanges ? 'Descartar cambios' : 'Cerrar'}
-                        </Button>
-                    </div>
-                </motion.div>
-            </motion.div>
-        </AnimatePresence>,
-        document.body
+    return (
+        <ConfirmModal
+            isOpen={isOpen}
+            onClose={onClose}
+            onConfirm={onConfirm}
+            title={hasChanges ? '¿Descartar cambios?' : '¿Cerrar formulario?'}
+            description={
+                hasChanges 
+                    ? 'Ha realizado cambios en el producto. Si cierra ahora, perderá toda la información ingresada.' 
+                    : '¿Está seguro que desea cerrar el formulario?'
+            }
+            confirmText={hasChanges ? 'Descartar cambios' : 'Cerrar'}
+            cancelText={hasChanges ? 'Continuar editando' : 'Cancelar'}
+            type={hasChanges ? 'warning' : 'info'}
+        />
     );
 };
 
@@ -199,8 +176,14 @@ const ProductDrawer = ({ isOpen, onClose, onSave, product = null, features = {} 
         stock: 0,
         image: '',
         unitsPerPackage: 1,
-        minOrderQuantity: 1
+        minOrderQuantity: 1,
+        images: [],
+        coverImageIndex: 0
     });
+
+    // Estados para manejo de imágenes
+    const [uploadingImage, setUploadingImage] = useState(false);
+    const fileInputRef = useRef(null);
 
     // Cargar sugerencias al abrir
     useEffect(() => {
@@ -268,7 +251,9 @@ const ProductDrawer = ({ isOpen, onClose, onSave, product = null, features = {} 
                     stock: product.stock || 0,
                     image: product.image || '',
                     unitsPerPackage: product.unitsPerPackage || 1,
-                    minOrderQuantity: product.minOrderQuantity || 1
+                    minOrderQuantity: product.minOrderQuantity || 1,
+                    images: product.images || [],
+                    coverImageIndex: product.coverImageIndex || 0
                 };
             } else {
                 newFormData = {
@@ -291,7 +276,9 @@ const ProductDrawer = ({ isOpen, onClose, onSave, product = null, features = {} 
                     stock: 0,
                     image: '',
                     unitsPerPackage: 1,
-                    minOrderQuantity: 1
+                    minOrderQuantity: 1,
+                    images: [],
+                    coverImageIndex: 0
                 };
             }
             setFormData(newFormData);
@@ -406,6 +393,93 @@ const ProductDrawer = ({ isOpen, onClose, onSave, product = null, features = {} 
         handleChange('subcategory', '');
     };
 
+    // Funciones para manejo de imágenes
+    const handleImageUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // Validar tipo de archivo
+        if (!file.type.startsWith('image/')) {
+            addToast('Por favor selecciona un archivo de imagen válido', 'error');
+            return;
+        }
+
+        // Validar tamaño (5MB máximo)
+        if (file.size > 5 * 1024 * 1024) {
+            addToast('La imagen no debe superar los 5MB', 'error');
+            return;
+        }
+
+        // Validar máximo de imágenes
+        if (formData.images.length >= 5) {
+            addToast('Máximo 5 imágenes permitidas por producto', 'error');
+            return;
+        }
+
+        // Si es un producto nuevo, primero guardarlo
+        if (!isEditing) {
+            addToast('Primero debes crear el producto para poder subir imágenes', 'warning');
+            return;
+        }
+
+        setUploadingImage(true);
+        try {
+            const result = await uploadProductImage(product._id, file);
+            
+            // Actualizar el estado con las nuevas imágenes
+            setFormData(prev => ({
+                ...prev,
+                images: result.images
+            }));
+            
+            addToast('Imagen subida exitosamente', 'success');
+        } catch (error) {
+            console.error('Error uploading image:', error);
+            addToast(error.response?.data?.message || 'Error al subir la imagen', 'error');
+        } finally {
+            setUploadingImage(false);
+            // Resetear el input
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        }
+    };
+
+    const handleDeleteImage = async (imageIndex) => {
+        if (!window.confirm('¿Estás seguro de que deseas eliminar esta imagen?')) return;
+
+        try {
+            const result = await deleteProductImage(product._id, imageIndex);
+            
+            setFormData(prev => ({
+                ...prev,
+                images: result.images,
+                coverImageIndex: result.coverImageIndex
+            }));
+            
+            addToast('Imagen eliminada exitosamente', 'success');
+        } catch (error) {
+            console.error('Error deleting image:', error);
+            addToast(error.response?.data?.message || 'Error al eliminar la imagen', 'error');
+        }
+    };
+
+    const handleSetCoverImage = async (imageIndex) => {
+        try {
+            const result = await setCoverImage(product._id, imageIndex);
+            
+            setFormData(prev => ({
+                ...prev,
+                coverImageIndex: result.coverImageIndex
+            }));
+            
+            addToast('Imagen de portada actualizada', 'success');
+        } catch (error) {
+            console.error('Error setting cover image:', error);
+            addToast(error.response?.data?.message || 'Error al establecer la imagen de portada', 'error');
+        }
+    };
+
     // Manejar el cierre del drawer
     const handleClose = () => {
         if (hasChanges()) {
@@ -432,7 +506,7 @@ const ProductDrawer = ({ isOpen, onClose, onSave, product = null, features = {} 
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             transition={{ duration: 0.2 }}
-                            className="fixed inset-0 bg-secondary-900/50 dark:bg-black/60 backdrop-blur-sm z-[150]"
+                            className="fixed inset-0 bg-secondary-900/50 dark:bg-black/60 backdrop-blur-sm z-[200]"
                             onClick={handleClose}
                         />
                         <motion.div
@@ -441,7 +515,7 @@ const ProductDrawer = ({ isOpen, onClose, onSave, product = null, features = {} 
                             animate={{ x: 0 }}
                             exit={{ x: '100%' }}
                             transition={{ type: 'spring', damping: 28, stiffness: 220 }}
-                            className="fixed top-4 right-4 h-[calc(100vh-2rem)] w-full max-w-[600px] bg-[var(--bg-card)] shadow-2xl dark:shadow-soft-lg-dark z-[160] flex flex-col border border-[var(--border-color)] rounded-2xl overflow-hidden"
+                            className="fixed top-4 right-4 h-[calc(100vh-2rem)] w-full max-w-[600px] bg-[var(--bg-card)] shadow-2xl dark:shadow-soft-lg-dark z-[210] flex flex-col border border-[var(--border-color)] rounded-2xl overflow-hidden"
                         >
                             {/* Header */}
                             <div className="px-6 py-4 border-b border-[var(--border-color)] flex items-center justify-between shrink-0 bg-[var(--bg-card)]">
@@ -749,23 +823,119 @@ const ProductDrawer = ({ isOpen, onClose, onSave, product = null, features = {} 
                                         )}
                                     </div>
 
-                                    {/* Imagen URL */}
-                                    <div>
-                                        <label className="flex items-center gap-2 text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2">
-                                            <ImageIcon size={12} /> URL de Imagen
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={formData.image}
-                                            onChange={(e) => handleChange('image', e.target.value)}
-                                            className="w-full px-3 py-2.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:border-primary-500 transition-colors"
-                                            placeholder="https://ejemplo.com/imagen.jpg"
-                                        />
-                                        {formData.image && (
-                                            <div className="mt-3 aspect-video bg-[var(--bg-hover)] rounded-xl overflow-hidden border border-[var(--border-color)]">
-                                                <img src={formData.image} alt="Preview" className="w-full h-full object-cover" />
+                                    {/* Imágenes del Producto */}
+                                    <div className="bg-[var(--bg-hover)] rounded-2xl border border-[var(--border-color)] p-4">
+                                        <div className="flex items-center justify-between mb-4">
+                                            <h4 className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
+                                                <ImageIcon size={14} /> Imágenes del Producto
+                                            </h4>
+                                            <span className="text-[10px] text-[var(--text-muted)]">
+                                                {formData.images.length}/5
+                                            </span>
+                                        </div>
+
+                                        {/* Grid de imágenes */}
+                                        {formData.images.length > 0 && (
+                                            <div className="grid grid-cols-3 gap-3 mb-4">
+                                                {formData.images.map((image, index) => (
+                                                    <div 
+                                                        key={image.publicId || index} 
+                                                        className={`relative aspect-square rounded-xl overflow-hidden border-2 transition-all ${
+                                                            index === formData.coverImageIndex 
+                                                                ? 'border-primary-500 ring-2 ring-primary-100 dark:ring-primary-900' 
+                                                                : 'border-[var(--border-color)]'
+                                                        }`}
+                                                    >
+                                                        <img 
+                                                            src={image.url} 
+                                                            alt={`Producto ${index + 1}`} 
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                        
+                                                        {/* Overlay con acciones */}
+                                                        <div className="absolute inset-0 bg-black/50 opacity-0 hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
+                                                            {/* Botón de portada */}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleSetCoverImage(index)}
+                                                                className={`p-2 rounded-full transition-colors ${
+                                                                    index === formData.coverImageIndex
+                                                                        ? 'bg-primary-500 text-white'
+                                                                        : 'bg-white/90 text-[var(--text-primary)] hover:bg-white'
+                                                                }`}
+                                                                title={index === formData.coverImageIndex ? 'Imagen de portada' : 'Establecer como portada'}
+                                                            >
+                                                                <Star size={14} fill={index === formData.coverImageIndex ? 'currentColor' : 'none'} />
+                                                            </button>
+                                                            
+                                                            {/* Botón de eliminar */}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleDeleteImage(index)}
+                                                                className="p-2 rounded-full bg-danger-500/90 text-white hover:bg-danger-500 transition-colors"
+                                                                title="Eliminar imagen"
+                                                            >
+                                                                <Trash2 size={14} />
+                                                            </button>
+                                                        </div>
+
+                                                        {/* Badge de portada */}
+                                                        {index === formData.coverImageIndex && (
+                                                            <div className="absolute top-1 left-1 px-2 py-0.5 bg-primary-500 text-white text-[9px] font-bold rounded-full flex items-center gap-1">
+                                                                <Star size={8} fill="currentColor" />
+                                                                Portada
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
                                             </div>
                                         )}
+
+                                        {/* Mensaje para producto nuevo */}
+                                        {!isEditing && (
+                                            <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-100 dark:border-amber-800 mb-4">
+                                                <p className="text-xs text-amber-700 dark:text-amber-300 text-center">
+                                                    Primero debes crear el producto para poder subir imágenes
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {/* Botón de subir */}
+                                        {isEditing && formData.images.length < 5 && (
+                                            <div className="flex justify-center">
+                                                <input
+                                                    ref={fileInputRef}
+                                                    type="file"
+                                                    accept="image/*"
+                                                    onChange={handleImageUpload}
+                                                    className="hidden"
+                                                    disabled={uploadingImage}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => fileInputRef.current?.click()}
+                                                    disabled={uploadingImage}
+                                                    className="flex items-center gap-2 px-4 py-2.5 bg-[var(--bg-card)] border border-[var(--border-color)] border-dashed rounded-xl text-sm text-[var(--text-secondary)] hover:text-primary-600 hover:border-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    {uploadingImage ? (
+                                                        <>
+                                                            <Loader2 size={16} className="animate-spin" />
+                                                            Subiendo...
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Plus size={16} />
+                                                            Agregar Imagen
+                                                        </>
+                                                    )}
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        {/* Instrucciones */}
+                                        <p className="text-[10px] text-[var(--text-muted)] mt-3 text-center">
+                                            Formatos: JPG, PNG, WEBP • Máximo 5MB por imagen • Hasta 5 imágenes
+                                        </p>
                                     </div>
                                 </form>
                             </div>

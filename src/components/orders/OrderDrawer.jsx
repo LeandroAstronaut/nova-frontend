@@ -51,6 +51,7 @@ const OrderDrawer = ({ isOpen, onClose, onSave, order = null, forcedType = 'budg
                 // Pre-fill for edit
                 setSelectedClient(order.clientId);
                 setItems(order.items.map(item => ({
+                    lineId: item.lineId || `${(item.productId._id || item.productId)}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
                     productId: item.productId._id || item.productId,
                     name: item.productId.name || 'Producto',
                     code: item.productId.code || '',
@@ -118,25 +119,22 @@ const OrderDrawer = ({ isOpen, onClose, onSave, order = null, forcedType = 'budg
     };
 
     const addItem = (product) => {
-        const existing = items.find(i => i.productId === product._id);
         const currentPrice = priceList === 1 ? product.pricing.list1 : product.pricing.list2;
-
-        if (existing) {
-            setItems(items.map(i => i.productId === product._id ? { ...i, quantity: i.quantity + 1 } : i));
-        } else {
-            setItems([...items, {
-                productId: product._id,
-                name: product.name,
-                code: product.code,
-                quantity: 1,
-                listPrice: currentPrice,
-                discount: 0 // Product-level discount
-            }]);
-        }
+        const lineId = `${product._id}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+        
+        setItems([...items, {
+            lineId: lineId,
+            productId: product._id,
+            name: product.name,
+            code: product.code,
+            quantity: 1,
+            listPrice: currentPrice,
+            discount: 0
+        }]);
     };
 
-    const removeItem = (id) => {
-        setItems(items.filter(i => i.productId !== id));
+    const removeItem = (lineId) => {
+        setItems(items.filter(i => i.lineId !== lineId));
     };
 
     const calculateSubtotal = () => {
@@ -336,14 +334,14 @@ const OrderDrawer = ({ isOpen, onClose, onSave, order = null, forcedType = 'budg
 
                                         <div className="space-y-3">
                                             {items.map(item => (
-                                                <div key={item.productId} className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-color)] shadow-sm p-4 hover:border-primary-200 dark:hover:border-primary-800 transition-all group">
+                                                <div key={item.lineId} className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-color)] shadow-sm p-4 hover:border-primary-200 dark:hover:border-primary-800 transition-all group">
                                                     <div className="flex items-start justify-between mb-3">
                                                         <div className="flex-1 min-w-0">
                                                             <div className="text-[13px] font-bold text-[var(--text-primary)] truncate">{item.name}</div>
                                                             <div className="text-[11px] text-[var(--text-muted)] font-bold uppercase tracking-widest mt-0.5">{item.code}</div>
                                                         </div>
                                                         <button
-                                                            onClick={() => removeItem(item.productId)}
+                                                            onClick={() => removeItem(item.lineId)}
                                                             className="p-2 text-danger-300 hover:text-danger-600 dark:hover:text-danger-400 hover:bg-danger-50 dark:hover:bg-danger-900/30 rounded-xl transition-all"
                                                         >
                                                             <Trash2 size={16} />
@@ -356,17 +354,17 @@ const OrderDrawer = ({ isOpen, onClose, onSave, order = null, forcedType = 'budg
                                                             <div className="flex items-center bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg overflow-hidden h-9">
                                                                 <button
                                                                     className="w-8 h-full hover:bg-[var(--bg-hover)] text-[var(--text-muted)] font-bold"
-                                                                    onClick={() => setItems(items.map(i => i.productId === item.productId ? { ...i, quantity: Math.max(1, i.quantity - 1) } : i))}
+                                                                    onClick={() => setItems(items.map(i => i.lineId === item.lineId ? { ...i, quantity: Math.max(1, i.quantity - 1) } : i))}
                                                                 >-</button>
                                                                 <input
                                                                     type="number"
                                                                     className="flex-1 w-full text-center text-[12px] font-bold text-[var(--text-primary)] border-x border-[var(--border-color)] focus:outline-none bg-[var(--bg-card)]"
                                                                     value={item.quantity}
-                                                                    onChange={(e) => setItems(items.map(i => i.productId === item.productId ? { ...i, quantity: parseInt(e.target.value) || 1 } : i))}
+                                                                    onChange={(e) => setItems(items.map(i => i.lineId === item.lineId ? { ...i, quantity: parseInt(e.target.value) || 1 } : i))}
                                                                 />
                                                                 <button
                                                                     className="w-8 h-full hover:bg-[var(--bg-hover)] text-[var(--text-muted)] font-bold"
-                                                                    onClick={() => setItems(items.map(i => i.productId === item.productId ? { ...i, quantity: i.quantity + 1 } : i))}
+                                                                    onClick={() => setItems(items.map(i => i.lineId === item.lineId ? { ...i, quantity: i.quantity + 1 } : i))}
                                                                 >+</button>
                                                             </div>
                                                         </div>
@@ -379,7 +377,7 @@ const OrderDrawer = ({ isOpen, onClose, onSave, order = null, forcedType = 'budg
                                                                     placeholder="0"
                                                                     className="w-full px-3 h-9 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg text-[12px] font-bold text-primary-600 dark:text-primary-400 text-center focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900"
                                                                     value={item.discount || ''}
-                                                                    onChange={(e) => setItems(items.map(i => i.productId === item.productId ? { ...i, discount: parseFloat(e.target.value) || 0 } : i))}
+                                                                    onChange={(e) => setItems(items.map(i => i.lineId === item.lineId ? { ...i, discount: parseFloat(e.target.value) || 0 } : i))}
                                                                 />
                                                                 <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-primary-300 dark:text-primary-600">%</span>
                                                             </div>

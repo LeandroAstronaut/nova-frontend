@@ -166,36 +166,44 @@ const BudgetCreationPage = () => {
         const pricing = product.pricing || { list1: 0, list2: 0 };
         const priceListNum = header.priceList || 1;
         const price = (priceListNum === 2 ? (pricing.list2 || 0) : (pricing.list1 || 0)) || 0;
+        const hasOffer = pricing.offer > 0;
 
         const qty = parseInt(quantityToAdd) || 1;
         const disc = parseFloat(initialDiscount) || 0;
         const productId = product._id || Math.random().toString(36).substr(2, 9);
-        const existing = items.find(i => i.productId === productId);
+        
+        // Buscar si existe una línea con el MISMO productId Y MISMO descuento
+        const existing = items.find(i => 
+            i.productId === productId && Number(i.discount || 0) === disc
+        );
 
         if (existing) {
             setItems(items.map(i => 
-                i.productId === productId 
-                    ? { ...i, quantity: i.quantity + qty, discount: Math.max(Number(i.discount || 0), disc) } 
+                i.lineId === existing.lineId
+                    ? { ...i, quantity: i.quantity + qty }
                     : i
             ));
         } else {
+            const lineId = `${productId}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
             setItems([...items, {
+                lineId: lineId,
                 productId: productId,
                 name: product.name || 'Sin nombre',
                 code: product.code || 'S/N',
                 quantity: qty,
-                listPrice: price,
-                discount: disc
+                listPrice: hasOffer ? pricing.offer : price,
+                discount: disc,
+                hasOffer: hasOffer
             }]);
         }
     };
 
-    const removeItem = (id) => {
-        setItems(items.filter(i => i.productId !== id));
+    const removeItem = (lineId) => {
+        setItems(items.filter(i => i.lineId !== lineId));
     };
 
-    const updateItem = (id, field, value) => {
-        setItems(items.map(i => i.productId === id ? { ...i, [field]: value } : i));
+    const updateItem = (lineId, field, value) => {
+        setItems(items.map(i => i.lineId === lineId ? { ...i, [field]: value } : i));
     };
 
     const calculateSubtotal = () => {

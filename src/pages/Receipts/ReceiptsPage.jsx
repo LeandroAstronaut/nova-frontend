@@ -343,18 +343,18 @@ const ReceiptsPage = () => {
                 {/* Vista Mobile - Cards */}
                 <div className="md:hidden">
                     {loading ? (
-                        <div className="p-6 text-center">
-                            <div className="flex items-center justify-center gap-2 text-(--text-muted)">
-                                <div className="w-3.5 h-3.5 border-2 border-(--border-color) border-t-primary-600 rounded-full animate-spin"></div>
-                                Cargando...
+                        Array(3).fill(0).map((_, i) => (
+                            <div key={i} className="p-4 animate-pulse even:bg-(--bg-hover)">
+                                <div className="h-4 bg-(--bg-hover) rounded w-3/4 mb-2"></div>
+                                <div className="h-3 bg-(--bg-hover) rounded w-1/2"></div>
                             </div>
-                        </div>
+                        ))
                     ) : filteredReceipts.length > 0 ? (
                         <div className="divide-y divide-(--border-color)">
                             {filteredReceipts.map((receipt) => (
                                 <div 
                                     key={receipt._id} 
-                                    className="p-4 hover:bg-(--bg-hover) transition-colors cursor-pointer"
+                                    className="p-4 hover:bg-(--bg-hover) transition-colors cursor-pointer even:bg-(--bg-hover)/50"
                                     onClick={() => handleViewReceipt(receipt)}
                                 >
                                     {/* Header: Numero, Tipo y Estado */}

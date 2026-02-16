@@ -180,7 +180,7 @@ const BudgetSummary = ({
                                 </div>
                             ) : (
                                 items.map((item) => (
-                                    <div key={item.productId} className="p-4 flex items-center gap-4 hover:bg-(--bg-hover) transition-colors">
+                                    <div key={item.lineId} className="p-4 flex items-center gap-4 hover:bg-(--bg-hover) transition-colors">
                                         <div className="w-12 h-12 bg-(--bg-hover) rounded-xl flex items-center justify-center text-(--text-muted) shrink-0">
                                             <Package size={20} />
                                         </div>
@@ -192,7 +192,7 @@ const BudgetSummary = ({
                                                 </div>
                                                 {!readOnly && (
                                                     <button
-                                                        onClick={() => removeItem(item.productId)}
+                                                        onClick={() => removeItem(item.lineId)}
                                                         className="p-1.5 text-(--text-muted) hover:text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-900/20 rounded-lg transition-colors"
                                                     >
                                                         <Trash2 size={16} />
@@ -219,7 +219,7 @@ const BudgetSummary = ({
                                                                 return (
                                                                     <div className="flex items-center gap-1 p-0.5 bg-(--bg-hover) rounded-lg border border-(--border-color)">
                                                                         <button
-                                                                            onClick={() => updateItem(item.productId, 'quantity', getValidQuantity(item.productId, item.quantity, -step))}
+                                                                            onClick={() => updateItem(item.lineId, 'quantity', getValidQuantity(item.productId, item.quantity, -step))}
                                                                             disabled={item.quantity <= minQty}
                                                                             className="w-7 h-7 flex items-center justify-center text-(--text-muted) hover:text-primary-600 hover:bg-(--bg-card) rounded-md transition-colors disabled:opacity-40"
                                                                         >
@@ -231,11 +231,11 @@ const BudgetSummary = ({
                                                                             value={item.quantity}
                                                                             onChange={(e) => {
                                                                                 const val = parseInt(e.target.value) || 0;
-                                                                                updateItem(item.productId, 'quantity', getValidQuantity(item.productId, val, 0));
+                                                                                updateItem(item.lineId, 'quantity', getValidQuantity(item.productId, val, 0));
                                                                             }}
                                                                         />
                                                                         <button
-                                                                            onClick={() => updateItem(item.productId, 'quantity', getValidQuantity(item.productId, item.quantity, step))}
+                                                                            onClick={() => updateItem(item.lineId, 'quantity', getValidQuantity(item.productId, item.quantity, step))}
                                                                             className="w-7 h-7 flex items-center justify-center text-(--text-muted) hover:text-primary-600 hover:bg-(--bg-card) rounded-md transition-colors"
                                                                         >
                                                                             <Plus size={14} />
@@ -249,7 +249,7 @@ const BudgetSummary = ({
                                                                         type="number"
                                                                         className="w-8 bg-transparent text-center text-xs font-bold text-success-700 dark:text-success-400 disabled:opacity-60"
                                                                         value={item.discount || 0}
-                                                                        onChange={(e) => updateItem(item.productId, 'discount', Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
+                                                                        onChange={(e) => updateItem(item.lineId, 'discount', Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
                                                                         disabled={isClient || !canEditProductDiscount}
                                                                     />
                                                                     <span className="text-[10px] font-bold text-success-600/50 dark:text-success-400/50">%</span>

@@ -24,7 +24,7 @@ import ConfirmModal from '../common/ConfirmModal';
 
 const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', type = 'budget', readOnly = false }) => {
     const { user, loading: authLoading } = useAuth();
-    const { setNavigationBlocked } = useNavigationGuard();
+    const { setNavigationBlocked, navigationBlocked } = useNavigationGuard();
     const { addToast } = useToast();
     
     const features = user?.company?.features || {};
@@ -80,6 +80,7 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                 // Pre-fill for edit
                 setSelectedClient(order.clientId);
                 setItems(order.items.map(item => ({
+                    lineId: item.lineId || `${(item.productId._id || item.productId)}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
                     productId: item.productId._id || item.productId,
                     name: item.productId.name || item.name || 'Producto',
                     code: item.productId.code || item.code || '',
@@ -240,16 +241,24 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
         // Cliente: usar siempre el descuento del producto, no editable
         const disc = isClient ? (parseFloat(pricing.discount) || 0) : (parseFloat(initialDiscount) || 0);
         const productId = product._id || Math.random().toString(36).substr(2, 9);
-        const existing = items.find(i => i.productId === productId);
+        
+        // Buscar si existe una línea con el MISMO productId Y MISMO descuento
+        const existing = items.find(i => 
+            i.productId === productId && Number(i.discount || 0) === disc
+        );
 
         if (existing) {
+            // Si existe una línea con el mismo producto y mismo descuento, sumar cantidades
             setItems(items.map(i => 
-                i.productId === productId 
-                    ? { ...i, quantity: i.quantity + qty, discount: Math.max(Number(i.discount || 0), disc) } 
+                i.lineId === existing.lineId
+                    ? { ...i, quantity: i.quantity + qty }
                     : i
             ));
         } else {
+            // Crear una nueva línea con un ID único
+            const lineId = `${productId}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
             setItems([...items, {
+                lineId: lineId,
                 productId: productId,
                 name: product.name || 'Sin nombre',
                 code: product.code || 'S/N',
@@ -261,12 +270,12 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
         }
     };
 
-    const removeItem = (id) => {
-        setItems(items.filter(i => i.productId !== id));
+    const removeItem = (lineId) => {
+        setItems(items.filter(i => i.lineId !== lineId));
     };
 
-    const updateItem = (id, field, value) => {
-        setItems(items.map(i => i.productId === id ? { ...i, [field]: value } : i));
+    const updateItem = (lineId, field, value) => {
+        setItems(items.map(i => i.lineId === lineId ? { ...i, [field]: value } : i));
     };
 
     const calculateSubtotal = () => {
@@ -394,15 +403,17 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
         );
     }
 
-    return createPortal(
-        <AnimatePresence>
-            {isOpen && (
-                <>
-                    {/* Backdrop */}
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
+    return (
+        <>
+            {createPortal(
+                <AnimatePresence>
+                    {isOpen && (
+                        <>
+                            {/* Backdrop */}
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
                         onClick={handleCancel}
                         className="fixed top-0 left-0 w-screen h-screen bg-secondary-900/40 dark:bg-black/60 backdrop-blur-[2px] z-[150]"
                     />
@@ -652,22 +663,26 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                             company={user?.company}
                             priceList={header.priceList}
                         />
-
-                        <ConfirmModal
-                            isOpen={showExitModal}
-                            onClose={() => setShowExitModal(false)}
-                            onConfirm={handleConfirmExit}
-                            title={mode === 'edit' ? '¿Cerrar edición?' : (mode === 'view' ? '¿Cerrar vista?' : '¿Cerrar presupuesto?')}
-                            description="Tienes cambios sin guardar. Si sales ahora, perderás todo el progreso."
-                            confirmText="Sí, cerrar"
-                            cancelText="Continuar editando"
-                            type="warning"
-                        />
                     </motion.div>
                 </>
             )}
-        </AnimatePresence>,
-        document.body
+                </AnimatePresence>,
+                document.body
+            )}
+            {createPortal(
+                <ConfirmModal
+                    isOpen={showExitModal}
+                    onClose={() => setShowExitModal(false)}
+                    onConfirm={handleConfirmExit}
+                    title={mode === 'edit' ? '¿Cerrar edición?' : (mode === 'view' ? '¿Cerrar vista?' : '¿Cerrar presupuesto?')}
+                    description="Tienes cambios sin guardar. Si sales ahora, perderás todo el progreso."
+                    confirmText="Sí, cerrar"
+                    cancelText="Continuar editando"
+                    type="warning"
+                />,
+                document.body
+            )}
+        </>
     );
 };
 

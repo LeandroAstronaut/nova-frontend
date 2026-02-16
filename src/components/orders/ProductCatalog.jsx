@@ -21,6 +21,13 @@ const ProductCatalog = ({
         return price * (1 + (taxRate || 0) / 100);
     };
 
+    // Helper para obtener la imagen de portada del producto
+    const getCoverImage = (product) => {
+        if (!product.images || product.images.length === 0) return null;
+        const coverIndex = product.coverImageIndex || 0;
+        return product.images[coverIndex]?.url || product.images[0]?.url;
+    };
+
     return (
         <div className="space-y-4">
             {/* Nota general sobre configuración de pedidos o IVA */}
@@ -152,13 +159,16 @@ const ProductCatalog = ({
         
 
                                     <div className="flex flex-col gap-3">
-                                        {/* Imagen */}
+                                        {/* Imagen de portada */}
                                         <div className={`relative aspect-square rounded-xl overflow-hidden flex items-center justify-center ${inCart ? 'bg-primary-50 dark:bg-primary-900/20' : 'bg-(--bg-hover)'}`}>
-                                            {product.image ? (
-                                                <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                                            ) : (
-                                                <Package size={40} className="text-(--text-muted) opacity-50" />
-                                            )}
+                                            {(() => {
+                                                const coverImage = getCoverImage(product);
+                                                return coverImage ? (
+                                                    <img src={coverImage} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                                                ) : (
+                                                    <Package size={40} className="text-(--text-muted) opacity-50" />
+                                                );
+                                            })()}
                                         </div>
 
                                         {/* Info */}

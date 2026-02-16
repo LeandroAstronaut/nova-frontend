@@ -112,10 +112,17 @@ const Sidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }) => {
     const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
     
     useEffect(() => {
-        const handleResize = () => setIsMobile(window.innerWidth < 1024);
+        const handleResize = () => {
+            const mobile = window.innerWidth < 1024;
+            setIsMobile(mobile);
+            // Al redimensionar a desktop, cerrar el menú mobile
+            if (!mobile) {
+                setMobileOpen(false);
+            }
+        };
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
-    }, []);
+    }, [setMobileOpen]);
 
     const [logoRev, setLogoRev] = useState(0);
     
@@ -181,7 +188,7 @@ const Sidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }) => {
             {/* Sidebar */}
             <motion.aside
                 initial={false}
-                animate={isMobile ? { x: mobileOpen ? 0 : '-100%' } : {}}
+                animate={{ x: isMobile ? (mobileOpen ? 0 : '-100%') : 0 }}
                 transition={{ type: 'spring', damping: 30, stiffness: 300 }}
                 onMouseEnter={() => setShowCollapseTrigger(true)}
                 onMouseLeave={() => setShowCollapseTrigger(false)}
@@ -191,7 +198,6 @@ const Sidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }) => {
                     flex flex-col h-screen
                     transition-all duration-300 ease-out
                     ${collapsed ? 'w-[76px]' : 'w-[260px]'}
-                    ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
                 `}
             >                {/* Logo Header */}
                 <div className={`

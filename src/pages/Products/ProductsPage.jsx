@@ -24,24 +24,47 @@ const ProductsPage = () => {
     const { user } = useAuth();
     const { addToast } = useToast();
     
+    // Todos los hooks deben estar ANTES de cualquier return condicional
+    const [products, setProducts] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+    const [pagination, setPagination] = useState({
+        page: 1,
+        limit: 20,
+        total: 0,
+        totalPages: 0
+    });
+    const [sort, setSort] = useState({
+        sortBy: 'name',
+        order: 'asc'
+    });
+    const [selectedProduct, setSelectedProduct] = useState(null);
+    const [isQuickViewOpen, setIsQuickViewOpen] = useState(false);
+    const [isProductDrawerOpen, setIsProductDrawerOpen] = useState(false);
+    const [editingProduct, setEditingProduct] = useState(null);
+    const [deleteModal, setDeleteModal] = useState({
+        isOpen: false,
+        product: null,
+        loading: false
+    });
+    
+    // Ahora sí, después de todos los hooks, hacemos los cálculos y el return condicional
     const isAdmin = user?.role?.name === 'admin';
     const isSuperadmin = user?.role?.name === 'superadmin';
     const features = user?.company?.features || {};
     const showPricesWithTax = user?.company?.showPricesWithTax === true;
     
-    // Feature flags
     const hasStockFeature = features.stock === true;
     const hasPriceListsFeature = features.priceLists === true;
     
-    // Calcular número total de columnas para colspan
     const totalColumns = useMemo(() => {
-        let cols = 8; // Producto, Código, Categoría, Lista 1, IVA, Oferta, Unidades/Bulto, Acciones
-        if (hasPriceListsFeature) cols++; // Lista 2
-        if (hasStockFeature) cols++; // Stock
+        let cols = 6;
+        if (hasPriceListsFeature) cols++;
+        if (hasStockFeature) cols++;
         return cols;
     }, [hasPriceListsFeature, hasStockFeature]);
     
-    // Redirigir si no es admin
     if (!isAdmin && !isSuperadmin) {
         return (
             <div className="min-h-screen flex items-center justify-center">
@@ -55,40 +78,6 @@ const ProductsPage = () => {
             </div>
         );
     }
-
-    const [products, setProducts] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
-    
-    // Pagination
-    const [pagination, setPagination] = useState({
-        page: 1,
-        limit: 20,
-        total: 0,
-        totalPages: 0
-    });
-    
-    // Sorting
-    const [sort, setSort] = useState({
-        sortBy: 'name',
-        order: 'asc'
-    });
-    
-    // QuickView Drawer
-    const [selectedProduct, setSelectedProduct] = useState(null);
-    const [isQuickViewOpen, setIsQuickViewOpen] = useState(false);
-    
-    // Product Drawer (create/edit)
-    const [isProductDrawerOpen, setIsProductDrawerOpen] = useState(false);
-    const [editingProduct, setEditingProduct] = useState(null);
-    
-    // Delete Modal
-    const [deleteModal, setDeleteModal] = useState({
-        isOpen: false,
-        product: null,
-        loading: false
-    });
 
     // Sort Icon Component
     const SortIcon = ({ field }) => {
@@ -274,7 +263,6 @@ const ProductsPage = () => {
                                 <th className="px-6 py-3 cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('code')}>
                                     <div className="flex items-center">Código <SortIcon field="code" /></div>
                                 </th>
-                                <th className="px-6 py-3">Categoría</th>
                                 <th className="px-6 py-3 text-right cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('pricing.list1')}>
                                     <div className="flex items-center justify-end">Lista 1 <SortIcon field="pricing.list1" /></div>
                                 </th>
@@ -288,9 +276,6 @@ const ProductsPage = () => {
                                 )}
                                 <th className="px-6 py-3 text-right cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('pricing.offer')}>
                                     <div className="flex items-center justify-end">Oferta <SortIcon field="pricing.offer" /></div>
-                                </th>
-                                <th className="px-6 py-3 text-center">
-                                    <div className="flex items-center justify-center">Uds/Bulto</div>
                                 </th>
                                 {hasStockFeature && (
                                     <th className="px-6 py-3 text-center cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('stock')}>
@@ -321,9 +306,13 @@ const ProductsPage = () => {
                                     >
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 bg-(--bg-hover) rounded-lg flex items-center justify-center shrink-0">
-                                                    {product.image ? (
-                                                        <img src={product.image} alt="" className="w-full h-full object-cover rounded-lg" />
+                                                <div className="w-10 h-10 bg-(--bg-hover) rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
+                                                    {product.images && product.images.length > 0 ? (
+                                                        <img 
+                                                            src={product.images[product.coverImageIndex || 0]?.url || product.images[0]?.url} 
+                                                            alt="" 
+                                                            className="w-full h-full object-cover rounded-lg" 
+                                                        />
                                                     ) : (
                                                         <Package size={18} className="text-(--text-muted)" />
                                                     )}
@@ -340,11 +329,6 @@ const ProductsPage = () => {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-[13px] text-(--text-secondary)">{product.code}</td>
-                                        <td className="px-6 py-4">
-                                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-(--bg-hover) text-(--text-muted) border border-(--border-color)">
-                                                {product.category || 'General'}
-                                            </span>
-                                        </td>
                                         <td className="px-6 py-4 text-right">
                                             <div className="flex flex-col items-end">
                                                 <span className="text-[13px] font-medium text-(--text-primary)">
@@ -389,18 +373,6 @@ const ProductsPage = () => {
                                             ) : (
                                                 <span className="text-[13px] text-(--text-muted)">-</span>
                                             )}
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <div className="flex flex-col items-center">
-                                                <span className="text-[13px] font-medium text-(--text-primary)">
-                                                    {product.unitsPerPackage || 1}
-                                                </span>
-                                                {(product.unitsPerPackage > 1 || product.minOrderQuantity > 1) && (
-                                                    <span className="text-[9px] text-(--text-muted)">
-                                                        {product.minOrderQuantity > 1 ? `min: ${product.minOrderQuantity}` : 'x bulto'}
-                                                    </span>
-                                                )}
-                                            </div>
                                         </td>
                                         {hasStockFeature && (
                                             <td className="px-6 py-4 text-center">
@@ -488,69 +460,89 @@ const ProductsPage = () => {
                         </div>
                     </div>
                 )}
-            </div>
 
-            {/* Mobile List */}
-            <div className="md:hidden space-y-3">
-                {loading ? (
-                    Array(3).fill(0).map((_, i) => (
-                        <div key={i} className="bg-(--bg-card) rounded-xl border border-(--border-color) p-4 animate-pulse">
-                            <div className="h-4 bg-(--bg-hover) rounded w-3/4 mb-2"></div>
-                            <div className="h-3 bg-(--bg-hover) rounded w-1/2"></div>
-                        </div>
-                    ))
-                ) : products.length > 0 ? (
-                    products.map((product) => (
-                        <div
-                            key={product._id}
-                            className="bg-(--bg-card) rounded-xl border border-(--border-color) p-4 shadow-sm active:bg-(--bg-hover) transition-colors"
-                            onClick={() => handleViewProduct(product)}
-                        >
-                            <div className="flex items-start gap-3">
-                                <div className="w-12 h-12 bg-(--bg-hover) rounded-lg flex items-center justify-center shrink-0">
-                                    {product.image ? (
-                                        <img src={product.image} alt="" className="w-full h-full object-cover rounded-lg" />
-                                    ) : (
-                                        <Package size={20} className="text-(--text-muted)" />
-                                    )}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <h3 className="font-semibold text-(--text-primary) text-sm truncate">{product.name}</h3>
-                                    <p className="text-[11px] text-(--text-muted) mt-0.5">{product.code}</p>
+                {/* Mobile List */}
+                <div className="md:hidden divide-y divide-(--border-color)">
+                    {loading ? (
+                        Array(3).fill(0).map((_, i) => (
+                            <div key={i} className="p-4 animate-pulse even:bg-(--bg-hover)">
+                                <div className="h-4 bg-(--bg-hover) rounded w-3/4 mb-2"></div>
+                                <div className="h-3 bg-(--bg-hover) rounded w-1/2"></div>
+                            </div>
+                        ))
+                    ) : products.length > 0 ? (
+                        products.map((product) => (
+                            <div
+                                key={product._id}
+                                className="p-4 hover:bg-(--bg-hover) transition-colors even:bg-(--bg-hover)/50"
+                            >
+                                {/* Header: Nombre y código */}
+                                <div className="flex items-start justify-between mb-2">
+                                    <h3 className="font-bold text-(--text-primary) text-[15px]">{product.name}</h3>
                                     {product.pricing?.discount > 0 && (
-                                        <span className="inline-flex items-center gap-1 text-[10px] text-success-600 font-medium mt-1">
+                                        <span className="inline-flex items-center gap-1 text-[10px] text-success-600 font-medium">
                                             <Tag size={10} />
                                             {product.pricing.discount}% dto.
                                         </span>
                                     )}
-                                    <div className="flex items-center gap-3 mt-2">
-                                        <span className="text-[12px] font-medium text-(--text-primary)">
-                                            {formatPrice(product.pricing?.list1)}
+                                </div>
+                                
+                                {/* Código */}
+                                <p className="text-[12px] text-(--text-muted) mb-3">{product.code}</p>
+                                
+                                {/* Info Grid: Precio y Stock */}
+                                <div className="flex items-center justify-between mb-3">
+                                    <span className="text-[14px] font-bold text-(--text-primary)">
+                                        {formatPrice(product.pricing?.list1)}
+                                    </span>
+                                    {hasStockFeature && (
+                                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${
+                                            product.stock > 10 
+                                                ? 'bg-success-50 text-success-600 border-success-100' 
+                                                : product.stock > 0 
+                                                    ? 'bg-warning-50 text-warning-600 border-warning-100' 
+                                                    : 'bg-danger-50 text-danger-600 border-danger-100'
+                                        }`}>
+                                            Stock: {product.stock}
                                         </span>
-                                        {hasStockFeature && (
-                                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${
-                                                product.stock > 10 
-                                                    ? 'bg-success-50 text-success-600 border-success-100' 
-                                                    : product.stock > 0 
-                                                        ? 'bg-warning-50 text-warning-600 border-warning-100' 
-                                                        : 'bg-danger-50 text-danger-600 border-danger-100'
-                                            }`}>
-                                                Stock: {product.stock}
-                                            </span>
-                                        )}
-                                    </div>
+                                    )}
+                                </div>
+                                
+                                {/* Acciones */}
+                                <div className="flex items-center justify-end gap-2 pt-2">
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); handleViewProduct(product); }}
+                                        className="p-2 rounded-lg text-(--text-muted) hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-all"
+                                        title="Ver detalle"
+                                    >
+                                        <Eye size={18} />
+                                    </button>
+                                    <button
+                                        onClick={(e) => handleEditProduct(product, e)}
+                                        className="p-2 rounded-lg text-(--text-muted) hover:text-info-600 hover:bg-info-50 dark:hover:bg-info-900/20 transition-all"
+                                        title="Editar"
+                                    >
+                                        <Edit2 size={18} />
+                                    </button>
+                                    <button
+                                        onClick={(e) => handleDeleteClick(product, e)}
+                                        className="p-2 rounded-lg text-(--text-muted) hover:text-danger-600 hover:bg-danger-50 dark:hover:bg-danger-900/20 transition-all"
+                                        title="Eliminar"
+                                    >
+                                        <Trash2 size={18} />
+                                    </button>
                                 </div>
                             </div>
+                        ))
+                    ) : (
+                        <div className="text-center py-8">
+                            <div className="w-16 h-16 bg-(--bg-hover) rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                <Package size={32} className="text-(--text-muted) opacity-50" />
+                            </div>
+                            <p className="text-(--text-muted) font-medium">No se encontraron productos</p>
                         </div>
-                    ))
-                ) : (
-                    <div className="text-center py-8">
-                        <div className="w-16 h-16 bg-(--bg-hover) rounded-2xl flex items-center justify-center mx-auto mb-4">
-                            <Package size={32} className="text-(--text-muted) opacity-50" />
-                        </div>
-                        <p className="text-(--text-muted) font-medium">No se encontraron productos</p>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
 
             {/* QuickView Drawer */}

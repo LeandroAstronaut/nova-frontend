@@ -21,7 +21,8 @@ import {
     Check,
     Download,
     Percent,
-    X
+    X,
+    Tag
 } from 'lucide-react';
 import { getOrders, convertBudgetToOrder, deleteOrder, revertOrderToBudget, updateOrderStatus, sendOrderEmail } from '../../services/orderService';
 import { generateOrderPDF } from '../../utils/pdfGenerator';
@@ -104,6 +105,9 @@ const OrderDetailPage = () => {
     const hasCommissionFeature = user?.company?.features?.commissionCalculation === true;
     const canViewCommission = (isAdmin || isSuperadmin || user?.canViewCommission === true) && hasCommissionFeature;
     const canEditCommission = (isAdmin || isSuperadmin) && hasCommissionFeature;
+    
+    // Price display setting
+    const showPricesWithTax = user?.company?.showPricesWithTax === true;
 
     useEffect(() => {
         fetchOrder();
@@ -316,12 +320,13 @@ const OrderDetailPage = () => {
 
     if (!order) return null;
 
-    const total = order.items?.reduce((acc, item) => 
+    // Usar total calculado del backend o calcular para pedidos antiguos
+    const subtotal = order.subtotal !== undefined ? parseFloat(order.subtotal) : (order.items?.reduce((acc, item) => 
         acc + (item.quantity * item.listPrice * (1 - (item.discount || 0) / 100)), 0
-    ) || 0;
-
-    const discountAmount = total * (order.discount || 0) / 100;
-    const finalTotal = total - discountAmount;
+    ) || 0);
+    
+    const finalTotal = order.total !== undefined ? parseFloat(order.total) : (subtotal * (1 - (order.discount || 0) / 100));
+    const discountAmount = subtotal - finalTotal;
 
     return (
         <div className="space-y-6">
@@ -487,6 +492,22 @@ const OrderDetailPage = () => {
                         <div className="text-right">
                             <p className="text-[10px] text-(--text-muted) font-bold uppercase tracking-wider">Total</p>
                             <p className="text-xl font-black text-(--text-primary)">${finalTotal.toLocaleString('es-AR')}</p>
+                            {/* Nota sobre productos con oferta */}
+                            {(() => {
+                                if (order.excludeOfferProductsFromGlobalDiscount !== true) return null;
+                                const offerItems = order.items?.filter(item => item.hasOffer === true) || [];
+                                if (offerItems.length > 0) {
+                                    return (
+                                        <div className="mt-1 px-2 py-1 bg-pink-50 dark:bg-pink-900/20 border border-pink-100 dark:border-pink-800 rounded-lg flex items-center justify-end gap-1">
+                                            <Tag size={10} className="text-pink-600 dark:text-pink-400" />
+                                            <p className="text-[9px] text-pink-600 dark:text-pink-400">
+                                                {offerItems.length} producto{offerItems.length > 1 ? 's' : ''} con oferta no aplica descuento
+                                            </p>
+                                        </div>
+                                    );
+                                }
+                                return null;
+                            })()}
                         </div>
                     </div>
                 </div>
@@ -509,11 +530,24 @@ const OrderDetailPage = () => {
                                             </div>
                                             <div className="flex-1">
                                                 <p className="font-semibold text-(--text-primary)">{item.name}</p>
-                                                <p className="text-[11px] text-(--text-muted)">Código: {item.code}</p>
+                                                <p className="text-[11px] text-(--text-muted)">
+                                                    Código: {item.code || 'N/A'}
+                                                    {item.hasOffer && (
+                                                        <span className="ml-2 px-1.5 py-0.5 bg-warning-100 dark:bg-warning-900/30 text-warning-600 text-[9px] font-bold rounded">
+                                                            OFERTA
+                                                        </span>
+                                                    )}
+                                                </p>
+                                                {item.hasOffer === true && order.excludeOfferProductsFromGlobalDiscount === true && (
+                                                    <p className="text-[10px] text-pink-600 mt-1 flex items-center gap-1">
+                                                        <Tag size={10} />
+                                                        No aplica descuento global
+                                                    </p>
+                                                )}
                                             </div>
                                             <div className="text-right">
                                                 <p className="font-semibold text-(--text-primary)">
-                                                    {item.quantity} x ${item.listPrice.toLocaleString('es-AR')}
+                                                    {item.quantity} x ${Number(item.listPrice || 0).toLocaleString('es-AR')}
                                                 </p>
                                                 {item.discount > 0 && (
                                                     <p className="text-[11px] text-success-600">
@@ -581,11 +615,48 @@ const OrderDetailPage = () => {
                                 />
                                 {order.discount > 0 && (
                                     <InfoRow 
-                                        label="Descuento" 
+                                        label="Descuento Global" 
                                         value={`${order.discount}%`}
                                         icon={Percent}
                                     />
                                 )}
+                                
+                                {/* Desglose de totales */}
+                                <div className="pt-4 mt-4 border-t border-(--border-color)">
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between text-xs text-(--text-muted)">
+                                            <span>Subtotal</span>
+                                            <span>${subtotal.toLocaleString('es-AR')}</span>
+                                        </div>
+                                        {discountAmount > 0 && (
+                                            <div className="flex justify-between text-xs text-success-600 dark:text-success-400">
+                                                <span>Descuento</span>
+                                                <span>-${discountAmount.toLocaleString('es-AR')}</span>
+                                            </div>
+                                        )}
+                                        <div className="flex justify-between text-sm font-bold text-(--text-primary) pt-2 border-t border-(--border-color)">
+                                            <span>Total Final</span>
+                                            <span>${finalTotal.toLocaleString('es-AR')}</span>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Nota sobre productos con oferta protegidos */}
+                                    {order.excludeOfferProductsFromGlobalDiscount === true && order.items?.some(item => item.hasOffer === true) && (
+                                        <div className="mt-3 p-2 bg-pink-50 dark:bg-pink-900/20 rounded-lg border border-pink-200 dark:border-pink-800">
+                                            <p className="text-[11px] text-pink-700 dark:text-pink-300 flex items-start gap-1.5">
+                                                <Tag size={12} className="shrink-0 mt-0.5" />
+                                                <span>
+                                                    {order.items.filter(item => item.hasOffer).length} producto{order.items.filter(item => item.hasOffer).length > 1 ? 's' : ''} con precio de oferta no aplican descuento global
+                                                </span>
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                                <InfoRow 
+                                    label={showPricesWithTax ? 'Precios con IVA' : 'Precios sin IVA'}
+                                    value={showPricesWithTax ? 'IVA incluido' : 'IVA se agrega al facturar'}
+                                    icon={DollarSign}
+                                />
                                 {order.paymentMethod && (
                                     <InfoRow 
                                         label="Método de Pago" 

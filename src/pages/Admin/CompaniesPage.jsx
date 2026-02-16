@@ -4,7 +4,7 @@ import {
     Building2, Plus, Edit2, Trash2, Power, Check, X, 
     Package, FileText, Receipt, Users, Landmark, ShoppingCart, 
     Search, Download, MoreHorizontal, ChevronUp, ChevronDown,
-    Briefcase, Shield, Mail, Phone, Percent
+    Briefcase, Shield, Mail, Phone, Percent, Box
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { companyService } from '../../services/companyService';
@@ -263,7 +263,7 @@ const CompaniesPage = () => {
                 maxUsers: 3
             }
         });
-    };
+    }
 
     const openCreateDrawer = () => {
         setEditingCompany(null);

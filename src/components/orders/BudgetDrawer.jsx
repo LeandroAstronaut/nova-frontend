@@ -28,6 +28,7 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
     const { addToast } = useToast();
     
     const features = user?.company?.features || {};
+    const showPricesWithTax = user?.company?.showPricesWithTax === true;
     const isAdmin = user?.role?.name === 'admin';
     const isSuperadmin = user?.role?.name === 'superadmin';
     const isVendedor = user?.role?.name === 'vendedor';
@@ -85,6 +86,7 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                     quantity: item.quantity,
                     listPrice: item.listPrice,
                     discount: item.discount || 0
+                    // Nota: hasOffer se recalcula en el backend según estado actual del producto
                 })));
                 setHeader({
                     date: new Date(order.date).toISOString().split('T')[0],
@@ -167,7 +169,7 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
             ]);
             setClients(cData || []);
             setSellers(sData || []);
-            setProducts(pData || []);
+            setProducts(pData?.products || pData || []);
         } catch (error) {
             console.error('Error fetching data:', error);
         } finally {
@@ -186,7 +188,7 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
             setSearchQuery(query);
             setLoading(true);
             const data = await getProducts(query);
-            setProducts(data || []);
+            setProducts(data?.products || data || []);
         } catch (error) {
             console.error('Error searching products:', error);
         } finally {
@@ -222,7 +224,17 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
 
         const pricing = product.pricing || { list1: 0, list2: 0 };
         const priceListNum = header.priceList || 1;
-        const price = (priceListNum === 2 ? (pricing.list2 || 0) : (pricing.list1 || 0)) || 0;
+        
+        // Verificar si el producto tiene precio de oferta (tiene prioridad)
+        const hasOffer = pricing.offer > 0;
+        
+        // Usar precio de oferta si existe, sino el precio de la lista seleccionada
+        let price;
+        if (hasOffer) {
+            price = pricing.offer;
+        } else {
+            price = (priceListNum === 2 ? (pricing.list2 || 0) : (pricing.list1 || 0)) || 0;
+        }
 
         const qty = parseInt(quantityToAdd) || 1;
         // Cliente: usar siempre el descuento del producto, no editable
@@ -243,7 +255,8 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                 code: product.code || 'S/N',
                 quantity: qty,
                 listPrice: price,
-                discount: disc
+                discount: disc,
+                hasOffer: hasOffer
             }]);
         }
     };
@@ -264,8 +277,34 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
     };
 
     const calculateTotal = () => {
-        const sub = calculateSubtotal() || 0;
-        return sub * (1 - (Number(header.discount || 0) / 100)) || 0;
+        const excludeOfferFromGlobalDiscount = user?.company?.excludeOfferProductsFromGlobalDiscount === true;
+        
+        if (!excludeOfferFromGlobalDiscount) {
+            // Comportamiento normal: descuento global aplica a todos los productos
+            const sub = calculateSubtotal() || 0;
+            return sub * (1 - (Number(header.discount || 0) / 100)) || 0;
+        }
+        
+        // Comportamiento especial: productos con oferta no aplican descuento global
+        let totalWithGlobalDiscount = 0;
+        let totalWithoutGlobalDiscount = 0;
+        
+        items.forEach(item => {
+            const product = products.find(p => p._id === item.productId);
+            const hasOffer = product?.pricing?.offer > 0;
+            const itemTotal = Number(item.quantity || 0) * Number(item.listPrice || 0) * (1 - (Number(item.discount || 0) / 100));
+            
+            if (hasOffer) {
+                // Productos con oferta: no aplican descuento global
+                totalWithoutGlobalDiscount += itemTotal;
+            } else {
+                // Productos sin oferta: aplican descuento global
+                totalWithGlobalDiscount += itemTotal;
+            }
+        });
+        
+        const discountedAmount = totalWithGlobalDiscount * (1 - (Number(header.discount || 0) / 100));
+        return discountedAmount + totalWithoutGlobalDiscount;
     };
     
     const calculateCommissionAmount = () => {
@@ -344,7 +383,7 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                             animate={{ x: 0 }}
                             exit={{ x: '100%' }}
                             transition={{ type: 'spring', damping: 28, stiffness: 220 }}
-                            className="fixed top-4 right-4 h-[calc(100vh-2rem)] w-full max-w-[900px] bg-[var(--bg-card)] shadow-2xl dark:shadow-soft-lg-dark z-[10000] flex items-center justify-center border border-[var(--border-color)] rounded-[1.25rem]"
+                            className="fixed top-4 right-4 h-[calc(100vh-2rem)] w-full max-w-[1100px] bg-[var(--bg-card)] shadow-2xl dark:shadow-soft-lg-dark z-[10000] flex items-center justify-center border border-[var(--border-color)] rounded-[1.25rem]"
                         >
                             <Loader2 size={40} className="animate-spin text-primary-600" />
                         </motion.div>
@@ -374,7 +413,7 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                         animate={{ x: 0 }}
                         exit={{ x: '100%' }}
                         transition={{ type: 'spring', damping: 28, stiffness: 220 }}
-                        className="fixed top-4 right-4 h-[calc(100vh-2rem)] w-full max-w-[900px] bg-[var(--bg-card)] shadow-2xl dark:shadow-soft-lg-dark z-[160] flex flex-col border border-[var(--border-color)] rounded-2xl overflow-hidden"
+                        className="fixed top-4 right-4 h-[calc(100vh-2rem)] w-full max-w-[1100px] bg-[var(--bg-card)] shadow-2xl dark:shadow-soft-lg-dark z-[160] flex flex-col border border-[var(--border-color)] rounded-2xl overflow-hidden"
                     >
                         {/* Header - Estilo Modal */}
                         <div className="px-6 py-4 border-b border-[var(--border-color)] flex items-center justify-between shrink-0 bg-[var(--bg-card)]">
@@ -448,6 +487,8 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                                             onProductClick={openQuickView}
                                             onAddDirect={(p) => addItem(p)}
                                             isClient={isClient}
+                                            showPricesWithTax={showPricesWithTax}
+                                            company={user?.company}
                                         />
                                     )}
 
@@ -484,6 +525,11 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                                             // Discount permissions
                                             canEditProductDiscount={canEditProductDiscount}
                                             canEditBudgetDiscount={canEditBudgetDiscount}
+                                            // Price display
+                                            showPricesWithTax={showPricesWithTax}
+                                            // Products y company para reglas de cantidad
+                                            products={products}
+                                            company={user?.company}
                                         />
                                     )}
                                 </AnimatePresence>
@@ -591,6 +637,8 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                             removeItem={removeItem}
                             total={calculateTotal()}
                             onCheckout={() => { setIsCartOpen(false); setStep(3); }}
+                            products={products}
+                            company={user?.company}
                         />
 
                         <ProductQuickView
@@ -599,6 +647,10 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                             product={quickViewProduct}
                             onAddToCart={(p, q, d) => addItem(p, q, d)}
                             isClient={isClient}
+                            showPricesWithTax={showPricesWithTax}
+                            features={features}
+                            company={user?.company}
+                            priceList={header.priceList}
                         />
 
                         <ConfirmModal

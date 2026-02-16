@@ -92,6 +92,28 @@ const updateContactInfo = async (id, contactData) => {
 };
 
 /**
+ * Actualizar preferencias de visualización de la compañía
+ * @param {string} id - ID de la compañía
+ * @param {Object} preferences - { showPricesWithTax }
+ * @returns {Promise<Object>} Compañía actualizada
+ */
+const updateDisplayPreferences = async (id, preferences) => {
+    const response = await api.put(`/companies/${id}/display-preferences`, preferences);
+    return response.data;
+};
+
+/**
+ * Actualizar configuración de pedidos de la compañía
+ * @param {string} id - ID de la compañía
+ * @param {Object} settings - { sellOnlyFullPackages }
+ * @returns {Promise<Object>} Compañía actualizada
+ */
+const updateOrderSettings = async (id, settings) => {
+    const response = await api.put(`/companies/${id}/order-settings`, settings);
+    return response.data;
+};
+
+/**
  * Subir logo de la compañía
  * @param {string} id - ID de la compañía
  * @param {File} file - Archivo de imagen
@@ -128,6 +150,8 @@ export {
     toggleCompanyStatus,
     toggleCompanyFeature,
     updateContactInfo,
+    updateDisplayPreferences,
+    updateOrderSettings,
     uploadCompanyLogo,
     deleteCompanyLogo
 };
@@ -145,6 +169,8 @@ export const companyService = {
     toggleStatus: toggleCompanyStatus,
     toggleFeature: toggleCompanyFeature,
     updateContactInfo,
+    updateDisplayPreferences,
+    updateOrderSettings,
     uploadLogo: uploadCompanyLogo,
     deleteLogo: deleteCompanyLogo
 };

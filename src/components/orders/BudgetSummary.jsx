@@ -32,8 +32,43 @@ const BudgetSummary = ({
     orderStatus = null,
     // Discount permissions
     canEditProductDiscount = true,
-    canEditBudgetDiscount = true
+    canEditBudgetDiscount = true,
+    // Price display
+    showPricesWithTax = false,
+    // Products y company para reglas de cantidad
+    products = [],
+    company = null
 }) => {
+    // Helper para obtener datos del producto
+    const getProductData = (productId) => {
+        return products.find(p => p._id === productId) || {};
+    };
+
+    // Helper para calcular cantidad válida
+    const getValidQuantity = (productId, quantity, delta = 0) => {
+        const product = getProductData(productId);
+        const unitsPerPackage = product.unitsPerPackage || 1;
+        const minOrderQuantity = product.minOrderQuantity || 1;
+        const sellOnlyFullPackages = company?.sellOnlyFullPackages === true;
+        
+        let newQty = quantity + delta;
+        
+        // Aplicar mínimo
+        newQty = Math.max(minOrderQuantity, newQty);
+        
+        // Aplicar step de bulto si corresponde
+        if (sellOnlyFullPackages && unitsPerPackage > 1) {
+            if (delta !== 0) {
+                newQty = quantity + (delta > 0 ? unitsPerPackage : -unitsPerPackage);
+                newQty = Math.max(unitsPerPackage, newQty);
+            } else {
+                newQty = Math.round(newQty / unitsPerPackage) * unitsPerPackage;
+                newQty = Math.max(unitsPerPackage, newQty);
+            }
+        }
+        
+        return Math.max(1, newQty);
+    };
     return (
         <div className="space-y-6">
             {/* Header Fields - Estilo consistente con otros pasos */}
@@ -93,10 +128,10 @@ const BudgetSummary = ({
                                 <div className="flex-1 px-3 py-2 bg-(--bg-hover) border border-(--border-color) rounded-lg text-xs font-semibold text-(--text-primary)">
                                     {priceList === 1 ? 'Lista 1' : 'Lista 2'}
                                 </div>
-                                <div className="flex items-center gap-1 px-2 py-2 bg-success-50 dark:bg-success-900/30 rounded-lg border border-success-100 dark:border-success-800 w-24">
+                                <div className="flex items-center gap-1 px-2 py-2 bg-success-50 dark:bg-success-900/30 rounded-lg border border-success-100 dark:border-success-800">
                                     <input
                                         type="number"
-                                        className="w-full bg-transparent text-xs font-bold text-success-700 dark:text-success-400 outline-none disabled:opacity-50 text-center"
+                                        className="w-12 bg-transparent text-xs font-bold text-success-700 dark:text-success-400 outline-none disabled:opacity-50 text-center"
                                         value={discountGlobal}
                                         onChange={(e) => setDiscountGlobal(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
                                         placeholder="0"
@@ -173,26 +208,41 @@ const BudgetSummary = ({
                                                         </div>
                                                     ) : (
                                                         <>
-                                                            <div className="flex items-center gap-1 p-0.5 bg-(--bg-hover) rounded-lg border border-(--border-color)">
-                                                                <button
-                                                                    onClick={() => updateItem(item.productId, 'quantity', Math.max(1, item.quantity - 1))}
-                                                                    className="w-7 h-7 flex items-center justify-center text-(--text-muted) hover:text-primary-600 hover:bg-(--bg-card) rounded-md transition-colors"
-                                                                >
-                                                                    <Minus size={14} />
-                                                                </button>
-                                                                <input
-                                                                    type="number"
-                                                                    className="w-10 bg-transparent text-center text-xs font-bold text-(--text-primary)"
-                                                                    value={item.quantity}
-                                                                    onChange={(e) => updateItem(item.productId, 'quantity', parseInt(e.target.value) || 0)}
-                                                                />
-                                                                <button
-                                                                    onClick={() => updateItem(item.productId, 'quantity', item.quantity + 1)}
-                                                                    className="w-7 h-7 flex items-center justify-center text-(--text-muted) hover:text-primary-600 hover:bg-(--bg-card) rounded-md transition-colors"
-                                                                >
-                                                                    <Plus size={14} />
-                                                                </button>
-                                                            </div>
+                                                            {(() => {
+                                                                const product = getProductData(item.productId);
+                                                                const unitsPerPackage = product.unitsPerPackage || 1;
+                                                                const minOrderQuantity = product.minOrderQuantity || 1;
+                                                                const sellOnlyFullPackages = company?.sellOnlyFullPackages === true;
+                                                                const step = sellOnlyFullPackages ? unitsPerPackage : 1;
+                                                                const minQty = sellOnlyFullPackages ? unitsPerPackage : minOrderQuantity;
+                                                                
+                                                                return (
+                                                                    <div className="flex items-center gap-1 p-0.5 bg-(--bg-hover) rounded-lg border border-(--border-color)">
+                                                                        <button
+                                                                            onClick={() => updateItem(item.productId, 'quantity', getValidQuantity(item.productId, item.quantity, -step))}
+                                                                            disabled={item.quantity <= minQty}
+                                                                            className="w-7 h-7 flex items-center justify-center text-(--text-muted) hover:text-primary-600 hover:bg-(--bg-card) rounded-md transition-colors disabled:opacity-40"
+                                                                        >
+                                                                            <Minus size={14} />
+                                                                        </button>
+                                                                        <input
+                                                                            type="number"
+                                                                            className="w-10 bg-transparent text-center text-xs font-bold text-(--text-primary)"
+                                                                            value={item.quantity}
+                                                                            onChange={(e) => {
+                                                                                const val = parseInt(e.target.value) || 0;
+                                                                                updateItem(item.productId, 'quantity', getValidQuantity(item.productId, val, 0));
+                                                                            }}
+                                                                        />
+                                                                        <button
+                                                                            onClick={() => updateItem(item.productId, 'quantity', getValidQuantity(item.productId, item.quantity, step))}
+                                                                            className="w-7 h-7 flex items-center justify-center text-(--text-muted) hover:text-primary-600 hover:bg-(--bg-card) rounded-md transition-colors"
+                                                                        >
+                                                                            <Plus size={14} />
+                                                                        </button>
+                                                                    </div>
+                                                                );
+                                                            })()}
                                                             {item.discount > 0 || !isClient ? (
                                                                 <div className="flex items-center gap-1 px-2 py-1.5 bg-success-50 dark:bg-success-900/30 rounded-lg border border-success-100 dark:border-success-800">
                                                                     <input
@@ -205,6 +255,21 @@ const BudgetSummary = ({
                                                                     <span className="text-[10px] font-bold text-success-600/50 dark:text-success-400/50">%</span>
                                                                 </div>
                                                             ) : null}
+                                                            
+                                                            {/* Badge de protección de oferta */}
+                                                            {(() => {
+                                                                const product = getProductData(item.productId);
+                                                                const hasOffer = product.pricing?.offer > 0;
+                                                                if (hasOffer && company?.excludeOfferProductsFromGlobalDiscount) {
+                                                                    return (
+                                                                        <div className="px-2 py-1 bg-pink-100 dark:bg-pink-900/30 border border-pink-200 dark:border-pink-800 rounded-lg text-[9px] font-bold text-pink-600 dark:text-pink-400 flex items-center gap-1">
+                                                                            <Tag size={10} />
+                                                                            Sin desc. global
+                                                                        </div>
+                                                                    );
+                                                                }
+                                                                return null;
+                                                            })()}
                                                         </>
                                                     )}
                                                 </div>
@@ -249,9 +314,37 @@ const BudgetSummary = ({
                                 <span>Descuento</span>
                                 <span>{discountGlobal}%</span>
                             </div>
+                            
+                            {/* Nota sobre productos con oferta */}
+                            {(() => {
+                                const offerItems = items.filter(item => {
+                                    const product = getProductData(item.productId);
+                                    return product?.pricing?.offer > 0;
+                                });
+                                if (company?.excludeOfferProductsFromGlobalDiscount && offerItems.length > 0) {
+                                    const offerTotal = offerItems.reduce((acc, item) => {
+                                        return acc + (Number(item.quantity || 0) * Number(item.listPrice || 0) * (1 - (Number(item.discount || 0) / 100)));
+                                    }, 0);
+                                    return (
+                                        <div className="px-3 py-2 bg-pink-50 dark:bg-pink-900/20 border border-pink-100 dark:border-pink-800 rounded-lg">
+                                            <p className="text-[10px] text-pink-600 dark:text-pink-400 flex items-center gap-1">
+                                                <Tag size={12} />
+                                                {offerItems.length} producto{offerItems.length > 1 ? 's' : ''} con oferta no aplica descuento global
+                                            </p>
+                                            <p className="text-[10px] text-pink-500 dark:text-pink-400/70 mt-0.5">
+                                                Subtotal protegido: ${offerTotal.toLocaleString('es-AR')}
+                                            </p>
+                                        </div>
+                                    );
+                                }
+                                return null;
+                            })()}
+                            
                             <div className="pt-3 border-t border-(--border-color) flex justify-between items-end">
                                 <div>
-                                    <p className="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-1">Total Final</p>
+                                    <p className="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-1">
+                                        Total Final
+                                    </p>
                                     <p className="text-2xl font-black text-(--text-primary)">${Number(total || 0).toLocaleString('es-AR')}</p>
                                 </div>
                             </div>

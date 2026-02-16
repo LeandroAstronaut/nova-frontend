@@ -1,10 +1,42 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Trash2, ShoppingBag, Minus, Plus, Package, ShoppingCart } from 'lucide-react';
+import { X, Trash2, ShoppingBag, Minus, Plus, Package, ShoppingCart, Tag } from 'lucide-react';
 import Button from '../../components/common/Button';
 
-const CartDrawer = ({ isOpen, onClose, items, updateItem, removeItem, onCheckout, total }) => {
+const CartDrawer = ({ isOpen, onClose, items, updateItem, removeItem, onCheckout, total, products = [], company = null }) => {
+    // Helper para obtener datos del producto
+    const getProductData = (productId) => {
+        return products.find(p => p._id === productId) || {};
+    };
+
+    // Helper para calcular cantidad válida
+    const getValidQuantity = (productId, quantity, delta = 0) => {
+        const product = getProductData(productId);
+        const unitsPerPackage = product.unitsPerPackage || 1;
+        const minOrderQuantity = product.minOrderQuantity || 1;
+        const sellOnlyFullPackages = company?.sellOnlyFullPackages === true;
+        
+        let newQty = quantity + delta;
+        
+        // Aplicar mínimo
+        newQty = Math.max(minOrderQuantity, newQty);
+        
+        // Aplicar step de bulto si corresponde
+        if (sellOnlyFullPackages && unitsPerPackage > 1) {
+            if (delta !== 0) {
+                // Cuando se usa +/-, incrementar/decrementar por el step
+                newQty = quantity + (delta > 0 ? unitsPerPackage : -unitsPerPackage);
+                newQty = Math.max(unitsPerPackage, newQty);
+            } else {
+                // Cuando se edita manualmente, redondear al múltiplo más cercano
+                newQty = Math.round(newQty / unitsPerPackage) * unitsPerPackage;
+                newQty = Math.max(unitsPerPackage, newQty);
+            }
+        }
+        
+        return Math.max(1, newQty);
+    };
     return createPortal(
         <AnimatePresence>
             {isOpen && (
@@ -80,29 +112,68 @@ const CartDrawer = ({ isOpen, onClose, items, updateItem, removeItem, onCheckout
                                                         <Trash2 size={16} />
                                                     </button>
                                                 </div>
-                                                <div className="mt-2 flex items-center justify-between gap-3">
+                                                {/* Badge de protección de oferta (arriba si aplica) */}
+                                                {(() => {
+                                                    const product = getProductData(item.productId);
+                                                    const hasOffer = product.pricing?.offer > 0;
+                                                    if (hasOffer && company?.excludeOfferProductsFromGlobalDiscount) {
+                                                        return (
+                                                            <div className="mb-2 px-2 py-1 bg-pink-100 dark:bg-pink-900/30 border border-pink-200 dark:border-pink-800 rounded-lg text-[9px] font-bold text-pink-600 dark:text-pink-400 flex items-center gap-1 w-fit">
+                                                                <Tag size={10} />
+                                                                Sin descuento global del pedido
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return null;
+                                                })()}
+
+                                                <div className="flex items-center justify-between gap-3">
                                                     <div className="flex items-center gap-3">
                                                         {/* Qty Selector */}
-                                                        <div className="flex items-center p-0.5 bg-[var(--bg-hover)] rounded-lg border border-[var(--border-color)]">
-                                                            <button
-                                                                onClick={() => updateItem(item.productId, 'quantity', Math.max(1, item.quantity - 1))}
-                                                                className="w-7 h-7 flex items-center justify-center text-[var(--text-muted)] hover:text-primary-600 hover:bg-[var(--bg-card)] rounded-md transition-colors"
-                                                            >
-                                                                <Minus size={14} />
-                                                            </button>
-                                                            <input
-                                                                type="number"
-                                                                className="w-10 bg-transparent text-center text-xs font-bold text-[var(--text-primary)] focus:outline-none"
-                                                                value={item.quantity}
-                                                                onChange={(e) => updateItem(item.productId, 'quantity', parseInt(e.target.value) || 0)}
-                                                            />
-                                                            <button
-                                                                onClick={() => updateItem(item.productId, 'quantity', item.quantity + 1)}
-                                                                className="w-7 h-7 flex items-center justify-center text-[var(--text-muted)] hover:text-primary-600 hover:bg-[var(--bg-card)] rounded-md transition-colors"
-                                                            >
-                                                                <Plus size={14} />
-                                                            </button>
-                                                        </div>
+                                                        {(() => {
+                                                            const product = getProductData(item.productId);
+                                                            const unitsPerPackage = product.unitsPerPackage || 1;
+                                                            const minOrderQuantity = product.minOrderQuantity || 1;
+                                                            const sellOnlyFullPackages = company?.sellOnlyFullPackages === true;
+                                                            const step = sellOnlyFullPackages ? unitsPerPackage : 1;
+                                                            const showRestrictions = unitsPerPackage > 1 || minOrderQuantity > 1 || sellOnlyFullPackages;
+                                                            
+                                                            return (
+                                                                <div className="space-y-1">
+                                                                    <div className="flex items-center p-0.5 bg-[var(--bg-hover)] rounded-lg border border-[var(--border-color)]">
+                                                                        <button
+                                                                            onClick={() => updateItem(item.productId, 'quantity', getValidQuantity(item.productId, item.quantity, -step))}
+                                                                            disabled={item.quantity <= (sellOnlyFullPackages ? unitsPerPackage : minOrderQuantity)}
+                                                                            className="w-7 h-7 flex items-center justify-center text-[var(--text-muted)] hover:text-primary-600 hover:bg-[var(--bg-card)] rounded-md transition-colors disabled:opacity-40"
+                                                                        >
+                                                                            <Minus size={14} />
+                                                                        </button>
+                                                                        <input
+                                                                            type="number"
+                                                                            className="w-10 bg-transparent text-center text-xs font-bold text-[var(--text-primary)] focus:outline-none"
+                                                                            value={item.quantity}
+                                                                            onChange={(e) => {
+                                                                                const val = parseInt(e.target.value) || 0;
+                                                                                updateItem(item.productId, 'quantity', getValidQuantity(item.productId, val, 0));
+                                                                            }}
+                                                                        />
+                                                                        <button
+                                                                            onClick={() => updateItem(item.productId, 'quantity', getValidQuantity(item.productId, item.quantity, step))}
+                                                                            className="w-7 h-7 flex items-center justify-center text-[var(--text-muted)] hover:text-primary-600 hover:bg-[var(--bg-card)] rounded-md transition-colors"
+                                                                        >
+                                                                            <Plus size={14} />
+                                                                        </button>
+                                                                    </div>
+                                                                    {showRestrictions && (
+                                                                        <p className="text-[9px] text-[var(--text-muted)]">
+                                                                            {sellOnlyFullPackages && unitsPerPackage > 1 
+                                                                                ? `Múltiplos de ${unitsPerPackage}` 
+                                                                                : (minOrderQuantity > 1 ? `Mín: ${minOrderQuantity}` : '')}
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })()}
 
                                                         {/* Disc Selector */}
                                                         <div className="flex items-center gap-1 px-2 py-1.5 bg-success-50 dark:bg-success-900/30 rounded-lg border border-success-100 dark:border-success-800">

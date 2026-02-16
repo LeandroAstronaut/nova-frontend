@@ -73,37 +73,51 @@ const SendWhatsAppModal = ({ isOpen, onClose, order }) => {
         };
         const status = statusLabels[order?.status] || order?.status || 'N/A';
         
-        // Calcular subtotal (suma de items sin descuento de orden)
-        const subtotal = order?.items?.reduce((acc, item) => 
+        // Verificar configuración de protección de ofertas
+        // Usar configuración CONGELADA en el pedido (no la actual de la empresa)
+        const excludeOfferFromGlobalDiscount = order?.excludeOfferProductsFromGlobalDiscount === true;
+        
+        // Usar totales calculados del order
+        const subtotal = order?.subtotal || order?.items?.reduce((acc, item) => 
             acc + (item.quantity * item.listPrice * (1 - (item.discount || 0) / 100)), 0
         ) || 0;
         
+        // Contar productos con oferta
+        const offerItems = order?.items?.filter(item => item.hasOffer) || [];
+        
         // Descuento de la orden (si existe)
         const orderDiscount = order?.discount || 0;
-        const discountAmount = subtotal * (orderDiscount / 100);
+        const discountAmount = subtotal - (order?.total || subtotal);
         
         // Total final
-        const total = subtotal - discountAmount;
+        const total = order?.total || subtotal;
         
         const items = order?.items?.map(item => {
             const name = item.name || item.productId?.name || 'Producto';
             const discountText = item.discount > 0 ? ` (-${item.discount}%)` : '';
-            return `- ${item.quantity}x ${name} ($${item.listPrice.toLocaleString()})${discountText}`;
+            const offerBadge = (item.hasOffer && excludeOfferFromGlobalDiscount) ? ' [OFERTA]' : '';
+            return `- ${item.quantity}x ${name}${offerBadge} ($${Number(item.listPrice).toLocaleString()})${discountText}`;
         }).join('\n') || '';
 
         // Construir totales
-        let totalsText = `*Subtotal:* $${subtotal.toLocaleString()}`;
+        let totalsText = `*Subtotal:* $${Number(subtotal).toLocaleString()}`;
         if (orderDiscount > 0) {
-            totalsText += `\n*Descuento:* -$${discountAmount.toLocaleString()} (${orderDiscount}%)`;
+            totalsText += `\n*Descuento:* -$${Number(discountAmount).toLocaleString()} (${orderDiscount}%)`;
         }
-        totalsText += `\n*Total:* $${total.toLocaleString()}`;
+        totalsText += `\n*Total:* $${Number(total).toLocaleString()}`;
+        
+        // Nota sobre productos con oferta
+        let offerNote = '';
+        if (offerItems.length > 0 && excludeOfferFromGlobalDiscount) {
+            offerNote = `\n\n⚠️ *Nota:* ${offerItems.length} producto${offerItems.length > 1 ? 's' : ''} con precio de oferta no aplica descuento global.`;
+        }
 
         const message = `*${orderTypeLabel} #${orderNumber}*
 *Estado:* ${status}
 
 *Cliente:* ${clientName}
 
-${totalsText}
+${totalsText}${offerNote}
 
 *Detalle:*
 ${items}

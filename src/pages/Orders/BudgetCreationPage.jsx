@@ -364,6 +364,7 @@ const BudgetCreationPage = () => {
                                 itemsInCart={items}
                                 onProductClick={openQuickView}
                                 onAddDirect={(p) => addItem(p)}
+                                company={user?.company}
                             />
                         )}
 
@@ -412,6 +413,7 @@ const BudgetCreationPage = () => {
                 onClose={() => setIsQuickViewOpen(false)}
                 product={quickViewProduct}
                 onAddToCart={(p, q, d) => addItem(p, q, d)}
+                company={user?.company}
             />
 
             <ConfirmModal

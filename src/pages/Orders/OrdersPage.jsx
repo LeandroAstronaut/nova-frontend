@@ -785,9 +785,12 @@ const OrdersPage = ({ mode = 'order' }) => {
                                         </td>
                                         <td className="px-6 py-4 text-right font-bold text-(--text-primary) text-[13px]">
                                             ${(() => {
-                                                const subtotal = order.items.reduce((acc, item) => acc + (item.quantity * item.listPrice * (1 - (item.discount || 0) / 100)), 0);
-                                                const total = subtotal * (1 - (order.discount || 0) / 100);
-                                                return total.toLocaleString();
+                                                // Usar total calculado del backend o recalcular para pedidos antiguos
+                                                const total = order.total !== undefined ? parseFloat(order.total) : (() => {
+                                                    const subtotal = order.items.reduce((acc, item) => acc + (item.quantity * item.listPrice * (1 - (item.discount || 0) / 100)), 0);
+                                                    return subtotal * (1 - (order.discount || 0) / 100);
+                                                })();
+                                                return total.toLocaleString('es-AR');
                                             })()}
                                         </td>
                                         {canViewCommission && (
@@ -992,9 +995,11 @@ const OrdersPage = ({ mode = 'order' }) => {
                                         <div className="col-span-2">
                                             <span className="text-(--text-muted)">Total:</span>
                                             <span className="ml-1 font-bold text-(--text-primary) text-[14px]">${(() => {
-                                                const subtotal = order.items.reduce((acc, item) => acc + (item.quantity * item.listPrice * (1 - (item.discount || 0) / 100)), 0);
-                                                const total = subtotal * (1 - (order.discount || 0) / 100);
-                                                return total.toLocaleString();
+                                                const total = order.total !== undefined ? parseFloat(order.total) : (() => {
+                                                    const subtotal = order.items.reduce((acc, item) => acc + (item.quantity * item.listPrice * (1 - (item.discount || 0) / 100)), 0);
+                                                    return subtotal * (1 - (order.discount || 0) / 100);
+                                                })();
+                                                return total.toLocaleString('es-AR');
                                             })()}</span>
                                         </div>
                                         {canViewCommission && order.commissionAmount && (

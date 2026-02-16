@@ -14,10 +14,16 @@ import {
     Database,
     Upload,
     Trash2,
-    Image as ImageIcon
+    Image as ImageIcon,
+    Eye,
+    DollarSign,
+    Package,
+    Globe,
+    ShoppingCart,
+    Tag
 } from 'lucide-react';
 import Button from '../../components/common/Button';
-import { updateContactInfo, uploadCompanyLogo, deleteCompanyLogo } from '../../services/companyService';
+import { updateContactInfo, updateDisplayPreferences, updateOrderSettings, uploadCompanyLogo, deleteCompanyLogo } from '../../services/companyService';
 
 const SettingsPage = () => {
     const { user, updateUserContext } = useAuth();
@@ -88,6 +94,78 @@ const SettingsPage = () => {
             addToast('Error al guardar: ' + (error.response?.data?.message || error.message), 'error');
         } finally {
             setLoading(false);
+        }
+    };
+    
+    // Estado para preferencias de visualización
+    const [displayPrefs, setDisplayPrefs] = useState({
+        showPricesWithTax: user?.company?.showPricesWithTax === true
+    });
+    const [savingPrefs, setSavingPrefs] = useState(false);
+    
+    // Estado para configuración de pedidos
+    const [orderSettings, setOrderSettings] = useState({
+        sellOnlyFullPackages: user?.company?.sellOnlyFullPackages === true,
+        publicCatalog: user?.company?.publicCatalog === true,
+        showPriceInPublicCatalog: user?.company?.showPriceInPublicCatalog === true,
+        allowAnonymousPurchases: user?.company?.allowAnonymousPurchases === true,
+        excludeOfferProductsFromGlobalDiscount: user?.company?.excludeOfferProductsFromGlobalDiscount === true
+    });
+    const [savingOrderSettings, setSavingOrderSettings] = useState(false);
+    
+    // Actualizar orderSettings cuando cambie user
+    useEffect(() => {
+        if (user?.company) {
+            setOrderSettings({
+                sellOnlyFullPackages: user.company.sellOnlyFullPackages === true,
+                publicCatalog: user.company.publicCatalog === true,
+                showPriceInPublicCatalog: user.company.showPriceInPublicCatalog === true,
+                allowAnonymousPurchases: user.company.allowAnonymousPurchases === true,
+                excludeOfferProductsFromGlobalDiscount: user.company.excludeOfferProductsFromGlobalDiscount === true
+            });
+        }
+    }, [user]);
+    
+    // Actualizar displayPrefs cuando cambie user
+    useEffect(() => {
+        if (user?.company) {
+            setDisplayPrefs({
+                showPricesWithTax: user.company.showPricesWithTax === true
+            });
+        }
+    }, [user]);
+    
+    const handleSaveDisplayPreferences = async () => {
+        setSavingPrefs(true);
+        try {
+            await updateDisplayPreferences(user.company._id, displayPrefs);
+            
+            // Actualizar el contexto del usuario
+            await updateUserContext();
+            
+            addToast('Preferencias actualizadas exitosamente', 'success');
+        } catch (error) {
+            console.error('Error saving display preferences:', error);
+            addToast('Error al guardar preferencias: ' + (error.response?.data?.message || error.message), 'error');
+        } finally {
+            setSavingPrefs(false);
+        }
+    };
+    
+    const handleSaveOrderSettings = async () => {
+        setSavingOrderSettings(true);
+        try {
+            await updateOrderSettings(user.company._id, orderSettings);
+            
+            // Actualizar el contexto del usuario
+            await updateUserContext();
+            
+            addToast('Configuración de pedidos guardada exitosamente', 'success');
+        } catch (error) {
+            console.error('Error saving order settings:', error);
+            addToast('Error al guardar configuración: ' + (error.response?.data?.message || error.message), 'error');
+        } finally {
+            setSavingOrderSettings(false);
         }
     };
 
@@ -451,6 +529,234 @@ const SettingsPage = () => {
                                     </div>
                                 ))}
                             </div>
+                        </div>
+                    </div>
+
+                    {/* Preferencias de Visualización */}
+                    <div className="card p-0! overflow-hidden border-none shadow-sm ring-1 ring-(--border-color)">
+                        <div className="px-6 py-4 border-b border-(--border-color) bg-(--bg-hover)">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600">
+                                    <Eye size={20} />
+                                </div>
+                                <div>
+                                    <h2 className="text-base font-bold text-(--text-primary)">Preferencias de Visualización</h2>
+                                    <p className="text-[11px] text-(--text-muted)">Configuración de cómo se muestran los datos</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="p-6 space-y-4">
+                            {/* Toggle: Mostrar precios con IVA */}
+                            <div className="p-4 bg-(--bg-hover) rounded-xl border border-(--border-color)">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-lg bg-success-100 dark:bg-success-900/30 flex items-center justify-center text-success-600">
+                                            <DollarSign size={16} />
+                                        </div>
+                                        <div>
+                                            <p className="text-[13px] font-semibold text-(--text-primary)">Mostrar precios con IVA incluido</p>
+                                            <p className="text-[11px] text-(--text-muted)">En productos, presupuestos y pedidos</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setDisplayPrefs(prev => ({ ...prev, showPricesWithTax: !prev.showPricesWithTax }))}
+                                        className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${
+                                            displayPrefs.showPricesWithTax ? 'bg-primary-500' : 'bg-(--border-color)'
+                                        }`}
+                                    >
+                                        <div
+                                            className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${
+                                                displayPrefs.showPricesWithTax ? 'translate-x-7' : 'translate-x-1'
+                                            }`}
+                                        />
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <Button
+                                variant="primary"
+                                onClick={handleSaveDisplayPreferences}
+                                isLoading={savingPrefs}
+                                className="w-full"
+                            >
+                                <Save size={18} className="mr-2" />
+                                Guardar Preferencias
+                            </Button>
+                        </div>
+                    </div>
+
+                    {/* Configuración de Pedidos */}
+                    <div className="card p-0! overflow-hidden border-none shadow-sm ring-1 ring-(--border-color)">
+                        <div className="px-6 py-4 border-b border-(--border-color) bg-(--bg-hover)">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center text-orange-600">
+                                    <Package size={20} />
+                                </div>
+                                <div>
+                                    <h2 className="text-base font-bold text-(--text-primary)">Configuración de Pedidos y Catálogo</h2>
+                                    <p className="text-[11px] text-(--text-muted)">Reglas para la compra de productos y catálogo público</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="p-6 space-y-4">
+                            {/* Toggle: Solo bultos cerrados */}
+                            <div className="p-4 bg-(--bg-hover) rounded-xl border border-(--border-color)">
+                                <div class="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center text-orange-600">
+                                            <Package size={16} />
+                                        </div>
+                                        <div>
+                                            <p className="text-[13px] font-semibold text-(--text-primary)">Solo bultos cerrados</p>
+                                            <p className="text-[11px] text-(--text-muted)">Los clientes solo podrán pedir cantidades en múltiplos del bulto</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setOrderSettings(prev => ({ ...prev, sellOnlyFullPackages: !prev.sellOnlyFullPackages }))}
+                                        className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${
+                                            orderSettings.sellOnlyFullPackages ? 'bg-primary-500' : 'bg-(--border-color)'
+                                        }`}
+                                    >
+                                        <div
+                                            className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${
+                                                orderSettings.sellOnlyFullPackages ? 'translate-x-7' : 'translate-x-1'
+                                            }`}
+                                        />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Toggle: Excluir productos en oferta del descuento global */}
+                            <div className="p-4 bg-(--bg-hover) rounded-xl border border-(--border-color)">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-lg bg-pink-100 dark:bg-pink-900/30 flex items-center justify-center text-pink-600">
+                                            <Tag size={16} />
+                                        </div>
+                                        <div>
+                                            <p className="text-[13px] font-semibold text-(--text-primary)">Proteger precios de oferta</p>
+                                            <p className="text-[11px] text-(--text-muted)">Los productos con precio de oferta no aplican descuento global del pedido</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setOrderSettings(prev => ({ ...prev, excludeOfferProductsFromGlobalDiscount: !prev.excludeOfferProductsFromGlobalDiscount }))}
+                                        className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${
+                                            orderSettings.excludeOfferProductsFromGlobalDiscount ? 'bg-primary-500' : 'bg-(--border-color)'
+                                        }`}
+                                    >
+                                        <div
+                                            className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${
+                                                orderSettings.excludeOfferProductsFromGlobalDiscount ? 'translate-x-7' : 'translate-x-1'
+                                            }`}
+                                        />
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="border-t border-(--border-color) my-4" />
+
+                            {/* Toggle: Catálogo público */}
+                            <div className="p-4 bg-(--bg-hover) rounded-xl border border-(--border-color)">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
+                                            <Globe size={16} />
+                                        </div>
+                                        <div>
+                                            <p className="text-[13px] font-semibold text-(--text-primary)">Catálogo público</p>
+                                            <p className="text-[11px] text-(--text-muted)">Permite acceder al catálogo sin iniciar sesión</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setOrderSettings(prev => ({ ...prev, publicCatalog: !prev.publicCatalog }))}
+                                        className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${
+                                            orderSettings.publicCatalog ? 'bg-primary-500' : 'bg-(--border-color)'
+                                        }`}
+                                    >
+                                        <div
+                                            className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${
+                                                orderSettings.publicCatalog ? 'translate-x-7' : 'translate-x-1'
+                                            }`}
+                                        />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Toggle: Mostrar precio en catálogo público (solo si está activado) */}
+                            {orderSettings.publicCatalog && (
+                                <div className="p-4 bg-(--bg-hover) rounded-xl border border-(--border-color) ml-4">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-600">
+                                                <Tag size={16} />
+                                            </div>
+                                            <div>
+                                                <p className="text-[13px] font-semibold text-(--text-primary)">Mostrar precios en catálogo público</p>
+                                                <p className="text-[11px] text-(--text-muted)">Los visitantes verán los precios de los productos</p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setOrderSettings(prev => ({ ...prev, showPriceInPublicCatalog: !prev.showPriceInPublicCatalog }))}
+                                            className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${
+                                                orderSettings.showPriceInPublicCatalog ? 'bg-primary-500' : 'bg-(--border-color)'
+                                            }`}
+                                        >
+                                            <div
+                                                className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${
+                                                    orderSettings.showPriceInPublicCatalog ? 'translate-x-7' : 'translate-x-1'
+                                                }`}
+                                            />
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Toggle: Permitir compras anónimas (solo si está activado) */}
+                            {orderSettings.publicCatalog && (
+                                <div className="p-4 bg-(--bg-hover) rounded-xl border border-(--border-color) ml-4">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-purple-600">
+                                                <ShoppingCart size={16} />
+                                            </div>
+                                            <div>
+                                                <p className="text-[13px] font-semibold text-(--text-primary)">Permitir compras anónimas</p>
+                                                <p className="text-[11px] text-(--text-muted)">Los visitantes pueden hacer pedidos sin registrarse</p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setOrderSettings(prev => ({ ...prev, allowAnonymousPurchases: !prev.allowAnonymousPurchases }))}
+                                            className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${
+                                                orderSettings.allowAnonymousPurchases ? 'bg-primary-500' : 'bg-(--border-color)'
+                                            }`}
+                                        >
+                                            <div
+                                                className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${
+                                                    orderSettings.allowAnonymousPurchases ? 'translate-x-7' : 'translate-x-1'
+                                                }`}
+                                            />
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                            
+                            <Button
+                                variant="primary"
+                                onClick={handleSaveOrderSettings}
+                                isLoading={savingOrderSettings}
+                                className="w-full"
+                            >
+                                <Save size={18} className="mr-2" />
+                                Guardar Configuración
+                            </Button>
                         </div>
                     </div>
 

@@ -16,18 +16,37 @@ export const generateOrderPDF = (order, company) => {
     const textColor = [51, 51, 51];
     const lightGray = [240, 240, 240];
     
-    // Calcular totales
-    const subtotal = order.items.reduce((acc, item) => {
-        return acc + (item.quantity * item.listPrice);
+    // Usar totales del backend o calcular con lógica de ofertas
+    const subtotal = order.subtotal !== undefined ? order.subtotal : order.items.reduce((acc, item) => {
+        return acc + (item.quantity * item.listPrice * (1 - (item.discount || 0) / 100));
     }, 0);
     
-    const discountTotal = order.items.reduce((acc, item) => {
+    const total = order.total !== undefined ? order.total : subtotal * (1 - (order.discount || 0) / 100);
+    
+    // Calcular descuentos para mostrar
+    const itemsDiscountTotal = order.items.reduce((acc, item) => {
         const itemTotal = item.quantity * item.listPrice;
         return acc + (itemTotal * (item.discount || 0) / 100);
     }, 0);
     
-    const globalDiscount = subtotal * (order.discount || 0) / 100;
-    const total = subtotal - discountTotal - globalDiscount;
+    // Verificar si aplica protección de ofertas
+    const excludeOfferFromGlobalDiscount = order.excludeOfferProductsFromGlobalDiscount === true;
+    const offerItems = order.items?.filter(item => item.hasOffer === true) || [];
+    
+    // Calcular descuento global (considerando protección de ofertas)
+    let globalDiscountAmount = 0;
+    if (order.discount > 0) {
+        if (excludeOfferFromGlobalDiscount && offerItems.length > 0) {
+            // Solo aplica descuento global a items sin oferta
+            const nonOfferTotal = order.items
+                .filter(item => !item.hasOffer)
+                .reduce((acc, item) => acc + (item.quantity * item.listPrice * (1 - (item.discount || 0) / 100)), 0);
+            globalDiscountAmount = nonOfferTotal * (order.discount / 100);
+        } else {
+            // Aplica a todo
+            globalDiscountAmount = subtotal * (order.discount / 100);
+        }
+    }
     
     // ENCABEZADO COMPACTO
     doc.setFillColor(...primaryColor);
@@ -93,8 +112,9 @@ export const generateOrderPDF = (order, company) => {
     
     const tableData = order.items.map(item => {
         const itemTotal = item.quantity * item.listPrice * (1 - (item.discount || 0) / 100);
+        const offerLabel = item.hasOffer ? ' (OFERTA)' : '';
         return {
-            name: item.productId?.name || item.name || 'Producto',
+            name: (item.productId?.name || item.name || 'Producto') + offerLabel,
             quantity: item.quantity,
             price: `$${Number(item.listPrice).toLocaleString('es-AR')}`,
             discount: `${item.discount || 0}%`,
@@ -148,13 +168,25 @@ export const generateOrderPDF = (order, company) => {
     finalY += 5;
     
     // Descuentos en una línea si hay ambos
-    if (discountTotal > 0 || order.discount > 0) {
+    if (itemsDiscountTotal > 0 || globalDiscountAmount > 0) {
         doc.setTextColor(16, 185, 129);
-        let discountText = '';
-        if (discountTotal > 0) discountText += `Items: -$${Number(discountTotal).toLocaleString('es-AR')}`;
-        if (discountTotal > 0 && order.discount > 0) discountText += ' | ';
-        if (order.discount > 0) discountText += `Global ${order.discount}%: -$${Number(globalDiscount).toLocaleString('es-AR')}`;
-        doc.text(discountText, totalsX, finalY);
+        let discountLabel = '';
+        let discountValue = '';
+        if (itemsDiscountTotal > 0) {
+            discountLabel += 'Desc. Items';
+            discountValue += `-$${Number(itemsDiscountTotal).toLocaleString('es-AR')}`;
+        }
+        if (itemsDiscountTotal > 0 && globalDiscountAmount > 0) {
+            discountLabel += ' | ';
+            discountValue += ' | ';
+        }
+        if (globalDiscountAmount > 0) {
+            const offerNote = (excludeOfferFromGlobalDiscount && offerItems.length > 0) ? '*' : '';
+            discountLabel += `Global ${order.discount}%${offerNote}`;
+            discountValue += `-$${Number(globalDiscountAmount).toLocaleString('es-AR')}`;
+        }
+        doc.text(discountLabel, totalsX, finalY);
+        doc.text(discountValue, valueX, finalY, { align: 'right' });
         doc.setTextColor(...textColor);
         finalY += 5;
     }
@@ -174,9 +206,19 @@ export const generateOrderPDF = (order, company) => {
     doc.text(`$${Number(total).toLocaleString('es-AR')}`, valueX, finalY, { align: 'right' });
     doc.setTextColor(...textColor);
     
+    // NOTA SOBRE PRODUCTOS CON OFERTA
+    if (excludeOfferFromGlobalDiscount && offerItems.length > 0) {
+        finalY += 10;
+        doc.setFontSize(8);
+        doc.setTextColor(236, 72, 153); // Color pink
+        const offerNote = `* ${offerItems.length} producto${offerItems.length > 1 ? 's' : ''} con precio de oferta no aplican descuento global.`;
+        doc.text(offerNote, margin, finalY);
+        doc.setTextColor(...textColor);
+    }
+    
     // NOTAS (compacto)
     if (order.notes) {
-        finalY += 12;
+        finalY += 8;
         doc.setFontSize(8);
         doc.setFont('helvetica', 'bold');
         doc.text('Notas:', margin, finalY);

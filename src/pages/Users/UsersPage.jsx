@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
     Plus, Search, Mail, Phone, User, Percent, Shield, Briefcase, Building2, 
-    Eye, MoreHorizontal, Edit2, Activity, CheckCircle, XCircle 
+    Eye, MoreHorizontal, Edit2, Activity, CheckCircle, XCircle, Download
 } from 'lucide-react';
 import { getStaffUsers, createStaffUser, toggleStaffStatus, updateStaffUser } from '../../services/userService';
 import { getClients } from '../../services/clientService';
@@ -31,10 +31,10 @@ const ActionMenu = ({ items, onClose, position, openAbove = false }) => {
             }
         };
         
-        document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('click', handleClickOutside);
         document.addEventListener('keydown', handleEscape);
         return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('click', handleClickOutside);
             document.removeEventListener('keydown', handleEscape);
         };
     }, [onClose]);
@@ -56,10 +56,11 @@ const ActionMenu = ({ items, onClose, position, openAbove = false }) => {
                     key={index}
                     onClick={(e) => {
                         e.stopPropagation();
-                        item.onClick();
+                        e.preventDefault();
                         onClose();
+                        setTimeout(() => item.onClick(), 0);
                     }}
-                    className={`w-full px-4 py-2.5 flex items-center gap-3 text-left text-sm transition-colors ${
+                    className={`w-full px-4 py-2.5 flex items-center gap-3 text-left text-[13px] transition-colors ${
                         item.variant === 'danger' 
                             ? 'text-danger-600 hover:bg-danger-50 dark:hover:bg-danger-900/20' 
                             : item.variant === 'success'
@@ -140,6 +141,15 @@ const UsersPage = () => {
     const [companies, setCompanies] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+    
+    // Pagination State
+    const [pagination, setPagination] = useState({
+        page: 1,
+        limit: 20,
+        total: 0,
+        totalPages: 0
+    });
     
     // Modales y drawers
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -157,19 +167,35 @@ const UsersPage = () => {
     const [isEditDrawerOpen, setIsEditDrawerOpen] = useState(false);
     const [editUser, setEditUser] = useState(null);
     
+    // Export Menu state
+    const [exportMenu, setExportMenu] = useState({ open: false, position: null });
+    
     // Calcular si alcanzó el límite (solo usuarios activos)
     const activeUsersCount = users.filter(u => u.active).length;
     const hasReachedLimit = activeUsersCount >= maxUsers;
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [pagination.page, debouncedSearchTerm]);
+
+    // Debounce para el término de búsqueda
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearchTerm(searchTerm);
+            setPagination(prev => ({ ...prev, page: 1 }));
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
 
     const fetchData = async () => {
         try {
             setLoading(true);
             const promises = [
-                getStaffUsers(),
+                getStaffUsers({ 
+                    page: pagination.page, 
+                    limit: pagination.limit,
+                    search: debouncedSearchTerm || undefined
+                }),
                 getClients()
             ];
             // Si es superadmin, también cargar compañías
@@ -177,7 +203,14 @@ const UsersPage = () => {
                 promises.push(getAllCompanies());
             }
             const [usersData, clientsData, companiesData] = await Promise.all(promises);
-            setUsers(usersData);
+            
+            setUsers(usersData.users || []);
+            setPagination(prev => ({
+                ...prev,
+                total: usersData.pagination?.total || 0,
+                totalPages: usersData.pagination?.totalPages || 0
+            }));
+            
             setClients(clientsData);
             if (isSuperadmin && companiesData) {
                 setCompanies(companiesData);
@@ -264,21 +297,53 @@ const UsersPage = () => {
         setIsEditDrawerOpen(true);
     };
 
-    // Filtrar usuarios: excluir clientes si la feature no está habilitada + búsqueda
-    const filteredUsers = users.filter(u => {
-        if (!clientUsersEnabled && u.roleId?.name === 'cliente') {
-            return false;
+    const handleOpenExportMenu = (e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const windowWidth = window.innerWidth;
+        const menuWidth = 192;
+        
+        let leftPosition = rect.left - menuWidth + rect.width;
+        
+        if (leftPosition + menuWidth > windowWidth) {
+            leftPosition = windowWidth - menuWidth - 16;
         }
-        if (!searchTerm) return true;
-        const term = searchTerm.toLowerCase();
-        return (
-            u.firstName?.toLowerCase().includes(term) ||
-            u.lastName?.toLowerCase().includes(term) ||
-            u.email?.toLowerCase().includes(term) ||
-            u.roleId?.name?.toLowerCase().includes(term) ||
-            u.clientId?.businessName?.toLowerCase().includes(term)
-        );
-    });
+        
+        if (leftPosition < 8) {
+            leftPosition = 8;
+        }
+        
+        setExportMenu({
+            open: true,
+            position: {
+                top: rect.bottom + 8,
+                left: leftPosition
+            }
+        });
+    };
+
+    const handleExport = () => {
+        const headers = ['Nombre', 'Apellido', 'Email', 'Rol', 'Compañía', 'Comisión', 'Estado'];
+        const rows = users.map(u => [
+            u.firstName,
+            u.lastName,
+            u.email,
+            u.roleId?.name || '',
+            u.companyId?.name || '',
+            u.commission || 0,
+            u.active ? 'Activo' : 'Inactivo'
+        ]);
+        
+        const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `usuarios_${new Date().toISOString().split('T')[0]}.csv`;
+        link.click();
+        
+        setExportMenu({ open: false, position: null });
+    };
+
+    // Nota: El filtrado ahora se hace en el backend
 
     // Si no es admin ni superadmin, no mostrar nada
     if (!isAdmin && !isSuperadmin) {
@@ -307,21 +372,47 @@ const UsersPage = () => {
                             : 'Gestione vendedores y administradores.'}
                     </p>
                 </div>
-                <div className="flex flex-col items-end gap-1">
-                    <Button 
-                        variant="primary" 
-                        onClick={() => setIsDrawerOpen(true)}
-                        disabled={!isSuperadmin && hasReachedLimit}
-                        className="text-[11px] font-bold uppercase tracking-wider shadow-md shadow-primary-100 dark:shadow-primary-900/30"
-                    >
-                        <Plus size={14} strokeWidth={2.5} />
-                        Nuevo Usuario
-                    </Button>
-                    {!isSuperadmin && hasReachedLimit && (
-                        <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
-                            Alcanzó el límite de {maxUsers} usuarios para su plan
-                        </span>
-                    )}
+                <div className="flex items-center gap-2">
+                    {/* Menú de 3 puntitos - Exportar */}
+                    <div className="relative">
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenExportMenu(e);
+                            }}
+                            className="p-2 rounded-lg text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-hover) transition-all border border-(--border-color)"
+                        >
+                            <MoreHorizontal size={18} />
+                        </button>
+                        {exportMenu.open && (
+                            <ActionMenu
+                                items={[{
+                                    icon: <Download size={16} />,
+                                    label: 'Exportar a CSV',
+                                    onClick: handleExport
+                                }]}
+                                position={exportMenu.position}
+                                onClose={() => setExportMenu({ open: false, position: null })}
+                            />
+                        )}
+                    </div>
+                    {/* Botón Nuevo */}
+                    <div className="flex flex-col items-end gap-1">
+                        <Button 
+                            variant="primary" 
+                            onClick={() => setIsDrawerOpen(true)}
+                            disabled={!isSuperadmin && hasReachedLimit}
+                            className="text-[11px] font-bold uppercase tracking-wider shadow-md shadow-primary-100 dark:shadow-primary-900/30"
+                        >
+                            <Plus size={14} strokeWidth={2.5} />
+                            Nuevo Usuario
+                        </Button>
+                        {!isSuperadmin && hasReachedLimit && (
+                            <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+                                Alcanzó el límite de {maxUsers} usuarios para su plan
+                            </span>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -359,22 +450,20 @@ const UsersPage = () => {
                         </thead>
                         <tbody className="divide-y divide-(--border-color)">
                             {loading ? (
-                                Array(5).fill(0).map((_, i) => (
-                                    <tr key={i}>
-                                        <td colSpan={isSuperadmin ? 7 : 6} className="px-6 py-6 text-center">
-                                            <div className="flex items-center justify-center gap-2 text-(--text-muted)">
-                                                <div className="w-3.5 h-3.5 border-2 border-(--border-color) border-t-primary-600 rounded-full animate-spin"></div>
-                                                Cargando...
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))
-                            ) : filteredUsers.length > 0 ? (
-                                filteredUsers.map((u) => (
+                                <tr>
+                                    <td colSpan={isSuperadmin ? 7 : 6} className="px-6 py-12 text-center">
+                                        <div className="flex items-center justify-center gap-2 text-(--text-muted) text-[11px] font-bold uppercase tracking-widest">
+                                            <div className="w-3.5 h-3.5 border-2 border-(--border-color) border-t-primary-600 rounded-full animate-spin"></div>
+                                            Cargando datos
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : users.length > 0 ? (
+                                users.map((u) => (
                                     <tr 
                                         key={u._id} 
                                         onClick={() => navigate(`/usuarios/${u._id}`)}
-                                        className="hover:bg-(--bg-hover) transition-colors group cursor-pointer"
+                                        className="hover:bg-(--bg-hover) transition-colors even:bg-(--bg-hover)/50 group cursor-pointer"
                                     >
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
@@ -440,7 +529,20 @@ const UsersPage = () => {
                                             <StatusBadge active={u.active} />
                                         </td>
                                         <td className="px-6 py-4 text-right">
-                                            <div className="flex items-center justify-end">
+                                            <div className="flex items-center justify-end gap-1">
+                                                {/* Botón Editar - Siempre visible */}
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleEdit(u);
+                                                    }}
+                                                    className="p-2 rounded-lg text-(--text-muted) hover:text-info-600 hover:bg-info-50 dark:hover:bg-info-900/20 transition-all"
+                                                    title="Editar"
+                                                >
+                                                    <Edit2 size={16} />
+                                                </button>
+                                                
+                                                {/* Menú de 3 puntitos - Otras acciones */}
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
@@ -459,11 +561,6 @@ const UsersPage = () => {
                                                                 icon: <Eye size={16} />,
                                                                 label: 'Ver detalle',
                                                                 onClick: () => navigate(`/usuarios/${u._id}`)
-                                                            },
-                                                            {
-                                                                icon: <Edit2 size={16} />,
-                                                                label: 'Editar',
-                                                                onClick: () => handleEdit(u)
                                                             },
                                                             {
                                                                 icon: <Activity size={16} />,
@@ -501,17 +598,17 @@ const UsersPage = () => {
                 {/* Vista Mobile - Cards */}
                 <div className="md:hidden">
                     {loading ? (
-                        <div className="p-6 text-center">
-                            <div className="flex items-center justify-center gap-2 text-(--text-muted)">
+                        <div className="p-12 text-center">
+                            <div className="flex items-center justify-center gap-2 text-(--text-muted) text-[11px] font-bold uppercase tracking-widest">
                                 <div className="w-3.5 h-3.5 border-2 border-(--border-color) border-t-primary-600 rounded-full animate-spin"></div>
-                                Cargando...
+                                Cargando datos
                             </div>
                         </div>
-                    ) : filteredUsers.length > 0 ? (
+                    ) : users.length > 0 ? (
                         <div className="divide-y divide-(--border-color)">
-                            {filteredUsers.map((u) => (
-                                <div key={u._id} className="p-4 hover:bg-(--bg-hover) transition-colors">
-                                    <div className="flex items-center justify-between mb-3">
+                            {users.map((u) => (
+                                <div key={u._id} className="p-4 hover:bg-(--bg-hover) transition-colors even:bg-(--bg-hover)/50">
+                                    <div className="flex items-start justify-between mb-3">
                                         <div className="flex items-center gap-3">
                                             <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${
                                                 u.roleId?.name === 'admin' 
@@ -531,7 +628,14 @@ const UsersPage = () => {
                                                 </div>
                                             </div>
                                         </div>
-                                        <StatusBadge active={u.active} />
+                                        <div className="flex flex-col items-end gap-1">
+                                            <StatusBadge active={u.active} />
+                                            {(u.roleId?.name === 'vendedor' || u.roleId?.name === 'admin') && (
+                                                <span className="text-[10px] font-bold text-primary-600 bg-primary-50 px-1.5 py-0.5 rounded">
+                                                    {u.commission || 0}%
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                     
                                     <div className="grid grid-cols-2 gap-2 mb-3 text-[12px]">
@@ -550,43 +654,66 @@ const UsersPage = () => {
                                                 <span className="font-medium">{u.clientId.businessName}</span>
                                             </div>
                                         )}
-                                        <div className="flex items-center gap-1 text-(--text-secondary)">
-                                            <Percent size={12} className="text-primary-600" />
-                                            <span className="font-bold">{u.commission || 0}%</span> comisión
-                                        </div>
+                                        {isSuperadmin && (
+                                            <div className="col-span-2 flex items-center gap-1 text-(--text-secondary)">
+                                                <Building2 size={12} className="text-(--text-muted)" />
+                                                <span className="truncate">{u.companyId?.name || 'Sin compañía'}</span>
+                                            </div>
+                                        )}
                                     </div>
                                     
                                     {/* Acciones Mobile */}
                                     <div className="flex items-center justify-end gap-2 pt-2 border-t border-(--border-color)">
+                                        {/* Botón Editar - Siempre visible */}
                                         <button
-                                            onClick={() => navigate(`/usuarios/${u._id}`)}
-                                            className="p-2 text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg transition-colors"
-                                        >
-                                            <Eye size={18} />
-                                        </button>
-                                        <button
-                                            onClick={() => handleEdit(u)}
-                                            className="p-2 text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-hover) rounded-lg transition-colors"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleEdit(u);
+                                            }}
+                                            className="p-2 text-(--text-muted) hover:text-info-600 hover:bg-info-50 dark:hover:bg-info-900/20 rounded-lg transition-colors"
+                                            title="Editar"
                                         >
                                             <Edit2 size={18} />
                                         </button>
+                                        
+                                        {/* Menú de 3 puntitos - Otras acciones */}
                                         <button
-                                            onClick={() => handleViewActivity(u)}
-                                            className="p-2 text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-hover) rounded-lg transition-colors"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleOpenMenu(e, u._id);
+                                            }}
+                                            className="p-2 rounded-lg text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-hover) transition-colors"
                                         >
-                                            <Activity size={18} />
-                                        </button>
-                                        <button
-                                            onClick={() => handleToggleStatus(u)}
-                                            className={`p-2 rounded-lg transition-colors ${
-                                                u.active 
-                                                    ? 'text-danger-600 hover:bg-danger-50 dark:hover:bg-danger-900/20' 
-                                                    : 'text-success-600 hover:bg-success-50 dark:hover:bg-success-900/20'
-                                            }`}
-                                        >
-                                            {u.active ? <XCircle size={18} /> : <CheckCircle size={18} />}
+                                            <MoreHorizontal size={20} />
                                         </button>
                                     </div>
+                                    
+                                    {/* Menu - Mobile */}
+                                    {openMenu.id === u._id && (
+                                        <ActionMenu
+                                            openAbove={openMenu.openAbove}
+                                            items={[
+                                                {
+                                                    icon: <Eye size={16} />,
+                                                    label: 'Ver detalle',
+                                                    onClick: () => navigate(`/usuarios/${u._id}`)
+                                                },
+                                                {
+                                                    icon: <Activity size={16} />,
+                                                    label: 'Ver actividad',
+                                                    onClick: () => handleViewActivity(u)
+                                                },
+                                                {
+                                                    icon: u.active ? <XCircle size={16} /> : <CheckCircle size={16} />,
+                                                    label: u.active ? 'Desactivar' : 'Activar',
+                                                    variant: u.active ? 'danger' : 'success',
+                                                    onClick: () => handleToggleStatus(u)
+                                                }
+                                            ]}
+                                            position={openMenu.position}
+                                            onClose={() => setOpenMenu({ id: null, position: null, openAbove: false })}
+                                        />
+                                    )}
                                 </div>
                             ))}
                         </div>
@@ -599,11 +726,30 @@ const UsersPage = () => {
                     )}
                 </div>
 
-                {/* Footer */}
-                <div className="px-6 py-3 border-t border-(--border-color) bg-(--bg-hover)">
+                {/* Footer / Pagination */}
+                <div className="px-6 py-3 border-t border-(--border-color) bg-(--bg-hover) flex items-center justify-between">
                     <span className="text-[10px] text-(--text-muted) font-bold uppercase tracking-widest">
-                        Total {filteredUsers.length} registros
+                        Mostrando {users.length > 0 ? ((pagination.page - 1) * pagination.limit) + 1 : 0} - {Math.min(pagination.page * pagination.limit, pagination.total)} de {pagination.total} registros
                     </span>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                            disabled={pagination.page === 1}
+                            className="px-3 py-1.5 text-xs font-medium rounded-lg border border-(--border-color) bg-(--bg-card) text-(--text-secondary) hover:bg-(--bg-hover) disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                            Anterior
+                        </button>
+                        <span className="text-xs text-(--text-muted) px-2">
+                            {pagination.page} / {pagination.totalPages}
+                        </span>
+                        <button
+                            onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                            disabled={pagination.page === pagination.totalPages}
+                            className="px-3 py-1.5 text-xs font-medium rounded-lg border border-(--border-color) bg-(--bg-card) text-(--text-secondary) hover:bg-(--bg-hover) disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                            Siguiente
+                        </button>
+                    </div>
                 </div>
             </div>
 

@@ -76,10 +76,14 @@ export const logWhatsAppSent = async (orderId, recipientType) => {
  * Obtener actividad de una entidad específica (pedido, presupuesto, etc.)
  * @param {string} entityType - Tipo de entidad (order, budget, receipt, client)
  * @param {string} entityId - ID de la entidad
+ * @param {number} limit - Límite de resultados
+ * @param {number} skip - Número de documentos a saltar
  * @returns {Promise<Array>} Logs de actividad
  */
-export const getEntityActivity = async (entityType, entityId) => {
-    const response = await api.get(`${ACTIVITY_LOGS_URL}/entity/${entityType}/${entityId}`);
+export const getEntityActivity = async (entityType, entityId, limit = 50, skip = 0) => {
+    const response = await api.get(`${ACTIVITY_LOGS_URL}/entity/${entityType}/${entityId}`, { 
+        params: { limit, skip } 
+    });
     return response.data.data;
 };
 
@@ -87,10 +91,11 @@ export const getEntityActivity = async (entityType, entityId) => {
  * Obtener actividad de un usuario específico
  * @param {string} userId - ID del usuario
  * @param {number} limit - Límite de resultados
+ * @param {number} skip - Número de documentos a saltar
  * @returns {Promise<Array>} Logs de actividad
  */
-export const getUserActivity = async (userId, limit = 100) => {
-    const response = await api.get(`${ACTIVITY_LOGS_URL}/user/${userId}`, { params: { limit } });
+export const getUserActivity = async (userId, limit = 100, skip = 0) => {
+    const response = await api.get(`${ACTIVITY_LOGS_URL}/user/${userId}`, { params: { limit, skip } });
     return response.data.data;
 };
 
@@ -98,9 +103,10 @@ export const getUserActivity = async (userId, limit = 100) => {
  * Obtener actividad relacionada con un cliente específico
  * @param {string} clientId - ID del cliente
  * @param {number} limit - Límite de resultados
+ * @param {number} skip - Número de documentos a saltar
  * @returns {Promise<Array>} Logs de actividad
  */
-export const getClientActivity = async (clientId, limit = 100) => {
-    const response = await api.get(`${ACTIVITY_LOGS_URL}/client/${clientId}`, { params: { limit } });
+export const getClientActivity = async (clientId, limit = 100, skip = 0) => {
+    const response = await api.get(`${ACTIVITY_LOGS_URL}/client/${clientId}`, { params: { limit, skip } });
     return response.data.data;
 };

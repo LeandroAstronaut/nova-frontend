@@ -108,7 +108,7 @@ const BudgetCreationPage = () => {
                 getSellers(),
                 getProducts()
             ]);
-            setClients(cData || []);
+            setClients(cData?.clients || cData || []);
             setSellers(sData || []);
             setProducts(pData || []);
         } catch (error) {
@@ -120,8 +120,8 @@ const BudgetCreationPage = () => {
 
     const handleSearchClient = async (query) => {
         setSearchQuery(query);
-        const data = await getClients(query);
-        setClients(data);
+        const data = await getClients({ search: query });
+        setClients(data?.clients || []);
     };
 
     const handleSearchProduct = async (query) => {
@@ -422,6 +422,7 @@ const BudgetCreationPage = () => {
                 product={quickViewProduct}
                 onAddToCart={(p, q, d) => addItem(p, q, d)}
                 company={user?.company}
+                user={user}
             />
 
             <ConfirmModal

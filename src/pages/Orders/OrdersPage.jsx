@@ -41,7 +41,7 @@ const StatusBadge = ({ status }) => {
         </span>
     );
 };
-import { getOrders, convertBudgetToOrder, deleteOrder, revertOrderToBudget, updateOrderStatus, sendOrderEmail } from '../../services/orderService';
+import { getOrders, getAllOrders, convertBudgetToOrder, deleteOrder, revertOrderToBudget, updateOrderStatus, sendOrderEmail } from '../../services/orderService';
 import Button from '../../components/common/Button';
 import ConfirmModal from '../../components/common/ConfirmModal';
 import BudgetDrawer from '../../components/orders/BudgetDrawer';
@@ -56,8 +56,14 @@ import { Building2, History } from 'lucide-react';
 import { generateOrderPDF } from '../../utils/pdfGenerator';
 
 // Función para exportar a CSV
-const exportToCSV = (data, mode) => {
-    const headers = ['Número', 'Cliente', 'Fecha', 'Vendedor', 'Total', 'Estado'];
+const exportToCSV = (data, mode, isSuperadmin, canViewCommission) => {
+    // Headers dinámicos según permisos
+    const headers = ['Número'];
+    if (isSuperadmin) headers.push('Compañía');
+    headers.push('Cliente', 'Fecha', 'Vendedor', 'Total');
+    if (canViewCommission) headers.push('Comisión');
+    headers.push('Estado');
+    
     const rows = data.map(order => {
         // Calcular subtotal con descuento por ítem
         const subtotal = order.items.reduce((acc, item) => 
@@ -65,14 +71,21 @@ const exportToCSV = (data, mode) => {
         );
         // Aplicar descuento general de la orden
         const total = subtotal * (1 - (order.discount || 0) / 100);
-        return [
-            `#${String(order.orderNumber).padStart(5, '0')}`,
+        
+        const row = [`#${String(order.orderNumber).padStart(5, '0')}`];
+        if (isSuperadmin) row.push(order.companyId?.name || 'N/A');
+        row.push(
             order.clientId?.businessName || 'N/A',
             new Date(order.date).toLocaleDateString(),
             `${order.salesRepId?.firstName || ''} ${order.salesRepId?.lastName || ''}`.trim(),
-            `$${total.toLocaleString()}`,
-            order.status
-        ];
+            `$${total.toLocaleString()}`
+        );
+        if (canViewCommission) {
+            row.push(order.commissionAmount ? `$${order.commissionAmount.toLocaleString()}` : '-');
+        }
+        row.push(order.status);
+        
+        return row;
     });
     
     const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
@@ -153,8 +166,11 @@ const OrdersPage = ({ mode = 'order' }) => {
     const isVendedor = user?.role?.name === 'vendedor';
     const isClient = user?.role?.name === 'cliente';
 
+    // Features de la compañía
+    const features = user?.company?.features || {};
+    
     // Check if commission display is enabled for current user
-    const hasCommissionFeature = user?.company?.features?.commissionCalculation === true;
+    const hasCommissionFeature = features?.commissionCalculation === true;
     const canViewCommission = (isAdmin || isSuperadmin || user?.canViewCommission === true) && hasCommissionFeature;
     
     // Refrescar datos del usuario al montar y cuando vuelve al foco
@@ -187,6 +203,14 @@ const OrdersPage = ({ mode = 'order' }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
     const [isSearching, setIsSearching] = useState(false);
+
+    // Pagination State
+    const [pagination, setPagination] = useState({
+        page: 1,
+        limit: 20,
+        total: 0,
+        totalPages: 0
+    });
 
     // Sorting State
     const [sort, setSort] = useState({
@@ -230,6 +254,9 @@ const OrdersPage = ({ mode = 'order' }) => {
 
     // Action Menu state
     const [openMenu, setOpenMenu] = useState({ id: null, position: null, openAbove: false });
+
+    // Export Menu state
+    const [exportMenu, setExportMenu] = useState({ open: false, position: null });
 
     // Delete confirmation state
     const [deleteModal, setDeleteModal] = useState({ isOpen: false, order: null, loading: false });
@@ -280,13 +307,59 @@ const OrdersPage = ({ mode = 'order' }) => {
         });
     };
 
+    const handleOpenExportMenu = (e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const windowWidth = window.innerWidth;
+        const menuWidth = 192; // Ancho del menú
+        
+        // Alinear a la derecha del botón
+        let leftPosition = rect.left - menuWidth + rect.width;
+        
+        // Asegurar que no se salga por la derecha de la pantalla
+        if (leftPosition + menuWidth > windowWidth) {
+            leftPosition = windowWidth - menuWidth - 16;
+        }
+        
+        // Asegurar que no sea negativo
+        if (leftPosition < 8) {
+            leftPosition = 8;
+        }
+        
+        setExportMenu({
+            open: true,
+            position: {
+                top: rect.bottom + 8,
+                left: leftPosition
+            }
+        });
+    };
+
+    const handleExportClick = async () => {
+        try {
+            setLoading(true);
+            // Obtener todos los registros para exportar
+            const data = await getAllOrders(mode, {
+                ...sort,
+                search: debouncedSearchTerm
+            });
+            const ordersToExport = data.orders || data || [];
+            exportToCSV(ordersToExport, mode, isSuperadmin, canViewCommission);
+        } catch (error) {
+            console.error('Error exporting orders:', error);
+            addToast('Error al exportar: ' + error.message, 'error');
+        } finally {
+            setLoading(false);
+            setExportMenu({ open: false, position: null });
+        }
+    };
+
     useEffect(() => {
         fetchInitialData();
     }, []);
 
     useEffect(() => {
         fetchOrders();
-    }, [mode, sort, debouncedSearchTerm]);
+    }, [mode, sort, debouncedSearchTerm, pagination.page, pagination.limit]);
 
     // Debounce para el término de búsqueda (esperar 500ms después de dejar de tipear)
     useEffect(() => {
@@ -296,6 +369,8 @@ const OrdersPage = ({ mode = 'order' }) => {
         const timer = setTimeout(() => {
             setDebouncedSearchTerm(searchTerm);
             setIsSearching(false);
+            // Resetear a página 1 cuando cambia la búsqueda
+            setPagination(prev => ({ ...prev, page: 1 }));
         }, 500);
 
         return () => clearTimeout(timer);
@@ -319,15 +394,22 @@ const OrdersPage = ({ mode = 'order' }) => {
             setLoading(true);
             const data = await getOrders(mode, {
                 ...sort,
-                search: debouncedSearchTerm
+                search: debouncedSearchTerm,
+                page: pagination.page,
+                limit: pagination.limit
             });
-            setOrders(data);
+            setOrders(data.orders || []);
+            setPagination(prev => ({
+                ...prev,
+                total: data.pagination?.total || 0,
+                totalPages: data.pagination?.totalPages || 0
+            }));
         } catch (error) {
             console.error('Error fetching orders:', error);
         } finally {
             setLoading(false);
         }
-    }, [mode, sort, debouncedSearchTerm]);
+    }, [mode, sort, debouncedSearchTerm, pagination.page, pagination.limit]);
 
     const handleSort = (field) => {
         setSort(prev => ({
@@ -661,7 +743,7 @@ const OrdersPage = ({ mode = 'order' }) => {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-xl font-bold text-(--text-primary) leading-tight">
-                        {mode === 'order' ? 'Listado de Pedidos' : 'Listado de Presupuestos'}
+                        {mode === 'order' ? 'Pedidos' : 'Presupuestos'}
                         {isSuperadmin && <span className="ml-2 text-sm font-normal text-primary-600">(Todas las compañías)</span>}
                     </h1>
                     <p className="text-[13px] text-(--text-secondary) mt-0.5 font-medium">
@@ -673,16 +755,33 @@ const OrdersPage = ({ mode = 'order' }) => {
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
+                    {/* Menú de 3 puntitos con Exportar */}
                     {!isClient && (
-                        <Button
-                            variant="secondary"
-                            className="px-3! text-[11px] font-bold uppercase tracking-wider"
-                            onClick={() => exportToCSV(orders, mode)}
-                        >
-                            <Download size={14} strokeWidth={2.5} />
-                            Exportar
-                        </Button>
+                        <div className="relative">
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenExportMenu(e);
+                                }}
+                                className="p-2 rounded-lg text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-hover) transition-all border border-(--border-color)"
+                            >
+                                <MoreHorizontal size={18} />
+                            </button>
+                            {/* Menú desplegable */}
+                            {exportMenu.open && (
+                                <ActionMenu
+                                    items={[{
+                                        icon: <Download size={16} />,
+                                        label: 'Exportar a CSV',
+                                        onClick: handleExportClick
+                                    }]}
+                                    position={exportMenu.position}
+                                    onClose={() => setExportMenu({ open: false, position: null })}
+                                />
+                            )}
+                        </div>
                     )}
+                    {/* Botón Nuevo */}
                     {!isSuperadmin && (
                         <Button 
                             variant="primary" 
@@ -745,21 +844,19 @@ const OrdersPage = ({ mode = 'order' }) => {
                         </thead>
                         <tbody className="divide-y divide-(--border-color)">
                             {loading ? (
-                                Array(5).fill(0).map((_, i) => (
-                                    <tr key={i}>
-                                        <td colSpan={isSuperadmin ? (canViewCommission ? 9 : 8) : (canViewCommission ? 8 : 7)} className="px-6 py-6 text-center">
-                                            <div className="flex items-center justify-center gap-2 text-(--text-muted) text-[11px] font-bold uppercase tracking-widest">
-                                                <div className="w-3.5 h-3.5 border-2 border-(--border-color) border-t-primary-600 dark:border-t-primary-400 rounded-full animate-spin"></div>
-                                                Sincronizando...
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))
+                                <tr>
+                                    <td colSpan={isSuperadmin ? (canViewCommission ? 9 : 8) : (canViewCommission ? 8 : 7)} className="px-6 py-12 text-center">
+                                        <div className="flex items-center justify-center gap-2 text-(--text-muted) text-[11px] font-bold uppercase tracking-widest">
+                                            <div className="w-3.5 h-3.5 border-2 border-(--border-color) border-t-primary-600 dark:border-t-primary-400 rounded-full animate-spin"></div>
+                                            Cargando datos
+                                        </div>
+                                    </td>
+                                </tr>
                             ) : orders.length > 0 ? (
                                 orders.map((order) => (
                                     <tr 
                                         key={order._id} 
-                                        className="hover:bg-(--bg-hover) transition-colors group cursor-pointer"
+                                        className="hover:bg-(--bg-hover) transition-colors even:bg-(--bg-hover)/50 group cursor-pointer"
                                         onClick={(e) => { e.stopPropagation(); handleViewOrder(order); }}
                                     >
                                         <td className="px-6 py-4 font-bold text-(--text-primary) text-[13px]">
@@ -847,18 +944,18 @@ const OrdersPage = ({ mode = 'order' }) => {
                                                     </button>
                                                 )}
 
-                                                {/* Botón Ver - Siempre visible si tiene permiso */}
-                                                {canView(order) && (
+                                                {/* Botón Editar - Cuando es editable */}
+                                                {canEdit(order) && (
                                                     <button
-                                                        onClick={(e) => { e.stopPropagation(); handleViewOrder(order); }}
-                                                        className="p-1.5 rounded-lg text-(--text-muted) hover:text-primary-600 dark:hover:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-all"
-                                                        title="Ver detalle"
+                                                        onClick={(e) => { e.stopPropagation(); handleEditOrder(order); }}
+                                                        className="p-1.5 rounded-lg text-(--text-muted) hover:text-info-600 hover:bg-info-50 dark:hover:bg-info-900/30 transition-all"
+                                                        title="Editar"
                                                     >
-                                                        <Eye size={16} strokeWidth={2.5} />
+                                                        <Edit2 size={16} strokeWidth={2.5} />
                                                     </button>
                                                 )}
 
-                                                {/* Menú de 3 puntos - Acciones adicionales (todos los roles) */}
+                                                {/* Menú de 3 puntos - Acciones adicionales */}
                                                 <div>
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); handleOpenMenu(e, order._id); }}
@@ -876,11 +973,6 @@ const OrdersPage = ({ mode = 'order' }) => {
                                                                     label: 'Ver detalle',
                                                                     onClick: () => handleViewOrder(order)
                                                                 },
-                                                                ...(canEdit(order) ? [{
-                                                                    icon: <Edit2 size={16} />,
-                                                                    label: 'Editar',
-                                                                    onClick: () => handleEditOrder(order)
-                                                                }] : []),
                                                                 ...(isClient ? [] : [{  // Clientes no pueden enviar emails/WhatsApp
                                                                     icon: <Send size={16} />,
                                                                     label: 'Enviar por email',
@@ -946,10 +1038,10 @@ const OrdersPage = ({ mode = 'order' }) => {
                 {/* Vista Mobile - Cards */}
                 <div className="md:hidden">
                     {loading ? (
-                        <div className="p-6 text-center">
+                        <div className="p-12 text-center">
                             <div className="flex items-center justify-center gap-2 text-(--text-muted) text-[11px] font-bold uppercase tracking-widest">
                                 <div className="w-3.5 h-3.5 border-2 border-(--border-color) border-t-primary-600 dark:border-t-primary-400 rounded-full animate-spin"></div>
-                                Sincronizando...
+                                Cargando datos
                             </div>
                         </div>
                     ) : orders.length > 0 ? (
@@ -957,7 +1049,7 @@ const OrdersPage = ({ mode = 'order' }) => {
                             {orders.map((order) => (
                                 <div 
                                     key={order._id} 
-                                    className="p-4 hover:bg-(--bg-hover) transition-colors cursor-pointer"
+                                    className="p-4 hover:bg-(--bg-hover) transition-colors cursor-pointer even:bg-(--bg-hover)/50"
                                     onClick={() => handleViewOrder(order)}
                                 >
                                     {/* Header: Numero y Estado */}
@@ -1046,13 +1138,14 @@ const OrdersPage = ({ mode = 'order' }) => {
                                                 Completar
                                             </button>
                                         )}
-                                        {canView(order) && (
+                                        {/* Botón Editar - Cuando es editable */}
+                                        {canEdit(order) && (
                                             <button
-                                                onClick={(e) => { e.stopPropagation(); handleViewOrder(order); }}
-                                                className="flex items-center justify-center p-2 rounded-lg text-(--text-muted) hover:text-primary-600 dark:hover:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-all"
-                                                title="Ver detalle"
+                                                onClick={(e) => { e.stopPropagation(); handleEditOrder(order); }}
+                                                className="flex items-center justify-center p-2 rounded-lg text-(--text-muted) hover:text-info-600 hover:bg-info-50 dark:hover:bg-info-900/30 transition-all"
+                                                title="Editar"
                                             >
-                                                <Eye size={18} strokeWidth={2.5} />
+                                                <Edit2 size={18} strokeWidth={2.5} />
                                             </button>
                                         )}
                                         <button
@@ -1069,7 +1162,6 @@ const OrdersPage = ({ mode = 'order' }) => {
                                             openAbove={openMenu.openAbove}
                                             items={[
                                                 { icon: <Eye size={16} />, label: 'Ver detalle', onClick: () => handleViewOrder(order) },
-                                                ...(canEdit(order) ? [{ icon: <Edit2 size={16} />, label: 'Editar', onClick: () => handleEditOrder(order) }] : []),
                                                 ...(isClient ? [] : [{ icon: <Send size={16} />, label: 'Enviar por email', onClick: () => handleSendEmailClick(order) }]),
                                                 ...(isClient ? [] : [{ icon: <MessageCircle size={16} />, label: 'Enviar WhatsApp', onClick: () => handleSendWhatsAppClick(order) }]),
                                                 { icon: <Printer size={16} />, label: 'Imprimir / PDF', onClick: () => { try { generateOrderPDF(order, order.companyId); } catch (error) { addToast('Error al generar PDF: ' + error.message, 'error'); } } },
@@ -1096,11 +1188,26 @@ const OrdersPage = ({ mode = 'order' }) => {
                 {/* Footer / Pagination */}
                 <div className="px-6 py-3 border-t border-(--border-color) bg-(--bg-hover) flex items-center justify-between">
                     <span className="text-[10px] text-(--text-muted) font-bold uppercase tracking-widest">
-                        Total {orders.length} registros
+                        Mostrando {orders.length > 0 ? ((pagination.page - 1) * pagination.limit) + 1 : 0} - {Math.min(pagination.page * pagination.limit, pagination.total)} de {pagination.total} registros
                     </span>
-                    <div className="flex gap-1">
-                        <Button variant="secondary" className="px-3! py-1! text-[10px]! font-bold uppercase tracking-wider">Anterior</Button>
-                        <Button variant="secondary" className="px-3! py-1! text-[10px]! font-bold uppercase tracking-wider">Siguiente</Button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                            disabled={pagination.page === 1}
+                            className="px-3 py-1.5 text-xs font-medium rounded-lg border border-(--border-color) bg-(--bg-card) text-(--text-secondary) hover:bg-(--bg-hover) disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                            Anterior
+                        </button>
+                        <span className="text-xs text-(--text-muted) px-2">
+                            {pagination.page} / {pagination.totalPages}
+                        </span>
+                        <button
+                            onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                            disabled={pagination.page === pagination.totalPages}
+                            className="px-3 py-1.5 text-xs font-medium rounded-lg border border-(--border-color) bg-(--bg-card) text-(--text-secondary) hover:bg-(--bg-hover) disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                            Siguiente
+                        </button>
                     </div>
                 </div>
             </div>
@@ -1127,6 +1234,7 @@ const OrdersPage = ({ mode = 'order' }) => {
                 budget={selectedBudget}
                 loading={converting}
                 isClient={isClient}
+                features={features}
             />
 
             {/* Delete Confirmation Modal */}

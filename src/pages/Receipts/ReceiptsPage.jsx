@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Plus,
@@ -10,7 +10,9 @@ import {
     MessageCircle,
     X,
     FileText,
-    Ban
+    Ban,
+    Eye,
+    History
 } from 'lucide-react';
 import { getReceipts, cancelReceipt, createReceipt, sendReceiptEmail } from '../../services/receiptService';
 import { getClients } from '../../services/orderService';
@@ -19,6 +21,7 @@ import ConfirmModal from '../../components/common/ConfirmModal';
 import ReceiptDrawer from '../../components/receipts/ReceiptDrawer';
 import SendEmailModal from '../../components/receipts/SendEmailModal';
 import SendWhatsAppModal from '../../components/receipts/SendWhatsAppModal';
+import OrderActivityDrawer from '../../components/orders/OrderActivityDrawer';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { generateReceiptPDF } from '../../utils/receiptPdfGenerator';
@@ -68,6 +71,15 @@ const ReceiptsPage = () => {
     const [clients, setClients] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+    
+    // Pagination State
+    const [pagination, setPagination] = useState({
+        page: 1,
+        limit: 20,
+        total: 0,
+        totalPages: 0
+    });
 
     // Modales
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -76,26 +88,56 @@ const ReceiptsPage = () => {
     const [cancelModal, setCancelModal] = useState({ isOpen: false, receipt: null, reason: '', loading: false });
     const [selectedReceipt, setSelectedReceipt] = useState(null);
     const [emailLoading, setEmailLoading] = useState(false);
+    const [exportMenu, setExportMenu] = useState({ open: false, position: null });
+    
+    // Action Menu state
+    const [openMenu, setOpenMenu] = useState({ id: null, position: null, openAbove: false });
+    
+    // Activity Drawer state
+    const [isActivityDrawerOpen, setIsActivityDrawerOpen] = useState(false);
+    const [selectedReceiptForActivity, setSelectedReceiptForActivity] = useState(null);
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [pagination.page, debouncedSearchTerm]);
+
+    // Debounce para el término de búsqueda
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearchTerm(searchTerm);
+            setPagination(prev => ({ ...prev, page: 1 }));
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
 
     const fetchData = async () => {
         try {
             setLoading(true);
             const [receiptData, clientData] = await Promise.all([
-                getReceipts(),
+                getReceipts({ 
+                    page: pagination.page, 
+                    limit: pagination.limit,
+                    search: debouncedSearchTerm || undefined
+                }),
                 getClients()
             ]);
-            setReceipts(receiptData);
+            
+            setReceipts(receiptData.receipts || []);
+            setPagination(prev => ({
+                ...prev,
+                total: receiptData.pagination?.total || 0,
+                totalPages: receiptData.pagination?.totalPages || 0
+            }));
+            
+            // Asegurar que clientData sea un array
+            const clientsArray = Array.isArray(clientData) ? clientData : (clientData?.clients || []);
             
             // Filtrar clientes según el rol
             // Vendedor: solo sus clientes, Admin: todos
             if (isVendedor) {
-                setClients(clientData.filter(c => c.salesRepId === user.id || c.salesRepId?._id === user.id));
+                setClients(clientsArray.filter(c => c.salesRepId === user.id || c.salesRepId?._id === user.id));
             } else {
-                setClients(clientData);
+                setClients(clientsArray);
             }
         } catch (error) {
             console.error('Error fetching data:', error);
@@ -177,18 +219,74 @@ const ReceiptsPage = () => {
         }
     };
 
-    // Filtrar recibos por búsqueda en todas las columnas
-    const filteredReceipts = receipts.filter(receipt => {
-        if (!searchTerm) return true;
-        const term = searchTerm.toLowerCase();
-        return (
-            receipt.receiptNumber?.toString().includes(term) ||
-            receipt.clientId?.businessName?.toLowerCase().includes(term) ||
-            receipt.type?.toLowerCase().includes(term) ||
-            receipt.status?.toLowerCase().includes(term) ||
-            receipt.amount?.toString().includes(term)
-        );
-    });
+    const handleOpenExportMenu = (e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const windowWidth = window.innerWidth;
+        const menuWidth = 192;
+        
+        let leftPosition = rect.left - menuWidth + rect.width;
+        
+        if (leftPosition + menuWidth > windowWidth) {
+            leftPosition = windowWidth - menuWidth - 16;
+        }
+        
+        if (leftPosition < 8) {
+            leftPosition = 8;
+        }
+        
+        setExportMenu({
+            open: true,
+            position: {
+                top: rect.bottom + 8,
+                left: leftPosition
+            }
+        });
+    };
+
+    const handleOpenMenu = (e, receiptId) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const windowHeight = window.innerHeight;
+        const menuHeight = 200;
+        
+        const openAbove = (rect.bottom + menuHeight) > windowHeight;
+        
+        setOpenMenu({
+            id: receiptId,
+            position: {
+                top: rect.bottom + 8,
+                left: rect.left - 160 + rect.width
+            },
+            openAbove
+        });
+    };
+
+    const handleViewActivity = (receipt) => {
+        setSelectedReceiptForActivity(receipt);
+        setIsActivityDrawerOpen(true);
+    };
+
+    const handleExport = () => {
+        const headers = ['Número', 'Fecha', 'Cliente', 'Tipo', 'Monto', 'Estado'];
+        const rows = receipts.map(receipt => [
+            `#${String(receipt.receiptNumber).padStart(5, '0')}`,
+            new Date(receipt.date).toLocaleDateString(),
+            receipt.clientId?.businessName || 'N/A',
+            receipt.type === 'ingreso' ? 'Ingreso' : 'Egreso',
+            receipt.amount,
+            receipt.status === 'activo' ? 'Activo' : 'Anulado'
+        ]);
+        
+        const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `recibos_${new Date().toISOString().split('T')[0]}.csv`;
+        link.click();
+        
+        setExportMenu({ open: false, position: null });
+    };
+
+    // Nota: El filtrado ahora se hace en el backend
 
     return (
         <div className="space-y-6">
@@ -204,6 +302,32 @@ const ReceiptsPage = () => {
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
+                    {/* Menú de 3 puntitos - Exportar */}
+                    {!isSuperadmin && !isClient && (
+                        <div className="relative">
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenExportMenu(e);
+                                }}
+                                className="p-2 rounded-lg text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-hover) transition-all border border-(--border-color)"
+                            >
+                                <MoreHorizontal size={18} />
+                            </button>
+                            {exportMenu.open && (
+                                <ActionMenu
+                                    items={[{
+                                        icon: <Download size={16} />,
+                                        label: 'Exportar a CSV',
+                                        onClick: handleExport
+                                    }]}
+                                    position={exportMenu.position}
+                                    onClose={() => setExportMenu({ open: false, position: null })}
+                                />
+                            )}
+                        </div>
+                    )}
+                    {/* Botón Nuevo */}
                     {!isSuperadmin && !isClient && (
                         <Button
                             variant="primary"
@@ -251,21 +375,19 @@ const ReceiptsPage = () => {
                         </thead>
                         <tbody className="divide-y divide-(--border-color)">
                             {loading ? (
-                                Array(5).fill(0).map((_, i) => (
-                                    <tr key={i}>
-                                        <td colSpan={7} className="px-6 py-6 text-center">
-                                            <div className="flex items-center justify-center gap-2 text-(--text-muted)">
-                                                <div className="w-3.5 h-3.5 border-2 border-(--border-color) border-t-primary-600 rounded-full animate-spin"></div>
-                                                Cargando...
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))
-                            ) : filteredReceipts.length > 0 ? (
-                                filteredReceipts.map((receipt) => (
+                                <tr>
+                                    <td colSpan={7} className="px-6 py-12 text-center">
+                                        <div className="flex items-center justify-center gap-2 text-(--text-muted) text-[11px] font-bold uppercase tracking-widest">
+                                            <div className="w-3.5 h-3.5 border-2 border-(--border-color) border-t-primary-600 rounded-full animate-spin"></div>
+                                            Cargando datos
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : receipts.length > 0 ? (
+                                receipts.map((receipt) => (
                                     <tr 
                                         key={receipt._id} 
-                                        className="hover:bg-(--bg-hover) transition-colors group cursor-pointer"
+                                        className="hover:bg-(--bg-hover) transition-colors even:bg-(--bg-hover)/50 group cursor-pointer"
                                         onClick={() => handleViewReceipt(receipt)}
                                     >
                                         <td className="px-6 py-4 font-bold text-(--text-primary) text-[13px]">
@@ -288,6 +410,7 @@ const ReceiptsPage = () => {
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <div className="flex items-center justify-end gap-2">
+                                                {/* Botón Imprimir - Siempre visible */}
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); handlePrintPDF(receipt); }}
                                                     className="p-1.5 rounded-lg text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-hover) transition-all"
@@ -295,34 +418,52 @@ const ReceiptsPage = () => {
                                                 >
                                                     <Printer size={16} />
                                                 </button>
-                                                {receipt.status === 'activo' && !isClient && (
-                                                    <>
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); handleSendEmail(receipt); }}
-                                                            className="p-1.5 rounded-lg text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-hover) transition-all"
-                                                            title="Enviar Email"
-                                                        >
-                                                            <Send size={16} />
-                                                        </button>
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); handleSendWhatsApp(receipt); }}
-                                                            className="p-1.5 rounded-lg text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-hover) transition-all"
-                                                            title="Enviar WhatsApp"
-                                                        >
-                                                            <MessageCircle size={16} />
-                                                        </button>
-                                                        {/* Solo el creador puede anular */}
-                                                        {receipt.createdBy._id === user.id && (
-                                                            <button
-                                                                onClick={(e) => { e.stopPropagation(); handleCancelClick(receipt); }}
-                                                                className="p-1.5 rounded-lg text-danger-600 hover:bg-danger-50 dark:hover:bg-danger-900/20 transition-all"
-                                                                title="Anular"
-                                                            >
-                                                                <Ban size={16} />
-                                                            </button>
-                                                        )}
-                                                    </>
-                                                )}
+                                                
+                                                {/* Menú de 3 puntitos - Otras acciones */}
+                                                <div>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); handleOpenMenu(e, receipt._id); }}
+                                                        className="p-1.5 rounded-lg text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-hover) transition-all"
+                                                    >
+                                                        <MoreHorizontal size={18} />
+                                                    </button>
+                                                    
+                                                    {openMenu.id === receipt._id && (
+                                                        <ActionMenu
+                                                            openAbove={openMenu.openAbove}
+                                                            items={[
+                                                                {
+                                                                    icon: <Eye size={16} />,
+                                                                    label: 'Ver detalle',
+                                                                    onClick: () => handleViewReceipt(receipt)
+                                                                },
+                                                                {
+                                                                    icon: <History size={16} />,
+                                                                    label: 'Ver actividad',
+                                                                    onClick: () => handleViewActivity(receipt)
+                                                                },
+                                                                ...(receipt.status === 'activo' && !isClient ? [{
+                                                                    icon: <Send size={16} />,
+                                                                    label: 'Enviar por email',
+                                                                    onClick: () => handleSendEmail(receipt)
+                                                                }] : []),
+                                                                ...(receipt.status === 'activo' && !isClient ? [{
+                                                                    icon: <MessageCircle size={16} />,
+                                                                    label: 'Enviar WhatsApp',
+                                                                    onClick: () => handleSendWhatsApp(receipt)
+                                                                }] : []),
+                                                                ...(receipt.status === 'activo' && !isClient && receipt.createdBy._id === user.id ? [{
+                                                                    icon: <Ban size={16} />,
+                                                                    label: 'Anular',
+                                                                    variant: 'danger',
+                                                                    onClick: () => handleCancelClick(receipt)
+                                                                }] : [])
+                                                            ]}
+                                                            position={openMenu.position}
+                                                            onClose={() => setOpenMenu({ id: null, position: null, openAbove: false })}
+                                                        />
+                                                    )}
+                                                </div>
                                             </div>
                                         </td>
                                     </tr>
@@ -343,15 +484,15 @@ const ReceiptsPage = () => {
                 {/* Vista Mobile - Cards */}
                 <div className="md:hidden">
                     {loading ? (
-                        Array(3).fill(0).map((_, i) => (
-                            <div key={i} className="p-4 animate-pulse even:bg-(--bg-hover)">
-                                <div className="h-4 bg-(--bg-hover) rounded w-3/4 mb-2"></div>
-                                <div className="h-3 bg-(--bg-hover) rounded w-1/2"></div>
+                        <div className="p-12 text-center">
+                            <div className="flex items-center justify-center gap-2 text-(--text-muted) text-[11px] font-bold uppercase tracking-widest">
+                                <div className="w-3.5 h-3.5 border-2 border-(--border-color) border-t-primary-600 rounded-full animate-spin"></div>
+                                Cargando datos
                             </div>
-                        ))
-                    ) : filteredReceipts.length > 0 ? (
+                        </div>
+                    ) : receipts.length > 0 ? (
                         <div className="divide-y divide-(--border-color)">
-                            {filteredReceipts.map((receipt) => (
+                            {receipts.map((receipt) => (
                                 <div 
                                     key={receipt._id} 
                                     className="p-4 hover:bg-(--bg-hover) transition-colors cursor-pointer even:bg-(--bg-hover)/50"
@@ -387,6 +528,7 @@ const ReceiptsPage = () => {
                                     
                                     {/* Acciones */}
                                     <div className="flex items-center justify-end gap-2 pt-2 border-t border-(--border-color)">
+                                        {/* Botón Imprimir - Siempre visible */}
                                         <button
                                             onClick={(e) => { e.stopPropagation(); handlePrintPDF(receipt); }}
                                             className="p-2 rounded-lg text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-hover) transition-all"
@@ -394,34 +536,52 @@ const ReceiptsPage = () => {
                                         >
                                             <Printer size={18} />
                                         </button>
-                                        {receipt.status === 'activo' && !isClient && (
-                                            <>
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); handleSendEmail(receipt); }}
-                                                    className="p-2 rounded-lg text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-hover) transition-all"
-                                                    title="Enviar Email"
-                                                >
-                                                    <Send size={18} />
-                                                </button>
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); handleSendWhatsApp(receipt); }}
-                                                    className="p-2 rounded-lg text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-hover) transition-all"
-                                                    title="Enviar WhatsApp"
-                                                >
-                                                    <MessageCircle size={18} />
-                                                </button>
-                                                {receipt.createdBy._id === user.id && (
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); handleCancelClick(receipt); }}
-                                                        className="p-2 rounded-lg text-danger-600 hover:bg-danger-50 dark:hover:bg-danger-900/20 transition-all"
-                                                        title="Anular"
-                                                    >
-                                                        <Ban size={18} />
-                                                    </button>
-                                                )}
-                                            </>
-                                        )}
+                                        
+                                        {/* Menú de 3 puntitos - Otras acciones */}
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); handleOpenMenu(e, receipt._id); }}
+                                            className="p-2 rounded-lg text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-hover) transition-all"
+                                        >
+                                            <MoreHorizontal size={20} />
+                                        </button>
                                     </div>
+                                    
+                                    {/* Menu - Mobile */}
+                                    {openMenu.id === receipt._id && (
+                                        <ActionMenu
+                                            openAbove={openMenu.openAbove}
+                                            items={[
+                                                {
+                                                    icon: <Eye size={16} />,
+                                                    label: 'Ver detalle',
+                                                    onClick: () => handleViewReceipt(receipt)
+                                                },
+                                                {
+                                                    icon: <History size={16} />,
+                                                    label: 'Ver actividad',
+                                                    onClick: () => handleViewActivity(receipt)
+                                                },
+                                                ...(receipt.status === 'activo' && !isClient ? [{
+                                                    icon: <Send size={16} />,
+                                                    label: 'Enviar por email',
+                                                    onClick: () => handleSendEmail(receipt)
+                                                }] : []),
+                                                ...(receipt.status === 'activo' && !isClient ? [{
+                                                    icon: <MessageCircle size={16} />,
+                                                    label: 'Enviar WhatsApp',
+                                                    onClick: () => handleSendWhatsApp(receipt)
+                                                }] : []),
+                                                ...(receipt.status === 'activo' && !isClient && receipt.createdBy._id === user.id ? [{
+                                                    icon: <Ban size={16} />,
+                                                    label: 'Anular',
+                                                    variant: 'danger',
+                                                    onClick: () => handleCancelClick(receipt)
+                                                }] : [])
+                                            ]}
+                                            position={openMenu.position}
+                                            onClose={() => setOpenMenu({ id: null, position: null, openAbove: false })}
+                                        />
+                                    )}
                                 </div>
                             ))}
                         </div>
@@ -434,11 +594,30 @@ const ReceiptsPage = () => {
                     )}
                 </div>
 
-                {/* Footer */}
-                <div className="px-6 py-3 border-t border-(--border-color) bg-(--bg-hover)">
+                {/* Footer / Pagination */}
+                <div className="px-6 py-3 border-t border-(--border-color) bg-(--bg-hover) flex items-center justify-between">
                     <span className="text-[10px] text-(--text-muted) font-bold uppercase tracking-widest">
-                        Total {filteredReceipts.length} registros
+                        Mostrando {receipts.length > 0 ? ((pagination.page - 1) * pagination.limit) + 1 : 0} - {Math.min(pagination.page * pagination.limit, pagination.total)} de {pagination.total} registros
                     </span>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                            disabled={pagination.page === 1}
+                            className="px-3 py-1.5 text-xs font-medium rounded-lg border border-(--border-color) bg-(--bg-card) text-(--text-secondary) hover:bg-(--bg-hover) disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                            Anterior
+                        </button>
+                        <span className="text-xs text-(--text-muted) px-2">
+                            {pagination.page} / {pagination.totalPages}
+                        </span>
+                        <button
+                            onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                            disabled={pagination.page === pagination.totalPages}
+                            className="px-3 py-1.5 text-xs font-medium rounded-lg border border-(--border-color) bg-(--bg-card) text-(--text-secondary) hover:bg-(--bg-hover) disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                            Siguiente
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -490,6 +669,81 @@ const ReceiptsPage = () => {
                 onClose={() => setIsWhatsAppModalOpen(false)}
                 receipt={selectedReceipt}
             />
+
+            {/* Activity Drawer */}
+            <OrderActivityDrawer
+                isOpen={isActivityDrawerOpen}
+                onClose={() => {
+                    setIsActivityDrawerOpen(false);
+                    setSelectedReceiptForActivity(null);
+                }}
+                entityType="receipt"
+                entityId={selectedReceiptForActivity?._id}
+                entityNumber={selectedReceiptForActivity?.receiptNumber}
+                clientName={selectedReceiptForActivity?.clientId?.businessName}
+            />
+        </div>
+    );
+};
+
+const ActionMenu = ({ items, onClose, position, openAbove = false }) => {
+    const menuRef = useRef(null);
+    
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (menuRef.current && !menuRef.current.contains(e.target)) {
+                onClose();
+            }
+        };
+        const handleEscape = (e) => {
+            if (e.key === 'Escape') onClose();
+        };
+        // Usar click en lugar de mousedown para evitar conflictos
+        document.addEventListener('click', handleClickOutside);
+        document.addEventListener('keydown', handleEscape);
+        return () => {
+            document.removeEventListener('click', handleClickOutside);
+            document.removeEventListener('keydown', handleEscape);
+        };
+    }, [onClose]);
+    
+    // Calcular altura estimada del menú (aprox 40px por item)
+    const estimatedHeight = items.length * 42;
+    
+    return (
+        <div
+            ref={menuRef}
+            onClick={(e) => e.stopPropagation()}
+            style={{ 
+                position: 'fixed', 
+                top: openAbove ? (position?.top - estimatedHeight) : position?.top, 
+                left: position?.left 
+            }}
+            className="w-48 bg-(--bg-card) rounded-xl shadow-xl border border-(--border-color) z-[9999] overflow-hidden"
+        >
+            {items.map((item, idx) => (
+                <button
+                    key={idx}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        onClose();
+                        // Ejecutar el onClick después de cerrar el menú
+                        setTimeout(() => {
+                            item.onClick();
+                        }, 0);
+                    }}
+                    disabled={item.disabled}
+                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-left text-[13px] font-medium transition-colors ${
+                        item.variant === 'danger' 
+                            ? 'text-danger-600 dark:text-danger-400 hover:bg-danger-50 dark:hover:bg-danger-900/20' 
+                            : 'text-(--text-primary) hover:bg-(--bg-hover)'
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                    {item.icon}
+                    {item.label}
+                </button>
+            ))}
         </div>
     );
 };

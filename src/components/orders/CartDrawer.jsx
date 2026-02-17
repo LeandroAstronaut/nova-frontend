@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Trash2, ShoppingBag, Minus, Plus, Package, ShoppingCart, Tag } from 'lucide-react';
 import Button from '../../components/common/Button';
 
-const CartDrawer = ({ isOpen, onClose, items, updateItem, removeItem, onCheckout, total, products = [], company = null }) => {
+const CartDrawer = ({ isOpen, onClose, items, updateItem, removeItem, onCheckout, subtotal, total, globalDiscount = 0, products = [], company = null }) => {
     // Helper para obtener datos del producto
     const getProductData = (productId) => {
         return products.find(p => p._id === productId) || {};
@@ -56,17 +56,17 @@ const CartDrawer = ({ isOpen, onClose, items, updateItem, removeItem, onCheckout
                         animate={{ x: 0 }}
                         exit={{ x: '100%' }}
                         transition={{ type: 'spring', damping: 28, stiffness: 220 }}
-                        className="fixed top-4 right-4 h-[calc(100vh-2rem)] w-full max-w-[420px] bg-[var(--bg-card)] shadow-2xl dark:shadow-soft-lg-dark z-[10000] flex flex-col border border-[var(--border-color)] rounded-2xl overflow-hidden"
+                        className="fixed top-4 left-4 right-4 md:left-auto h-[calc(100vh-2rem)] w-auto md:w-full md:max-w-[400px] bg-[var(--bg-card)] shadow-2xl dark:shadow-soft-lg-dark z-[10000] flex flex-col border border-[var(--border-color)] rounded-2xl overflow-hidden"
                     >
                         {/* Header - Estilo consistente */}
-                        <div className="px-6 py-4 border-b border-[var(--border-color)] flex items-center justify-between shrink-0 bg-[var(--bg-card)]">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-xl flex items-center justify-center text-primary-600 dark:text-primary-400">
-                                    <ShoppingBag size={20} />
+                        <div className="px-4 md:px-5 py-3 md:py-4 border-b border-[var(--border-color)] flex items-center justify-between shrink-0 bg-[var(--bg-card)]">
+                            <div className="flex items-center gap-2 md:gap-3">
+                                <div className="w-9 h-9 md:w-10 md:h-10 bg-primary-100 dark:bg-primary-900/30 rounded-xl flex items-center justify-center text-primary-600 dark:text-primary-400">
+                                    <ShoppingBag size={18} className="md:w-5 md:h-5" />
                                 </div>
                                 <div>
-                                    <h2 className="text-base font-bold text-[var(--text-primary)]">Mi Carrito</h2>
-                                    <p className="text-[11px] text-[var(--text-muted)] font-medium">{items.length} productos</p>
+                                    <h2 className="text-sm md:text-base font-semibold text-[var(--text-primary)]">Mi Carrito</h2>
+                                    <p className="text-[10px] md:text-[11px] text-[var(--text-muted)] font-medium">{items.length} productos</p>
                                 </div>
                             </div>
                             <button
@@ -78,7 +78,7 @@ const CartDrawer = ({ isOpen, onClose, items, updateItem, removeItem, onCheckout
                         </div>
 
                         {/* Content - Scrolleable */}
-                        <div className="flex-1 overflow-y-auto p-6 space-y-3">
+                        <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-2 md:space-y-3">
                             {items.length === 0 ? (
                                 <div className="h-full flex flex-col items-center justify-center text-center py-12">
                                     <div className="w-20 h-20 bg-[var(--bg-hover)] rounded-2xl flex items-center justify-center mb-4">
@@ -93,16 +93,16 @@ const CartDrawer = ({ isOpen, onClose, items, updateItem, removeItem, onCheckout
                                         layout
                                         initial={{ opacity: 0, y: 10 }}
                                         animate={{ opacity: 1, y: 0 }}
-                                        className="group p-4 bg-[var(--bg-card)] rounded-2xl border border-[var(--border-color)] hover:border-primary-200 dark:hover:border-primary-800 transition-all"
+                                        className="group p-3 md:p-3.5 bg-[var(--bg-card)] rounded-2xl border border-[var(--border-color)] hover:border-primary-200 dark:hover:border-primary-800 transition-all"
                                     >
-                                        <div className="flex gap-4">
-                                            <div className="w-14 h-14 bg-[var(--bg-hover)] rounded-xl flex items-center justify-center shrink-0">
-                                                <Package size={24} className="text-[var(--text-muted)] opacity-50" />
+                                        <div className="flex gap-3">
+                                            <div className="w-10 h-10 md:w-14 md:h-14 bg-[var(--bg-hover)] rounded-xl flex items-center justify-center shrink-0">
+                                                <Package size={20} className="md:w-6 md:h-6 text-[var(--text-muted)] opacity-50" />
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex justify-between items-start gap-2">
-                                                    <div>
-                                                        <h4 className="text-sm font-bold text-[var(--text-primary)] truncate">{item.name}</h4>
+                                                    <div className="min-w-0 flex-1">
+                                                        <h4 className="text-sm font-medium text-[var(--text-primary)] truncate">{item.name}</h4>
                                                         <p className="text-[11px] text-[var(--text-muted)]">{item.code}</p>
                                                     </div>
                                                     <button
@@ -118,17 +118,17 @@ const CartDrawer = ({ isOpen, onClose, items, updateItem, removeItem, onCheckout
                                                     const hasOffer = product.pricing?.offer > 0;
                                                     if (hasOffer && company?.excludeOfferProductsFromGlobalDiscount) {
                                                         return (
-                                                            <div className="mb-2 px-2 py-1 bg-pink-100 dark:bg-pink-900/30 border border-pink-200 dark:border-pink-800 rounded-lg text-[9px] font-bold text-pink-600 dark:text-pink-400 flex items-center gap-1 w-fit">
-                                                                <Tag size={10} />
-                                                                Sin descuento global del pedido
+                                                            <div className="mb-1.5 px-2 py-0.5 bg-pink-100 dark:bg-pink-900/30 border border-pink-200 dark:border-pink-800 rounded text-[9px] font-medium text-pink-600 dark:text-pink-400 flex items-center gap-1 w-fit">
+                                                                <Tag size={9} />
+                                                                Sin dto. global
                                                             </div>
                                                         );
                                                     }
                                                     return null;
                                                 })()}
 
-                                                <div className="flex items-center justify-between gap-3">
-                                                    <div className="flex items-center gap-3">
+                                                <div className="flex items-center justify-between gap-2 mt-2">
+                                                    <div className="flex items-center gap-2">
                                                         {/* Qty Selector */}
                                                         {(() => {
                                                             const product = getProductData(item.productId);
@@ -144,13 +144,13 @@ const CartDrawer = ({ isOpen, onClose, items, updateItem, removeItem, onCheckout
                                                                         <button
                                                                             onClick={() => updateItem(item.lineId, 'quantity', getValidQuantity(item.productId, item.quantity, -step))}
                                                                             disabled={item.quantity <= (sellOnlyFullPackages ? unitsPerPackage : minOrderQuantity)}
-                                                                            className="w-7 h-7 flex items-center justify-center text-[var(--text-muted)] hover:text-primary-600 hover:bg-[var(--bg-card)] rounded-md transition-colors disabled:opacity-40"
+                                                                            className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center text-[var(--text-muted)] hover:text-primary-600 hover:bg-[var(--bg-card)] rounded-md transition-colors disabled:opacity-40"
                                                                         >
                                                                             <Minus size={14} />
                                                                         </button>
                                                                         <input
                                                                             type="number"
-                                                                            className="w-10 bg-transparent text-center text-xs font-bold text-[var(--text-primary)] focus:outline-none"
+                                                                            className="w-8 md:w-10 bg-transparent text-center text-xs font-semibold text-[var(--text-primary)] focus:outline-none"
                                                                             value={item.quantity}
                                                                             onChange={(e) => {
                                                                                 const val = parseInt(e.target.value) || 0;
@@ -159,7 +159,7 @@ const CartDrawer = ({ isOpen, onClose, items, updateItem, removeItem, onCheckout
                                                                         />
                                                                         <button
                                                                             onClick={() => updateItem(item.lineId, 'quantity', getValidQuantity(item.productId, item.quantity, step))}
-                                                                            className="w-7 h-7 flex items-center justify-center text-[var(--text-muted)] hover:text-primary-600 hover:bg-[var(--bg-card)] rounded-md transition-colors"
+                                                                            className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center text-[var(--text-muted)] hover:text-primary-600 hover:bg-[var(--bg-card)] rounded-md transition-colors"
                                                                         >
                                                                             <Plus size={14} />
                                                                         </button>
@@ -176,17 +176,17 @@ const CartDrawer = ({ isOpen, onClose, items, updateItem, removeItem, onCheckout
                                                         })()}
 
                                                         {/* Disc Selector */}
-                                                        <div className="flex items-center gap-1 px-2 py-1.5 bg-success-50 dark:bg-success-900/30 rounded-lg border border-success-100 dark:border-success-800">
+                                                        <div className="flex items-center gap-1 px-1.5 py-1 md:px-2 md:py-1.5 bg-success-50 dark:bg-success-900/30 rounded-lg border border-success-100 dark:border-success-800">
                                                             <input
                                                                 type="number"
-                                                                className="w-8 bg-transparent text-center text-xs font-bold text-success-700 dark:text-success-400 focus:outline-none"
+                                                                className="w-7 md:w-8 bg-transparent text-center text-xs font-semibold text-success-700 dark:text-success-400 focus:outline-none"
                                                                 value={item.discount || 0}
                                                                 onChange={(e) => updateItem(item.lineId, 'discount', Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
                                                             />
-                                                            <span className="text-[10px] font-bold text-success-600/50">%</span>
+                                                            <span className="text-[10px] font-medium text-success-600/50">%</span>
                                                         </div>
                                                     </div>
-                                                    <p className="text-sm font-bold text-[var(--text-primary)]">
+                                                    <p className="text-sm font-semibold text-[var(--text-primary)] whitespace-nowrap">
                                                         ${(Number(item.quantity || 0) * Number(item.listPrice || 0) * (1 - (Number(item.discount || 0) / 100))).toLocaleString('es-AR')}
                                                     </p>
                                                 </div>
@@ -199,21 +199,37 @@ const CartDrawer = ({ isOpen, onClose, items, updateItem, removeItem, onCheckout
 
                         {/* Footer - Acciones siempre abajo */}
                         {items.length > 0 && (
-                            <div className="px-6 py-4 border-t border-[var(--border-color)] bg-[var(--bg-hover)] space-y-4">
+                            <div className="px-4 md:px-5 py-3 md:py-4 border-t border-[var(--border-color)] bg-[var(--bg-hover)] space-y-3">
                                 <div className="space-y-2">
+                                    {/* Subtotal (antes de descuento global) */}
                                     <div className="flex justify-between items-center">
-                                        <span className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
-                                            Items: {items.reduce((acc, i) => acc + Number(i.quantity || 0), 0)}
+                                        <span className="text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wider">
+                                            Subtotal ({items.reduce((acc, i) => acc + Number(i.quantity || 0), 0)} items)
                                         </span>
-                                        <span className="text-sm font-bold text-[var(--text-primary)]">
-                                            ${Number(total || 0).toLocaleString('es-AR')}
+                                        <span className="text-sm font-medium text-[var(--text-primary)]">
+                                            ${Number(subtotal || total || 0).toLocaleString('es-AR')}
                                         </span>
                                     </div>
+                                    
+                                    {/* Descuento Global (solo si > 0) */}
+                                    {Number(globalDiscount) > 0 && (
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-[11px] font-medium text-success-600 uppercase tracking-wider flex items-center gap-1">
+                                                <Tag size={10} />
+                                                Desc. Global ({globalDiscount}%)
+                                            </span>
+                                            <span className="text-sm font-medium text-success-600">
+                                                -${(Number(subtotal || total || 0) - Number(total || 0)).toLocaleString('es-AR')}
+                                            </span>
+                                        </div>
+                                    )}
+                                    
+                                    {/* Total Final */}
                                     <div className="flex justify-between items-end pt-2 border-t border-[var(--border-color)]">
                                         <div>
-                                            <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-0.5">Total Final</p>
+                                            <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-0.5">Total Final</p>
                                         </div>
-                                        <p className="text-2xl font-black text-[var(--text-primary)]">
+                                        <p className="text-xl md:text-2xl font-semibold text-[var(--text-primary)]">
                                             ${Number(total || 0).toLocaleString('es-AR')}
                                         </p>
                                     </div>
@@ -222,15 +238,15 @@ const CartDrawer = ({ isOpen, onClose, items, updateItem, removeItem, onCheckout
                                 <Button
                                     variant="primary"
                                     onClick={onCheckout}
-                                    className="w-full !py-3 !text-sm font-bold uppercase tracking-wider"
+                                    className="w-full !py-2.5 !text-sm font-semibold uppercase tracking-wider"
                                 >
                                     <ShoppingCart size={18} className="mr-2" />
-                                    Revisar Presupuesto
+                                    Revisar
                                 </Button>
 
                                 <button
                                     onClick={() => items.forEach(i => removeItem(i.lineId))}
-                                    className="w-full text-center text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider hover:text-danger-500 transition-colors py-1"
+                                    className="w-full text-center text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wider hover:text-danger-500 transition-colors py-1"
                                 >
                                     Limpiar Carrito
                                 </button>

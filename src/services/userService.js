@@ -20,8 +20,8 @@ api.interceptors.request.use((config) => {
 // ========== GESTIÓN DE USUARIOS STAFF (VENDEDORES + ADMINS) ==========
 
 // Obtener todos los usuarios staff (vendedores + admins)
-export const getStaffUsers = async () => {
-    const response = await api.get('/users/staff');
+export const getStaffUsers = async (params = {}) => {
+    const response = await api.get('/users/staff', { params });
     return response.data;
 };
 

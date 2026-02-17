@@ -25,7 +25,7 @@ import {
     Tag,
     RefreshCw
 } from 'lucide-react';
-import { getOrders, convertBudgetToOrder, deleteOrder, revertOrderToBudget, updateOrderStatus, sendOrderEmail, checkPriceChanges, updateOrderPrices } from '../../services/orderService';
+import { getOrder, convertBudgetToOrder, deleteOrder, revertOrderToBudget, updateOrderStatus, sendOrderEmail, checkPriceChanges, updateOrderPrices } from '../../services/orderService';
 import { generateOrderPDF } from '../../utils/pdfGenerator';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -122,18 +122,12 @@ const OrderDetailPage = () => {
     const fetchOrder = async () => {
         try {
             setLoading(true);
-            // Obtener todos los pedidos y filtrar por ID
-            const orders = await getOrders();
-            const foundOrder = orders.find(o => o._id === id);
-            if (foundOrder) {
-                setOrder(foundOrder);
-            } else {
-                addToast('Pedido no encontrado', 'error');
-                navigate(-1);
-            }
+            const orderData = await getOrder(id);
+            setOrder(orderData);
         } catch (error) {
             console.error('Error fetching order:', error);
             addToast('Error al cargar el pedido', 'error');
+            navigate(-1);
         } finally {
             setLoading(false);
         }
@@ -844,6 +838,7 @@ const OrderDetailPage = () => {
                 onConfirm={async ({ budgetId, notifications }) => {
                     try {
                         await convertBudgetToOrder(budgetId, notifications);
+                        setIsConvertModalOpen(false); // Cerrar modal inmediatamente
                         addToast('Presupuesto convertido a pedido exitosamente', 'success');
                         fetchOrder();
                     } catch (error) {
@@ -852,6 +847,7 @@ const OrderDetailPage = () => {
                 }}
                 budget={order}
                 isClient={isClient}
+                features={user?.company?.features}
             />
 
             <UpdateOrderStatusModal

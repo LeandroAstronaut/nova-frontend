@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
     Plus,
     Search,
@@ -10,7 +10,8 @@ import {
     ChevronDown,
     Eye,
     MoreHorizontal,
-    Tag
+    Tag,
+    History
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -19,6 +20,7 @@ import Button from '../../components/common/Button';
 import ConfirmModal from '../../components/common/ConfirmModal';
 import ProductQuickView from '../../components/products/ProductQuickView';
 import ProductDrawer from '../../components/products/ProductDrawer';
+import StockMovementsDrawer from '../../components/products/StockMovementsDrawer';
 
 const ProductsPage = () => {
     const { user } = useAuth();
@@ -48,6 +50,18 @@ const ProductsPage = () => {
         product: null,
         loading: false
     });
+    
+    // Stock movements drawer
+    const [stockMovementsDrawer, setStockMovementsDrawer] = useState({
+        isOpen: false,
+        product: null
+    });
+    
+    // Estado para el menú de exportación
+    const [exportMenu, setExportMenu] = useState({ open: false, position: null });
+    
+    // Estado para el menú de acciones por producto
+    const [actionMenu, setActionMenu] = useState({ open: false, position: null, productId: null });
     
     // Ahora sí, después de todos los hooks, hacemos los cálculos y el return condicional
     const isAdmin = user?.role?.name === 'admin';
@@ -153,6 +167,39 @@ const ProductsPage = () => {
         fetchProducts();
     };
 
+    const handleOpenExportMenu = (e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        setExportMenu({
+            open: true,
+            position: { top: rect.bottom + 8, left: rect.left }
+        });
+    };
+
+    const handleOpenActionMenu = (e, productId) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const windowWidth = window.innerWidth;
+        const menuWidth = 192;
+        
+        let leftPosition = rect.left - menuWidth + rect.width;
+        
+        if (leftPosition + menuWidth > windowWidth) {
+            leftPosition = windowWidth - menuWidth - 16;
+        }
+        
+        if (leftPosition < 8) {
+            leftPosition = 8;
+        }
+        
+        setActionMenu({
+            open: true,
+            productId,
+            position: {
+                top: rect.bottom + 8,
+                left: leftPosition
+            }
+        });
+    };
+
     const handleExport = async () => {
         try {
             const blob = await exportProducts();
@@ -172,11 +219,19 @@ const ProductsPage = () => {
     };
 
     const handleDeleteClick = (product, e) => {
-        e.stopPropagation();
+        if (e) e.stopPropagation();
         setDeleteModal({
             isOpen: true,
             product,
             loading: false
+        });
+    };
+
+    const handleViewStockMovements = (product, e) => {
+        e?.stopPropagation();
+        setStockMovementsDrawer({
+            isOpen: true,
+            product
         });
     };
 
@@ -207,21 +262,37 @@ const ProductsPage = () => {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-xl font-bold text-(--text-primary) leading-tight">
-                        Listado de Productos
+                        Productos
                     </h1>
                     <p className="text-[13px] text-(--text-secondary) mt-0.5 font-medium">
                         Gestione el catálogo de productos de su empresa.
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button
-                        variant="secondary"
-                        className="px-3! text-[11px] font-bold uppercase tracking-wider"
-                        onClick={handleExport}
-                    >
-                        <Download size={14} strokeWidth={2.5} />
-                        Exportar
-                    </Button>
+                    {/* Menú de 3 puntitos */}
+                    <div className="relative">
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenExportMenu(e);
+                            }}
+                            className="p-2 rounded-lg text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-hover) transition-all border border-(--border-color)"
+                        >
+                            <MoreHorizontal size={18} />
+                        </button>
+                        {exportMenu.open && (
+                            <ActionMenu
+                                items={[{
+                                    icon: <Download size={16} />,
+                                    label: 'Exportar a CSV',
+                                    onClick: handleExport
+                                }]}
+                                position={exportMenu.position}
+                                onClose={() => setExportMenu({ open: false, position: null })}
+                            />
+                        )}
+                    </div>
+                    {/* Botón Nuevo Producto */}
                     <Button
                         variant="primary"
                         onClick={handleCreateProduct}
@@ -279,7 +350,7 @@ const ProductsPage = () => {
                                 </th>
                                 {hasStockFeature && (
                                     <th className="px-6 py-3 text-center cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('stock')}>
-                                        <div className="flex items-center justify-center">Stock <SortIcon field="stock" /></div>
+                                        <div className="flex items-center justify-center">Disponible <SortIcon field="stock" /></div>
                                     </th>
                                 )}
                                 <th className="px-6 py-3 text-right">Acciones</th>
@@ -287,21 +358,19 @@ const ProductsPage = () => {
                         </thead>
                         <tbody className="divide-y divide-(--border-color)">
                             {loading ? (
-                                Array(5).fill(0).map((_, i) => (
-                                    <tr key={i}>
-                                        <td colSpan={totalColumns} className="px-6 py-6 text-center">
-                                            <div className="flex items-center justify-center gap-2 text-(--text-muted) text-[11px] font-bold uppercase tracking-widest">
-                                                <div className="w-3.5 h-3.5 border-2 border-(--border-color) border-t-primary-600 dark:border-t-primary-400 rounded-full animate-spin"></div>
-                                                Sincronizando...
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))
+                                <tr>
+                                    <td colSpan={totalColumns} className="px-6 py-12 text-center">
+                                        <div className="flex items-center justify-center gap-2 text-(--text-muted) text-[11px] font-bold uppercase tracking-widest">
+                                            <div className="w-3.5 h-3.5 border-2 border-(--border-color) border-t-primary-600 dark:border-t-primary-400 rounded-full animate-spin"></div>
+                                            Cargando datos
+                                        </div>
+                                    </td>
+                                </tr>
                             ) : products.length > 0 ? (
                                 products.map((product) => (
                                     <tr
                                         key={product._id}
-                                        className="hover:bg-(--bg-hover) transition-colors group cursor-pointer"
+                                        className="hover:bg-(--bg-hover) transition-colors even:bg-(--bg-hover)/50 group cursor-pointer"
                                         onClick={() => handleViewProduct(product)}
                                     >
                                         <td className="px-6 py-4">
@@ -366,9 +435,7 @@ const ProductsPage = () => {
                                                     <span className="text-[13px] font-bold text-warning-600">
                                                         {formatPrice(product.pricing?.offer)}
                                                     </span>
-                                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-warning-50 text-warning-600 border border-warning-100">
-                                                        Precio Oferta
-                                                    </span>
+
                                                 </div>
                                             ) : (
                                                 <span className="text-[13px] text-(--text-muted)">-</span>
@@ -376,40 +443,67 @@ const ProductsPage = () => {
                                         </td>
                                         {hasStockFeature && (
                                             <td className="px-6 py-4 text-center">
-                                                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${
-                                                    product.stock > 10 
-                                                        ? 'bg-success-50 dark:bg-success-900/30 text-success-600 dark:text-success-400 border-success-100 dark:border-success-800' 
-                                                        : product.stock > 0 
-                                                            ? 'bg-warning-50 dark:bg-warning-900/30 text-warning-600 dark:text-warning-400 border-warning-100 dark:border-warning-800' 
-                                                            : 'bg-danger-50 dark:bg-danger-900/30 text-danger-600 dark:text-danger-400 border-danger-100 dark:border-danger-800'
-                                                }`}>
-                                                    {product.stock}
-                                                </span>
+                                                {(() => {
+                                                    const available = Math.max(0, (product.stock || 0) - (product.stockReserved || 0));
+                                                    return (
+                                                        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${
+                                                            available > 10 
+                                                                ? 'bg-success-50 dark:bg-success-900/30 text-success-600 dark:text-success-400 border-success-100 dark:border-success-800' 
+                                                                : available > 0 
+                                                                    ? 'bg-warning-50 dark:bg-warning-900/30 text-warning-600 dark:text-warning-400 border-warning-100 dark:border-warning-800' 
+                                                                    : 'bg-danger-50 dark:bg-danger-900/30 text-danger-600 dark:text-danger-400 border-danger-100 dark:border-danger-800'
+                                                        }`}>
+                                                            {available}
+                                                        </span>
+                                                    );
+                                                })()}
                                             </td>
                                         )}
                                         <td className="px-6 py-4 text-right">
-                                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); handleViewProduct(product); }}
-                                                    className="p-1.5 text-(--text-muted) hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg transition-colors"
-                                                    title="Ver detalle"
-                                                >
-                                                    <Eye size={16} />
-                                                </button>
+                                            <div className="flex items-center justify-end gap-1">
+                                                {/* Botón Editar - Siempre visible */}
                                                 <button
                                                     onClick={(e) => handleEditProduct(product, e)}
-                                                    className="p-1.5 text-(--text-muted) hover:text-info-600 hover:bg-info-50 dark:hover:bg-info-900/20 rounded-lg transition-colors"
+                                                    className="p-1.5 rounded-lg text-(--text-muted) hover:text-info-600 hover:bg-info-50 dark:hover:bg-info-900/20 transition-colors"
                                                     title="Editar"
                                                 >
                                                     <Edit2 size={16} />
                                                 </button>
-                                                <button
-                                                    onClick={(e) => handleDeleteClick(product, e)}
-                                                    className="p-1.5 text-(--text-muted) hover:text-danger-600 hover:bg-danger-50 dark:hover:bg-danger-900/20 rounded-lg transition-colors"
-                                                    title="Eliminar"
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
+                                                
+                                                {/* Menú de 3 puntitos - Otras acciones */}
+                                                <div>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); handleOpenActionMenu(e, product._id); }}
+                                                        className="p-1.5 rounded-lg text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-hover) transition-colors"
+                                                    >
+                                                        <MoreHorizontal size={18} />
+                                                    </button>
+                                                    
+                                                    {actionMenu.open && actionMenu.productId === product._id && (
+                                                        <ActionMenu
+                                                            items={[
+                                                                {
+                                                                    icon: <Eye size={16} />,
+                                                                    label: 'Ver detalle',
+                                                                    onClick: () => handleViewProduct(product)
+                                                                },
+                                                                ...(hasStockFeature ? [{
+                                                                    icon: <History size={16} />,
+                                                                    label: 'Ver movimientos',
+                                                                    onClick: () => handleViewStockMovements(product)
+                                                                }] : []),
+                                                                {
+                                                                    icon: <Trash2 size={16} />,
+                                                                    label: 'Eliminar',
+                                                                    variant: 'danger',
+                                                                    onClick: () => handleDeleteClick(product)
+                                                                }
+                                                            ]}
+                                                            position={actionMenu.position}
+                                                            onClose={() => setActionMenu({ open: false, position: null, productId: null })}
+                                                        />
+                                                    )}
+                                                </div>
                                             </div>
                                         </td>
                                     </tr>
@@ -464,12 +558,12 @@ const ProductsPage = () => {
                 {/* Mobile List */}
                 <div className="md:hidden divide-y divide-(--border-color)">
                     {loading ? (
-                        Array(3).fill(0).map((_, i) => (
-                            <div key={i} className="p-4 animate-pulse even:bg-(--bg-hover)">
-                                <div className="h-4 bg-(--bg-hover) rounded w-3/4 mb-2"></div>
-                                <div className="h-3 bg-(--bg-hover) rounded w-1/2"></div>
+                        <div className="p-12 text-center">
+                            <div className="flex items-center justify-center gap-2 text-(--text-muted) text-[11px] font-bold uppercase tracking-widest">
+                                <div className="w-3.5 h-3.5 border-2 border-(--border-color) border-t-primary-600 rounded-full animate-spin"></div>
+                                Cargando datos
                             </div>
-                        ))
+                        </div>
                     ) : products.length > 0 ? (
                         products.map((product) => (
                             <div
@@ -492,31 +586,43 @@ const ProductsPage = () => {
                                 
                                 {/* Info Grid: Precio y Stock */}
                                 <div className="flex items-center justify-between mb-3">
-                                    <span className="text-[14px] font-bold text-(--text-primary)">
-                                        {formatPrice(product.pricing?.list1)}
-                                    </span>
-                                    {hasStockFeature && (
-                                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${
-                                            product.stock > 10 
-                                                ? 'bg-success-50 text-success-600 border-success-100' 
-                                                : product.stock > 0 
-                                                    ? 'bg-warning-50 text-warning-600 border-warning-100' 
-                                                    : 'bg-danger-50 text-danger-600 border-danger-100'
-                                        }`}>
-                                            Stock: {product.stock}
+                                    <div className="flex flex-col">
+                                        <span className="text-[14px] font-bold text-(--text-primary)">
+                                            {formatPrice(product.pricing?.list1)}
                                         </span>
+                                        {hasPriceListsFeature && product.pricing?.list2 > 0 && (
+                                            <span className="text-[11px] text-primary-600">
+                                                L2: {formatPrice(product.pricing.list2)}
+                                            </span>
+                                        )}
+                                    </div>
+                                    {hasStockFeature && (() => {
+                                        const available = Math.max(0, (product.stock || 0) - (product.stockReserved || 0));
+                                        return (
+                                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${
+                                                available > 10 
+                                                    ? 'bg-success-50 text-success-600 border-success-100' 
+                                                    : available > 0 
+                                                        ? 'bg-warning-50 text-warning-600 border-warning-100' 
+                                                        : 'bg-danger-50 text-danger-600 border-danger-100'
+                                            }`}>
+                                                Disp: {available}
+                                            </span>
+                                        );
+                                    })()}
+                                </div>
+                                
+                                {/* Info adicional: Código, IVA */}
+                                <div className="flex items-center justify-between text-[11px] text-(--text-muted) mb-3">
+                                    <span>Cód: {product.code}</span>
+                                    {product.pricing?.tax > 0 && (
+                                        <span>IVA: {product.pricing.tax}%</span>
                                     )}
                                 </div>
                                 
                                 {/* Acciones */}
                                 <div className="flex items-center justify-end gap-2 pt-2">
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); handleViewProduct(product); }}
-                                        className="p-2 rounded-lg text-(--text-muted) hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-all"
-                                        title="Ver detalle"
-                                    >
-                                        <Eye size={18} />
-                                    </button>
+                                    {/* Botón Editar - Siempre visible */}
                                     <button
                                         onClick={(e) => handleEditProduct(product, e)}
                                         className="p-2 rounded-lg text-(--text-muted) hover:text-info-600 hover:bg-info-50 dark:hover:bg-info-900/20 transition-all"
@@ -524,14 +630,41 @@ const ProductsPage = () => {
                                     >
                                         <Edit2 size={18} />
                                     </button>
+                                    
+                                    {/* Menú de 3 puntitos - Otras acciones */}
                                     <button
-                                        onClick={(e) => handleDeleteClick(product, e)}
-                                        className="p-2 rounded-lg text-(--text-muted) hover:text-danger-600 hover:bg-danger-50 dark:hover:bg-danger-900/20 transition-all"
-                                        title="Eliminar"
+                                        onClick={(e) => { e.stopPropagation(); handleOpenActionMenu(e, product._id); }}
+                                        className="p-2 rounded-lg text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-hover) transition-all"
                                     >
-                                        <Trash2 size={18} />
+                                        <MoreHorizontal size={20} />
                                     </button>
                                 </div>
+                                
+                                {/* Menu - Mobile */}
+                                {actionMenu.open && actionMenu.productId === product._id && (
+                                    <ActionMenu
+                                        items={[
+                                            {
+                                                icon: <Eye size={16} />,
+                                                label: 'Ver detalle',
+                                                onClick: () => handleViewProduct(product)
+                                            },
+                                            ...(hasStockFeature ? [{
+                                                icon: <History size={16} />,
+                                                label: 'Ver movimientos',
+                                                onClick: () => handleViewStockMovements(product)
+                                            }] : []),
+                                            {
+                                                icon: <Trash2 size={16} />,
+                                                label: 'Eliminar',
+                                                variant: 'danger',
+                                                onClick: () => handleDeleteClick(product)
+                                            }
+                                        ]}
+                                        position={actionMenu.position}
+                                        onClose={() => setActionMenu({ open: false, position: null, productId: null })}
+                                    />
+                                )}
                             </div>
                         ))
                     ) : (
@@ -554,6 +687,7 @@ const ProductsPage = () => {
                 showPricesWithTax={showPricesWithTax}
                 features={features}
                 company={user?.company}
+                user={user}
             />
 
             {/* Product Drawer (Create/Edit) */}
@@ -575,6 +709,61 @@ const ProductsPage = () => {
                 confirmText={deleteModal.loading ? 'Eliminando...' : 'Eliminar'}
                 type="danger"
             />
+
+            {/* Stock Movements Drawer */}
+            <StockMovementsDrawer
+                isOpen={stockMovementsDrawer.isOpen}
+                onClose={() => setStockMovementsDrawer({ isOpen: false, product: null })}
+                product={stockMovementsDrawer.product}
+            />
+        </div>
+    );
+};
+
+// ActionMenu Component
+const ActionMenu = ({ items, onClose, position }) => {
+    const menuRef = useRef(null);
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (menuRef.current && !menuRef.current.contains(e.target)) {
+                onClose();
+            }
+        };
+        const handleEscape = (e) => {
+            if (e.key === 'Escape') onClose();
+        };
+        document.addEventListener('click', handleClickOutside);
+        document.addEventListener('keydown', handleEscape);
+        return () => {
+            document.removeEventListener('click', handleClickOutside);
+            document.removeEventListener('keydown', handleEscape);
+        };
+    }, [onClose]);
+    return (
+        <div
+            ref={menuRef}
+            onClick={(e) => e.stopPropagation()}
+            style={{ position: 'fixed', top: position?.top, left: position?.left }}
+            className="w-48 bg-(--bg-card) rounded-xl shadow-xl border border-(--border-color) z-[9999] overflow-hidden"
+        >
+            {items.map((item, idx) => (
+                <button
+                    key={idx}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onClose();
+                        setTimeout(() => item.onClick(), 0);
+                    }}
+                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-left text-[13px] font-medium transition-colors ${
+                        item.variant === 'danger'
+                            ? 'text-danger-600 dark:text-danger-400 hover:bg-danger-50 dark:hover:bg-danger-900/20'
+                            : 'text-(--text-primary) hover:bg-(--bg-hover)'
+                    }`}
+                >
+                    {item.icon}
+                    {item.label}
+                </button>
+            ))}
         </div>
     );
 };

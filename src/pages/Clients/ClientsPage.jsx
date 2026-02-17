@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
     Plus, Search, Mail, Phone, User, Building2, MapPin, Percent, 
-    Eye, MoreHorizontal, Edit2, CheckCircle, XCircle, Truck, Tag, Activity
+    Eye, MoreHorizontal, Edit2, CheckCircle, XCircle, Truck, Tag, Activity, Download
 } from 'lucide-react';
 import { getClients, createClient, toggleClientStatus } from '../../services/clientService';
 import { useAuth } from '../../context/AuthContext';
@@ -28,10 +28,10 @@ const ActionMenu = ({ items, onClose, position, openAbove = false }) => {
             }
         };
         
-        document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('click', handleClickOutside);
         document.addEventListener('keydown', handleEscape);
         return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('click', handleClickOutside);
             document.removeEventListener('keydown', handleEscape);
         };
     }, [onClose]);
@@ -53,10 +53,11 @@ const ActionMenu = ({ items, onClose, position, openAbove = false }) => {
                     key={index}
                     onClick={(e) => {
                         e.stopPropagation();
-                        item.onClick();
+                        e.preventDefault();
                         onClose();
+                        setTimeout(() => item.onClick(), 0);
                     }}
-                    className={`w-full px-4 py-2.5 flex items-center gap-3 text-left text-sm transition-colors ${
+                    className={`w-full px-4 py-2.5 flex items-center gap-3 text-left text-[13px] transition-colors ${
                         item.variant === 'danger' 
                             ? 'text-danger-600 hover:bg-danger-50 dark:hover:bg-danger-900/20' 
                             : item.variant === 'success'
@@ -102,7 +103,16 @@ const ClientsPage = () => {
     const [clients, setClients] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'active', 'inactive'
+    
+    // Pagination State
+    const [pagination, setPagination] = useState({
+        page: 1,
+        limit: 20,
+        total: 0,
+        totalPages: 0
+    });
     
     // Modales y drawers
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -113,16 +123,46 @@ const ClientsPage = () => {
     const [activityClient, setActivityClient] = useState(null);
     const [statusModal, setStatusModal] = useState({ isOpen: false, client: null, loading: false });
     const [openMenu, setOpenMenu] = useState({ id: null, position: null, openAbove: false });
+    const [exportMenu, setExportMenu] = useState({ open: false, position: null });
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [pagination.page, debouncedSearchTerm, statusFilter]);
+
+    // Debounce para el término de búsqueda
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearchTerm(searchTerm);
+            setPagination(prev => ({ ...prev, page: 1 }));
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
 
     const fetchData = async () => {
         try {
             setLoading(true);
-            const clientsData = await getClients();
-            setClients(clientsData);
+            
+            // Construir parámetros de query
+            const params = {
+                page: pagination.page,
+                limit: pagination.limit
+            };
+            
+            if (debouncedSearchTerm) {
+                params.search = debouncedSearchTerm;
+            }
+            
+            if (statusFilter !== 'all') {
+                params.active = statusFilter === 'active';
+            }
+            
+            const data = await getClients(params);
+            setClients(data.clients || []);
+            setPagination(prev => ({
+                ...prev,
+                total: data.pagination?.total || 0,
+                totalPages: data.pagination?.totalPages || 0
+            }));
         } catch (error) {
             console.error('Error fetching clients:', error);
             addToast('Error al cargar clientes', 'error');
@@ -200,22 +240,53 @@ const ClientsPage = () => {
         });
     };
 
-    // Filtrar clientes
-    const filteredClients = clients.filter(c => {
-        // Filtro por estado
-        if (statusFilter === 'active' && !c.active) return false;
-        if (statusFilter === 'inactive' && c.active) return false;
+    const handleOpenExportMenu = (e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const windowWidth = window.innerWidth;
+        const menuWidth = 192;
         
-        // Filtro por búsqueda
-        const term = searchTerm.toLowerCase();
-        return (
-            c.businessName?.toLowerCase().includes(term) ||
-            c.cuit?.toLowerCase().includes(term) ||
-            c.email?.toLowerCase().includes(term) ||
-            c.salesRepId?.firstName?.toLowerCase().includes(term) ||
-            c.salesRepId?.lastName?.toLowerCase().includes(term)
-        );
-    });
+        let leftPosition = rect.left - menuWidth + rect.width;
+        
+        if (leftPosition + menuWidth > windowWidth) {
+            leftPosition = windowWidth - menuWidth - 16;
+        }
+        
+        if (leftPosition < 8) {
+            leftPosition = 8;
+        }
+        
+        setExportMenu({
+            open: true,
+            position: {
+                top: rect.bottom + 8,
+                left: leftPosition
+            }
+        });
+    };
+
+    const handleExport = () => {
+        const headers = ['Razón Social', 'CUIT', 'Email', 'Teléfono', 'Vendedor', 'Descuento', 'Estado'];
+        const rows = clients.map(client => [
+            client.businessName,
+            client.cuit || '',
+            client.email || '',
+            client.phone || '',
+            `${client.salesRepId?.firstName || ''} ${client.salesRepId?.lastName || ''}`.trim(),
+            client.discount || 0,
+            client.active ? 'Activo' : 'Inactivo'
+        ]);
+        
+        const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `clientes_${new Date().toISOString().split('T')[0]}.csv`;
+        link.click();
+        
+        setExportMenu({ open: false, position: null });
+    };
+
+    // Nota: El filtrado ahora se hace en el backend
 
     return (
         <div className="space-y-6">
@@ -229,14 +300,40 @@ const ClientsPage = () => {
                         Gestiona los clientes de tu empresa
                     </p>
                 </div>
-                <Button 
-                    variant="primary" 
-                    onClick={() => setIsDrawerOpen(true)}
-                    className="text-[11px] font-bold uppercase tracking-wider shadow-md shadow-primary-100 dark:shadow-primary-900/30"
-                >
-                    <Plus size={14} strokeWidth={2.5} />
-                    Nuevo Cliente
-                </Button>
+                <div className="flex items-center gap-2">
+                    {/* Menú de 3 puntitos - Exportar */}
+                    <div className="relative">
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenExportMenu(e);
+                            }}
+                            className="p-2 rounded-lg text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-hover) transition-all border border-(--border-color)"
+                        >
+                            <MoreHorizontal size={18} />
+                        </button>
+                        {exportMenu.open && (
+                            <ActionMenu
+                                items={[{
+                                    icon: <Download size={16} />,
+                                    label: 'Exportar a CSV',
+                                    onClick: handleExport
+                                }]}
+                                position={exportMenu.position}
+                                onClose={() => setExportMenu({ open: false, position: null })}
+                            />
+                        )}
+                    </div>
+                    {/* Botón Nuevo */}
+                    <Button 
+                        variant="primary" 
+                        onClick={() => setIsDrawerOpen(true)}
+                        className="text-[11px] font-bold uppercase tracking-wider shadow-md shadow-primary-100 dark:shadow-primary-900/30"
+                    >
+                        <Plus size={14} strokeWidth={2.5} />
+                        Nuevo Cliente
+                    </Button>
+                </div>
             </div>
 
             {/* Main Content Card */}
@@ -246,7 +343,10 @@ const ClientsPage = () => {
                     <div className="flex justify-end gap-3">
                         <select
                             value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value)}
+                            onChange={(e) => {
+                                setStatusFilter(e.target.value);
+                                setPagination(prev => ({ ...prev, page: 1 }));
+                            }}
                             className="px-3 py-2 bg-(--bg-input) border border-(--border-color) rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
                         >
                             <option value="all">Todos</option>
@@ -285,16 +385,16 @@ const ClientsPage = () => {
                                     <td colSpan={6} className="px-6 py-12 text-center">
                                         <div className="flex items-center justify-center gap-2 text-(--text-muted)">
                                             <div className="w-3.5 h-3.5 border-2 border-(--border-color) border-t-primary-600 rounded-full animate-spin"></div>
-                                            Cargando...
+                                            Cargando datos
                                         </div>
                                     </td>
                                 </tr>
-                            ) : filteredClients.length > 0 ? (
-                                filteredClients.map((c) => (
+                            ) : clients.length > 0 ? (
+                                clients.map((c) => (
                                     <tr 
                                         key={c._id} 
                                         onClick={() => navigate(`/clientes/${c._id}`)}
-                                        className="hover:bg-(--bg-hover) transition-colors group cursor-pointer"
+                                        className="hover:bg-(--bg-hover) transition-colors even:bg-(--bg-hover)/50 group cursor-pointer"
                                     >
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
@@ -351,7 +451,20 @@ const ClientsPage = () => {
                                             <StatusBadge active={c.active} />
                                         </td>
                                         <td className="px-6 py-4 text-right">
-                                            <div className="flex items-center justify-end">
+                                            <div className="flex items-center justify-end gap-1">
+                                                {/* Botón Editar - Siempre visible */}
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleEdit(c);
+                                                    }}
+                                                    className="p-2 rounded-lg text-(--text-muted) hover:text-info-600 hover:bg-info-50 dark:hover:bg-info-900/20 transition-all"
+                                                    title="Editar"
+                                                >
+                                                    <Edit2 size={16} />
+                                                </button>
+                                                
+                                                {/* Menú de 3 puntitos - Otras acciones */}
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
@@ -374,11 +487,6 @@ const ClientsPage = () => {
                                                                 icon: <Activity size={16} />,
                                                                 label: 'Ver actividad',
                                                                 onClick: () => handleViewActivity(c)
-                                                            },
-                                                            {
-                                                                icon: <Edit2 size={16} />,
-                                                                label: 'Editar',
-                                                                onClick: () => handleEdit(c)
                                                             },
                                                             {
                                                                 icon: c.active ? <XCircle size={16} /> : <CheckCircle size={16} />,
@@ -413,12 +521,12 @@ const ClientsPage = () => {
 
                 {/* Mobile View */}
                 <div className="lg:hidden">
-                    {filteredClients.length > 0 ? (
-                        filteredClients.map((c) => (
+                    {clients.length > 0 ? (
+                        clients.map((c) => (
                             <div 
                                 key={c._id}
                                 onClick={() => navigate(`/clientes/${c._id}`)}
-                                className="p-4 border-b border-(--border-color) hover:bg-(--bg-hover) cursor-pointer"
+                                className="p-4 border-b border-(--border-color) hover:bg-(--bg-hover) cursor-pointer even:bg-(--bg-hover)/50"
                             >
                                 <div className="flex items-start justify-between">
                                     <div className="flex items-center gap-3">
@@ -432,25 +540,16 @@ const ClientsPage = () => {
                                             <div className="text-[10px] text-(--text-muted)">
                                                 {c.cuit ? `CUIT: ${c.cuit}` : 'Sin CUIT'}
                                             </div>
-                                            <div className="flex items-center gap-2 mt-1">
-                                                <StatusBadge active={c.active} />
-                                                {c.discount > 0 && (
-                                                    <span className="text-[10px] font-bold text-primary-600 bg-primary-50 px-1.5 py-0.5 rounded">
-                                                        {c.discount}%
-                                                    </span>
-                                                )}
-                                            </div>
                                         </div>
                                     </div>
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleOpenMenu(e, c._id);
-                                        }}
-                                        className="p-2 rounded-lg text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-hover)"
-                                    >
-                                        <MoreHorizontal size={18} />
-                                    </button>
+                                    <div className="flex flex-col items-end gap-1">
+                                        <StatusBadge active={c.active} />
+                                        {c.discount > 0 && (
+                                            <span className="text-[10px] font-bold text-primary-600 bg-primary-50 px-1.5 py-0.5 rounded">
+                                                {c.discount}% dto
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                                 <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-(--text-secondary)">
                                     <div className="flex items-center gap-1">
@@ -472,51 +571,56 @@ const ClientsPage = () => {
                                 </div>
                                 {/* Acciones Mobile */}
                                 <div className="flex items-center justify-end gap-2 pt-3 mt-3 border-t border-(--border-color)">
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            navigate(`/clientes/${c._id}`);
-                                        }}
-                                        className="p-2 text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg"
-                                        title="Ver detalle"
-                                    >
-                                        <Eye size={18} />
-                                    </button>
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleViewActivity(c);
-                                        }}
-                                        className="p-2 text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-hover) rounded-lg"
-                                        title="Ver actividad"
-                                    >
-                                        <Activity size={18} />
-                                    </button>
+                                    {/* Botón Editar - Siempre visible */}
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             handleEdit(c);
                                         }}
-                                        className="p-2 text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-hover) rounded-lg"
+                                        className="p-2 text-(--text-muted) hover:text-info-600 hover:bg-info-50 dark:hover:bg-info-900/20 rounded-lg"
                                         title="Editar"
                                     >
                                         <Edit2 size={18} />
                                     </button>
+                                    
+                                    {/* Menú de 3 puntitos - Otras acciones */}
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            handleToggleStatus(c);
+                                            handleOpenMenu(e, c._id);
                                         }}
-                                        className={`p-2 rounded-lg ${
-                                            c.active 
-                                                ? 'text-danger-600 hover:bg-danger-50' 
-                                                : 'text-success-600 hover:bg-success-50'
-                                        }`}
-                                        title={c.active ? 'Desactivar' : 'Activar'}
+                                        className="p-2 rounded-lg text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-hover)"
                                     >
-                                        {c.active ? <XCircle size={18} /> : <CheckCircle size={18} />}
+                                        <MoreHorizontal size={18} />
                                     </button>
                                 </div>
+                                
+                                {/* Menu - Mobile */}
+                                {openMenu.id === c._id && (
+                                    <ActionMenu
+                                        openAbove={openMenu.openAbove}
+                                        items={[
+                                            {
+                                                icon: <Eye size={16} />,
+                                                label: 'Ver detalle',
+                                                onClick: () => navigate(`/clientes/${c._id}`)
+                                            },
+                                            {
+                                                icon: <Activity size={16} />,
+                                                label: 'Ver actividad',
+                                                onClick: () => handleViewActivity(c)
+                                            },
+                                            {
+                                                icon: c.active ? <XCircle size={16} /> : <CheckCircle size={16} />,
+                                                label: c.active ? 'Desactivar' : 'Activar',
+                                                variant: c.active ? 'danger' : 'success',
+                                                onClick: () => handleToggleStatus(c)
+                                            }
+                                        ]}
+                                        position={openMenu.position}
+                                        onClose={() => setOpenMenu({ id: null, position: null, openAbove: false })}
+                                    />
+                                )}
                             </div>
                         ))
                     ) : (
@@ -530,11 +634,30 @@ const ClientsPage = () => {
                     )}
                 </div>
 
-                {/* Footer */}
-                <div className="px-6 py-3 border-t border-(--border-color) bg-(--bg-hover)">
+                {/* Footer / Pagination */}
+                <div className="px-6 py-3 border-t border-(--border-color) bg-(--bg-hover) flex items-center justify-between">
                     <span className="text-[10px] text-(--text-muted) font-bold uppercase tracking-widest">
-                        Total {filteredClients.length} registros
+                        Mostrando {clients.length > 0 ? ((pagination.page - 1) * pagination.limit) + 1 : 0} - {Math.min(pagination.page * pagination.limit, pagination.total)} de {pagination.total} registros
                     </span>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                            disabled={pagination.page === 1}
+                            className="px-3 py-1.5 text-xs font-medium rounded-lg border border-(--border-color) bg-(--bg-card) text-(--text-secondary) hover:bg-(--bg-hover) disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                            Anterior
+                        </button>
+                        <span className="text-xs text-(--text-muted) px-2">
+                            {pagination.page} / {pagination.totalPages}
+                        </span>
+                        <button
+                            onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                            disabled={pagination.page === pagination.totalPages}
+                            className="px-3 py-1.5 text-xs font-medium rounded-lg border border-(--border-color) bg-(--bg-card) text-(--text-secondary) hover:bg-(--bg-hover) disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                            Siguiente
+                        </button>
+                    </div>
                 </div>
             </div>
 

@@ -37,7 +37,9 @@ const BudgetSummary = ({
     showPricesWithTax = false,
     // Products y company para reglas de cantidad
     products = [],
-    company = null
+    company = null,
+    // Stock errors
+    stockErrors = []
 }) => {
     // Helper para obtener datos del producto
     const getProductData = (productId) => {
@@ -165,6 +167,44 @@ const BudgetSummary = ({
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Products List */}
                 <div className="lg:col-span-2 space-y-4">
+                    {/* Stock Errors */}
+                    {stockErrors.length > 0 && (
+                        <div className="p-4 bg-danger-50 dark:bg-danger-900/20 rounded-xl border border-danger-100 dark:border-danger-800">
+                            <div className="flex items-center gap-2 mb-3">
+                                <div className="w-6 h-6 bg-danger-100 dark:bg-danger-900/40 rounded-full flex items-center justify-center">
+                                    <svg className="w-3.5 h-3.5 text-danger-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                </div>
+                                <p className="text-sm font-bold text-danger-700 dark:text-danger-300">
+                                    Stock insuficiente
+                                </p>
+                            </div>
+                            <p className="text-xs text-danger-600 dark:text-danger-400 mb-3">
+                                Los siguientes productos exceden el stock disponible. Reduzca las cantidades para continuar.
+                            </p>
+                            <div className="space-y-2">
+                                {stockErrors.map((error, index) => (
+                                    <div key={index} className="flex items-center justify-between p-2.5 bg-white dark:bg-secondary-800 rounded-lg border border-danger-100 dark:border-danger-800">
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-medium text-(--text-primary) truncate">
+                                                {error.name} <span className="text-(--text-muted)">({error.code})</span>
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center gap-3 text-xs">
+                                            <span className="text-danger-600 dark:text-danger-400 font-medium">
+                                                +{error.requested} solicitado
+                                            </span>
+                                            <span className="text-(--text-muted)">
+                                                ({error.available} disponible)
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    
                     <div className="bg-(--bg-card) rounded-2xl border border-(--border-color) overflow-hidden shadow-sm">
                         <div className="px-6 py-4 border-b border-(--border-color) bg-(--bg-hover) flex justify-between items-center">
                             <h3 className="text-sm font-bold text-(--text-primary)">Productos Seleccionados</h3>

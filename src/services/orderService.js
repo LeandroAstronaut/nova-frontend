@@ -27,6 +27,23 @@ export const getOrders = async (type, params = {}) => {
     return response.data;
 };
 
+export const getOrder = async (id) => {
+    const response = await api.get(`/orders/${id}`);
+    return response.data;
+};
+
+// Para compatibilidad hacia atrás - obtener todos los pedidos sin paginación
+export const getAllOrders = async (type, params = {}) => {
+    const response = await api.get('/orders', {
+        params: {
+            type,
+            ...params,
+            limit: 10000 // Número grande para traer todos
+        }
+    });
+    return response.data;
+};
+
 export const createOrder = async (orderData) => {
     const response = await api.post('/orders', orderData);
     return response.data;
@@ -47,8 +64,8 @@ export const getClients = async (search) => {
     return response.data;
 };
 
-export const getProducts = async (search) => {
-    const response = await api.get('/products', { params: { search } });
+export const getProducts = async (params = {}) => {
+    const response = await api.get('/products', { params });
     return response.data;
 };
 
@@ -62,6 +79,16 @@ export const convertBudgetToOrder = async (budgetId, notificationSettings) => {
     const response = await api.post(`/orders/${budgetId}/convert`, {
         notifications: notificationSettings
     });
+    return response.data;
+};
+
+/**
+ * Validar stock disponible antes de convertir presupuesto
+ * @param {string} budgetId - ID del presupuesto
+ * @returns {Promise<Object>} { canConvert, stockIssues, message }
+ */
+export const validateBudgetStock = async (budgetId) => {
+    const response = await api.get(`/orders/${budgetId}/validate-stock`);
     return response.data;
 };
 

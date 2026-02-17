@@ -174,6 +174,9 @@ const ProductDrawer = ({ isOpen, onClose, onSave, product = null, features = {} 
             tax: 21
         },
         stock: 0,
+        stockReserved: 0,
+        stockQuoted: 0,
+        minStock: 0,
         image: '',
         unitsPerPackage: 1,
         minOrderQuantity: 1,
@@ -249,6 +252,9 @@ const ProductDrawer = ({ isOpen, onClose, onSave, product = null, features = {} 
                         tax: product.pricing?.tax ?? 21
                     },
                     stock: product.stock || 0,
+                    stockReserved: product.stockReserved || 0,
+                    stockQuoted: product.stockQuoted || 0,
+                    minStock: product.minStock || 0,
                     image: product.image || '',
                     unitsPerPackage: product.unitsPerPackage || 1,
                     minOrderQuantity: product.minOrderQuantity || 1,
@@ -274,6 +280,9 @@ const ProductDrawer = ({ isOpen, onClose, onSave, product = null, features = {} 
                         tax: 21
                     },
                     stock: 0,
+                    stockReserved: 0,
+                    stockQuoted: 0,
+                    minStock: 0,
                     image: '',
                     unitsPerPackage: 1,
                     minOrderQuantity: 1,
@@ -354,6 +363,9 @@ const ProductDrawer = ({ isOpen, onClose, onSave, product = null, features = {} 
                     tax: parseFloat(formData.pricing.tax) || 0
                 },
                 stock: parseInt(formData.stock) || 0,
+                stockReserved: parseInt(formData.stockReserved) || 0,
+                stockQuoted: parseInt(formData.stockQuoted) || 0,
+                minStock: parseInt(formData.minStock) || 0,
                 unitsPerPackage: parseInt(formData.unitsPerPackage) || 1,
                 minOrderQuantity: parseInt(formData.minOrderQuantity) || 1
             };
@@ -515,7 +527,7 @@ const ProductDrawer = ({ isOpen, onClose, onSave, product = null, features = {} 
                             animate={{ x: 0 }}
                             exit={{ x: '100%' }}
                             transition={{ type: 'spring', damping: 28, stiffness: 220 }}
-                            className="fixed top-4 right-4 h-[calc(100vh-2rem)] w-full max-w-[600px] bg-[var(--bg-card)] shadow-2xl dark:shadow-soft-lg-dark z-[210] flex flex-col border border-[var(--border-color)] rounded-2xl overflow-hidden"
+                            className="fixed top-4 left-4 right-4 md:left-auto h-[calc(100vh-2rem)] w-auto md:w-full md:max-w-[600px] bg-[var(--bg-card)] shadow-2xl dark:shadow-soft-lg-dark z-[210] flex flex-col border border-[var(--border-color)] rounded-2xl overflow-hidden"
                         >
                             {/* Header */}
                             <div className="px-6 py-4 border-b border-[var(--border-color)] flex items-center justify-between shrink-0 bg-[var(--bg-card)]">
@@ -765,62 +777,145 @@ const ProductDrawer = ({ isOpen, onClose, onSave, product = null, features = {} 
                                     </div>
 
                                     {/* Stock y Configuración de Pedidos */}
-                                    <div className="bg-[var(--bg-hover)] rounded-2xl border border-[var(--border-color)] p-4">
-                                        <h4 className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2 mb-4">
-                                            <Boxes size={14} /> Configuración de Pedidos
+                                    <div className="bg-[var(--bg-hover)] rounded-2xl border border-[var(--border-color)] p-4 space-y-4">
+                                        <h4 className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
+                                            <Boxes size={14} /> Gestión de Stock
                                         </h4>
                                         
-                                        <div className="grid grid-cols-3 gap-4">
-                                            {hasStockFeature && (
-                                                <div>
-                                                    <label className="text-[10px] text-[var(--text-muted)] mb-1 block">Stock Disponible</label>
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        value={formData.stock}
-                                                        onChange={(e) => handleChange('stock', e.target.value)}
-                                                        className="w-full px-3 py-2.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:border-primary-500 transition-colors"
-                                                        placeholder="0"
-                                                    />
+                                        {hasStockFeature ? (
+                                            <>
+                                                {/* Stock físico editable */}
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="text-[10px] text-[var(--text-muted)] mb-1 block">Stock Físico</label>
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            value={formData.stock}
+                                                            onChange={(e) => handleChange('stock', e.target.value)}
+                                                            className="w-full px-3 py-2.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:border-primary-500 transition-colors"
+                                                            placeholder="0"
+                                                        />
+                                                        <p className="text-[9px] text-[var(--text-muted)] mt-1">Cantidad real en depósito</p>
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] text-[var(--text-muted)] mb-1 block">Stock Mínimo (Alerta)</label>
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            value={formData.minStock}
+                                                            onChange={(e) => handleChange('minStock', e.target.value)}
+                                                            className="w-full px-3 py-2.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:border-primary-500 transition-colors"
+                                                            placeholder="0"
+                                                        />
+                                                        <p className="text-[9px] text-[var(--text-muted)] mt-1">Límite para alerta de reposición</p>
+                                                    </div>
                                                 </div>
-                                            )}
-                                            <div>
-                                                <label className="text-[10px] text-[var(--text-muted)] mb-1 block">Unidades por Bulto</label>
-                                                <input
-                                                    type="number"
-                                                    min="1"
-                                                    value={formData.unitsPerPackage}
-                                                    onChange={(e) => handleChange('unitsPerPackage', e.target.value)}
-                                                    className="w-full px-3 py-2.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:border-primary-500 transition-colors"
-                                                    placeholder="1"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="text-[10px] text-[var(--text-muted)] mb-1 block">Cantidad Mínima</label>
-                                                <input
-                                                    type="number"
-                                                    min="1"
-                                                    value={formData.minOrderQuantity}
-                                                    onChange={(e) => handleChange('minOrderQuantity', e.target.value)}
-                                                    className="w-full px-3 py-2.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:border-primary-500 transition-colors"
-                                                    placeholder="1"
-                                                />
-                                            </div>
-                                        </div>
-                                        
-                                        {(formData.unitsPerPackage > 1 || formData.minOrderQuantity > 1) && (
-                                            <div className="mt-3 p-3 bg-primary-50 dark:bg-primary-900/20 rounded-lg border border-primary-100 dark:border-primary-800">
-                                                <p className="text-xs text-[var(--text-secondary)]">
-                                                    <span className="font-semibold text-primary-700 dark:text-primary-400">Información de pedido:</span>
-                                                    {formData.unitsPerPackage > 1 && (
-                                                        <span className="ml-1">Se vende por bultos de <strong>{formData.unitsPerPackage}</strong> unidades.</span>
-                                                    )}
-                                                    {formData.minOrderQuantity > 1 && (
-                                                        <span className="ml-1">Mínimo de pedido: <strong>{formData.minOrderQuantity}</strong> unidades.</span>
-                                                    )}
+
+                                                {/* Stock calculados (solo lectura en edición) */}
+                                                {isEditing && (
+                                                    <div className="grid grid-cols-3 gap-3">
+                                                        <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800">
+                                                            <p className="text-[10px] text-blue-600 dark:text-blue-400 font-medium mb-1">Disponible</p>
+                                                            <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
+                                                                {Math.max(0, (formData.stock || 0) - (formData.stockReserved || 0))}
+                                                            </p>
+                                                            <p className="text-[9px] text-blue-500">Físico - Reservado</p>
+                                                        </div>
+                                                        <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-100 dark:border-amber-800">
+                                                            <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium mb-1">Reservado</p>
+                                                            <p className="text-lg font-bold text-amber-700 dark:text-amber-300">
+                                                                {formData.stockReserved || 0}
+                                                            </p>
+                                                            <p className="text-[9px] text-amber-500">En pedidos</p>
+                                                        </div>
+                                                        <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-100 dark:border-purple-800">
+                                                            <p className="text-[10px] text-purple-600 dark:text-purple-400 font-medium mb-1">Presupuestado</p>
+                                                            <p className="text-lg font-bold text-purple-700 dark:text-purple-300">
+                                                                {formData.stockQuoted || 0}
+                                                            </p>
+                                                            <p className="text-[9px] text-purple-500">En presupuestos</p>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Alerta de stock bajo */}
+                                                {isEditing && formData.minStock > 0 && (formData.stock || 0) <= formData.minStock && (
+                                                    <div className="p-3 bg-danger-50 dark:bg-danger-900/20 rounded-lg border border-danger-100 dark:border-danger-800 flex items-center gap-2">
+                                                        <AlertCircle size={16} className="text-danger-500" />
+                                                        <p className="text-xs text-danger-700 dark:text-danger-300">
+                                                            <strong>Stock crítico:</strong> El stock físico ({formData.stock}) está por debajo o igual al mínimo ({formData.minStock})
+                                                        </p>
+                                                    </div>
+                                                )}
+
+                                                {/* Proyección si todo se convierte */}
+                                                {isEditing && (formData.stockQuoted || 0) > 0 && (
+                                                    <div className="p-3 bg-[var(--bg-card)] rounded-lg border border-[var(--border-color)]">
+                                                        <p className="text-[10px] text-[var(--text-muted)] mb-1">Proyección si todos los presupuestos se convierten:</p>
+                                                        <p className="text-sm font-medium text-[var(--text-primary)]">
+                                                            Disponible quedaría en: <span className={
+                                                                Math.max(0, (formData.stock || 0) - (formData.stockReserved || 0) - (formData.stockQuoted || 0)) === 0 
+                                                                    ? 'text-danger-500' 
+                                                                    : 'text-success-600'
+                                                            }>
+                                                                {Math.max(0, (formData.stock || 0) - (formData.stockReserved || 0) - (formData.stockQuoted || 0))}
+                                                            </span> unidades
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </>
+                                        ) : (
+                                            <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-100 dark:border-amber-800">
+                                                <p className="text-xs text-amber-700 dark:text-amber-300">
+                                                    El módulo de stock no está habilitado. Active el módulo en configuración para gestionar inventario.
                                                 </p>
                                             </div>
                                         )}
+
+                                        <div className="border-t border-[var(--border-color)] pt-4">
+                                            <h5 className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-3">
+                                                Configuración de Pedidos
+                                            </h5>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="text-[10px] text-[var(--text-muted)] mb-1 block">Unidades por Bulto</label>
+                                                    <input
+                                                        type="number"
+                                                        min="1"
+                                                        value={formData.unitsPerPackage}
+                                                        onChange={(e) => handleChange('unitsPerPackage', e.target.value)}
+                                                        className="w-full px-3 py-2.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:border-primary-500 transition-colors"
+                                                        placeholder="1"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="text-[10px] text-[var(--text-muted)] mb-1 block">Cantidad Mínima</label>
+                                                    <input
+                                                        type="number"
+                                                        min="1"
+                                                        value={formData.minOrderQuantity}
+                                                        onChange={(e) => handleChange('minOrderQuantity', e.target.value)}
+                                                        className="w-full px-3 py-2.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:border-primary-500 transition-colors"
+                                                        placeholder="1"
+                                                    />
+                                                </div>
+                                            </div>
+                                            
+                                            {(formData.unitsPerPackage > 1 || formData.minOrderQuantity > 1) && (
+                                                <div className="mt-3 p-3 bg-primary-50 dark:bg-primary-900/20 rounded-lg border border-primary-100 dark:border-primary-800">
+                                                    <p className="text-xs text-[var(--text-secondary)]">
+                                                        <span className="font-semibold text-primary-700 dark:text-primary-400">Información de pedido:</span>
+                                                        {formData.unitsPerPackage > 1 && (
+                                                            <span className="ml-1">Se vende por bultos de <strong>{formData.unitsPerPackage}</strong> unidades.</span>
+                                                        )}
+                                                        {formData.minOrderQuantity > 1 && (
+                                                            <span className="ml-1">Mínimo de pedido: <strong>{formData.minOrderQuantity}</strong> unidades.</span>
+                                                        )}
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
 
                                     {/* Imágenes del Producto */}

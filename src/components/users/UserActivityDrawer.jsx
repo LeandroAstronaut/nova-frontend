@@ -9,6 +9,7 @@ import {
 import { getUserActivity } from '../../services/activityLogService';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import ChangeDetails from '../common/ChangeDetails';
 
 const typeIcons = {
     budget_created: FileText,
@@ -76,9 +77,9 @@ const typeColors = {
     email_sent: 'bg-indigo-100 text-indigo-600',
     whatsapp_sent: 'bg-green-100 text-green-600',
     receipt_created: 'bg-yellow-100 text-yellow-600',
+    receipt_cancelled: 'bg-red-100 text-red-600',
     receipt_edited: 'bg-gray-100 text-gray-600',
     receipt_deleted: 'bg-red-100 text-red-600',
-    receipt_cancelled: 'bg-red-100 text-red-600',
     client_created: 'bg-blue-100 text-blue-600',
     client_edited: 'bg-gray-100 text-gray-600',
     client_deleted: 'bg-red-100 text-red-600',
@@ -104,31 +105,55 @@ const formatTime = (dateString) => {
     return format(date, 'dd/MM/yyyy HH:mm', { locale: es });
 };
 
+const ITEMS_PER_PAGE = 10;
+
 const UserActivityDrawer = ({ isOpen, onClose, user, isSuperadmin = false }) => {
     const [activities, setActivities] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [filter, setFilter] = useState('all');
+    const [page, setPage] = useState(1);
+    const [hasMore, setHasMore] = useState(true);
 
     useEffect(() => {
         if (isOpen && user?._id) {
-            fetchActivities();
+            fetchActivities(true);
         }
     }, [isOpen, user?._id]);
 
-    const fetchActivities = async () => {
+    const fetchActivities = async (reset = false, customPage = null) => {
         try {
             setLoading(true);
             setError(null);
-            // Obtener actividad donde el usuario es el actor (userId)
-            const data = await getUserActivity(user._id, 100);
-            setActivities(data);
+            
+            const currentPage = customPage || (reset ? 1 : page);
+            const skip = (currentPage - 1) * ITEMS_PER_PAGE;
+            
+            const data = await getUserActivity(user._id, ITEMS_PER_PAGE, skip);
+            
+            if (reset || currentPage === 1) {
+                setActivities(data);
+            } else {
+                setActivities(prev => [...prev, ...data]);
+            }
+            
+            setHasMore(data.length === ITEMS_PER_PAGE);
+            
+            if (reset) {
+                setPage(1);
+            }
         } catch (err) {
             console.error('Error fetching activities:', err);
             setError('Error al cargar la actividad');
         } finally {
             setLoading(false);
         }
+    };
+
+    const loadMore = () => {
+        const nextPage = page + 1;
+        setPage(nextPage);
+        fetchActivities(false, nextPage);
     };
 
     const filteredActivities = activities.filter(activity => {
@@ -162,7 +187,7 @@ const UserActivityDrawer = ({ isOpen, onClose, user, isSuperadmin = false }) => 
                         animate={{ x: 0 }}
                         exit={{ x: '100%' }}
                         transition={{ type: 'spring', damping: 28, stiffness: 220 }}
-                        className="fixed top-4 right-4 h-[calc(100vh-2rem)] w-full max-w-[480px] bg-[var(--bg-card)] shadow-2xl dark:shadow-soft-lg-dark z-[10000] flex flex-col border border-[var(--border-color)] rounded-2xl overflow-hidden"
+                        className="fixed top-4 left-4 right-4 md:left-auto h-[calc(100vh-2rem)] w-auto md:w-full md:max-w-[480px] bg-[var(--bg-card)] shadow-2xl dark:shadow-soft-lg-dark z-[10000] flex flex-col border border-[var(--border-color)] rounded-2xl overflow-hidden"
                     >
                         {/* Header */}
                         <div className="px-6 py-4 border-b border-[var(--border-color)] flex items-center justify-between shrink-0 bg-[var(--bg-card)]">
@@ -246,7 +271,7 @@ const UserActivityDrawer = ({ isOpen, onClose, user, isSuperadmin = false }) => 
 
                         {/* Content */}
                         <div className="flex-1 overflow-y-auto">
-                            {loading ? (
+                            {loading && activities.length === 0 ? (
                                 <div className="h-full flex flex-col items-center justify-center py-12">
                                     <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
                                     <p className="text-[var(--text-muted)] text-sm mt-3">Cargando actividad...</p>
@@ -258,7 +283,7 @@ const UserActivityDrawer = ({ isOpen, onClose, user, isSuperadmin = false }) => 
                                     </div>
                                     <p className="text-[var(--text-muted)] text-sm">{error}</p>
                                     <button
-                                        onClick={fetchActivities}
+                                        onClick={() => fetchActivities(true)}
                                         className="mt-3 text-primary-600 text-sm font-medium hover:underline"
                                     >
                                         Reintentar
@@ -281,47 +306,32 @@ const UserActivityDrawer = ({ isOpen, onClose, user, isSuperadmin = false }) => 
                                     </p>
                                 </div>
                             ) : (
-                                <div className="p-4 space-y-4">
-                                    {/* Timeline */}
-                                    <div className="relative">
-                                        {/* Timeline line */}
-                                        <div className="absolute left-5 top-2 bottom-2 w-px bg-[var(--border-color)]" />
+                                <div className="p-4 space-y-2">
+                                    {filteredActivities.map((activity) => {
+                                        const Icon = typeIcons[activity.type] || History;
+                                        const colorClass = typeColors[activity.type] || 'bg-gray-100 text-gray-600';
                                         
-                                        {filteredActivities.map((activity, index) => {
-                                            const Icon = typeIcons[activity.type] || History;
-                                            const colorClass = typeColors[activity.type] || 'bg-gray-100 text-gray-600';
-                                            const label = typeLabels[activity.type] || activity.type;
-                                            const isFirst = index === 0;
-                                            
-                                            return (
-                                                <motion.div
-                                                    key={activity._id}
-                                                    initial={{ opacity: 0, x: -10 }}
-                                                    animate={{ opacity: 1, x: 0 }}
-                                                    transition={{ delay: index * 0.05 }}
-                                                    className="relative flex gap-4 pb-4 last:pb-0"
-                                                >
-                                                    {/* Timeline dot */}
-                                                    <div className="relative z-10">
-                                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${colorClass} ${isFirst ? 'ring-2 ring-offset-2 ring-offset-[var(--bg-card)] ring-primary-500' : ''}`}>
-                                                            <Icon size={18} />
-                                                        </div>
+                                        // Determinar si mostrar cambios (solo para ediciones)
+                                        const showChanges = activity.changes && activity.changes.length > 0 && 
+                                            (activity.type === 'budget_edited' || activity.type === 'order_edited' || activity.type === 'client_edited');
+                                        
+                                        return (
+                                            <motion.div
+                                                key={activity._id}
+                                                layout
+                                                initial={{ opacity: 0, y: 10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                className="group p-4 bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] hover:border-primary-200 dark:hover:border-primary-800 transition-all"
+                                            >
+                                                <div className="flex gap-3">
+                                                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${colorClass}`}>
+                                                        <Icon size={18} />
                                                     </div>
-                                                    
-                                                    {/* Content */}
-                                                    <div className="flex-1 min-w-0 pt-1">
-                                                        <div className="flex items-start justify-between gap-2">
-                                                            <div>
-                                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-[var(--bg-hover)] text-[var(--text-muted)] mb-1">
-                                                                    {label}
-                                                                </span>
-                                                                <p className="text-[13px] text-[var(--text-primary)] leading-snug">
-                                                                    {activity.description}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                        
-                                                        <div className="flex items-center gap-2 mt-2">
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-[13px] text-[var(--text-primary)] leading-snug">
+                                                            {activity.description}
+                                                        </p>
+                                                        <div className="flex items-center gap-2 mt-1.5">
                                                             <span className="text-[11px] text-[var(--text-muted)]">
                                                                 {formatTime(activity.createdAt)}
                                                             </span>
@@ -331,20 +341,43 @@ const UserActivityDrawer = ({ isOpen, onClose, user, isSuperadmin = false }) => 
                                                             </span>
                                                         </div>
                                                     </div>
-                                                </motion.div>
-                                            );
-                                        })}
-                                    </div>
+                                                </div>
+                                                
+                                                {/* Mostrar cambios si es una edición */}
+                                                {showChanges && (
+                                                    <div className="mt-2 pt-2 border-t border-[var(--border-color)]">
+                                                        <ChangeDetails changes={activity.changes} compact={true} />
+                                                    </div>
+                                                )}
+                                            </motion.div>
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>
 
                         {/* Footer */}
-                        <div className="px-6 py-3 border-t border-[var(--border-color)] bg-[var(--bg-hover)] shrink-0">
-                            <p className="text-[11px] text-[var(--text-muted)] text-center">
-                                Mostrando {filteredActivities.length} de {activities.length} registros
-                            </p>
-                        </div>
+                        {(activities.length > 0 || loading) && (
+                            <div className="px-6 py-4 border-t border-[var(--border-color)] bg-[var(--bg-hover)] shrink-0">
+                                {loading && page > 1 ? (
+                                    <div className="flex items-center justify-center gap-2">
+                                        <div className="w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+                                        <span className="text-[12px] text-[var(--text-muted)]">Cargando...</span>
+                                    </div>
+                                ) : hasMore ? (
+                                    <button
+                                        onClick={loadMore}
+                                        className="w-full text-center text-[12px] font-bold text-primary-600 hover:text-primary-700 transition-colors uppercase tracking-wider"
+                                    >
+                                        Cargar más actividad
+                                    </button>
+                                ) : (
+                                    <p className="text-center text-[12px] text-[var(--text-muted)]">
+                                        No hay más actividad
+                                    </p>
+                                )}
+                            </div>
+                        )}
                     </motion.div>
                 </>
             )}

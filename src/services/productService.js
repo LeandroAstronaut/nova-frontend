@@ -192,6 +192,17 @@ export const reorderProductImages = async (productId, newOrder) => {
     return response.data;
 };
 
+/**
+ * Obtener movimientos de stock de un producto
+ * @param {string} productId - ID del producto
+ * @param {Object} params - { page, limit }
+ * @returns {Promise<Object>} { movements, total, page, totalPages }
+ */
+export const getProductStockMovements = async (productId, params = {}) => {
+    const response = await api.get(`/products/${productId}/stock-movements`, { params });
+    return response.data;
+};
+
 export default {
     getProducts,
     getProductById,
@@ -209,4 +220,5 @@ export default {
     deleteProductImage,
     setCoverImage,
     reorderProductImages,
+    getProductStockMovements,
 };

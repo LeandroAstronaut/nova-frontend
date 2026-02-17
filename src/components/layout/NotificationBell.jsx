@@ -80,18 +80,43 @@ const formatTime = (dateString) => {
 const NotificationBell = ({ isOpen, onClose, onUnreadCountChange }) => {
     const [notifications, setNotifications] = useState([]);
     const [unreadCount, setUnreadCount] = useState(0);
-    const [showAll, setShowAll] = useState(false);
+    const [page, setPage] = useState(1);
+    const [hasMore, setHasMore] = useState(true);
+    const [loading, setLoading] = useState(false);
     const { user } = useAuth();
     const { addToast } = useToast();
     const navigate = useNavigate();
+    
+    const ITEMS_PER_PAGE = 10;
 
-    const fetchNotifications = async () => {
+    const fetchNotifications = async (reset = false, customPage = null) => {
         try {
-            const data = await getActivityLogs({ limit: showAll ? 50 : 20 });
-            setNotifications(data);
+            setLoading(true);
+            const currentPage = customPage || (reset ? 1 : page);
+            const data = await getActivityLogs({ 
+                limit: ITEMS_PER_PAGE,
+                skip: (currentPage - 1) * ITEMS_PER_PAGE
+            });
+            
+            if (reset || currentPage === 1) {
+                setNotifications(data);
+            } else {
+                setNotifications(prev => [...prev, ...data]);
+            }
+            
+            // Si recibimos menos items de los esperados, no hay más
+            setHasMore(data.length === ITEMS_PER_PAGE);
         } catch (error) {
             console.error('Error fetching notifications:', error);
+        } finally {
+            setLoading(false);
         }
+    };
+
+    const loadMore = () => {
+        const nextPage = page + 1;
+        setPage(nextPage);
+        fetchNotifications(false, nextPage);
     };
 
     const fetchUnreadCount = async () => {
@@ -104,22 +129,22 @@ const NotificationBell = ({ isOpen, onClose, onUnreadCountChange }) => {
     };
 
     useEffect(() => {
-        fetchNotifications();
+        fetchNotifications(true);
         fetchUnreadCount();
         
         // Actualizar cada 30 segundos
         const interval = setInterval(() => {
-            fetchNotifications();
+            fetchNotifications(true);
             fetchUnreadCount();
         }, 30000);
         
         return () => clearInterval(interval);
-    }, [showAll]);
+    }, []);
 
     // Recargar cuando se abre el drawer
     useEffect(() => {
         if (isOpen) {
-            fetchNotifications();
+            fetchNotifications(true);
             refreshUnreadCount();
         }
     }, [isOpen]);
@@ -215,7 +240,7 @@ const NotificationBell = ({ isOpen, onClose, onUnreadCountChange }) => {
                         animate={{ x: 0 }}
                         exit={{ x: '100%' }}
                         transition={{ type: 'spring', damping: 28, stiffness: 220 }}
-                        className="fixed top-4 right-4 h-[calc(100vh-2rem)] w-full max-w-[420px] bg-[var(--bg-card)] shadow-2xl dark:shadow-soft-lg-dark z-[100000] flex flex-col border border-[var(--border-color)] rounded-2xl overflow-hidden"
+                        className="fixed top-4 left-4 right-4 md:left-auto h-[calc(100vh-2rem)] w-auto md:w-full md:max-w-[420px] bg-[var(--bg-card)] shadow-2xl dark:shadow-soft-lg-dark z-[100000] flex flex-col border border-[var(--border-color)] rounded-2xl overflow-hidden"
                     >
                         {/* Header - Estilo consistente */}
                         <div className="px-6 py-4 border-b border-[var(--border-color)] flex items-center justify-between shrink-0 bg-[var(--bg-card)]">
@@ -329,14 +354,25 @@ const NotificationBell = ({ isOpen, onClose, onUnreadCountChange }) => {
                         </div>
 
                         {/* Footer */}
-                        {notifications.length > 0 && (
+                        {(notifications.length > 0 || loading) && (
                             <div className="px-6 py-4 border-t border-[var(--border-color)] bg-[var(--bg-hover)]">
-                                <button
-                                    onClick={() => setShowAll(!showAll)}
-                                    className="w-full text-center text-[12px] font-bold text-primary-600 hover:text-primary-700 transition-colors uppercase tracking-wider"
-                                >
-                                    {showAll ? 'Ver menos' : 'Ver todas las notificaciones'}
-                                </button>
+                                {loading && page > 1 ? (
+                                    <div className="flex items-center justify-center gap-2">
+                                        <div className="w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+                                        <span className="text-[12px] text-[var(--text-muted)]">Cargando...</span>
+                                    </div>
+                                ) : hasMore ? (
+                                    <button
+                                        onClick={loadMore}
+                                        className="w-full text-center text-[12px] font-bold text-primary-600 hover:text-primary-700 transition-colors uppercase tracking-wider"
+                                    >
+                                        Cargar más notificaciones
+                                    </button>
+                                ) : (
+                                    <p className="text-center text-[12px] text-[var(--text-muted)]">
+                                        No hay más notificaciones
+                                    </p>
+                                )}
                             </div>
                         )}
                     </motion.div>

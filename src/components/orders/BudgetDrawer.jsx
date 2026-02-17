@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     ChevronRight,
+    ChevronLeft,
     ShoppingBag,
     FileText,
     X,
@@ -69,6 +70,13 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
     const [products, setProducts] = useState([]);
     const [sellers, setSellers] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
+    
+    // Product Pagination
+    const [productPage, setProductPage] = useState(1);
+    const [productPagination, setProductPagination] = useState({ total: 0, totalPages: 1 });
+    
+    // Stock validation errors
+    const [stockErrors, setStockErrors] = useState([]);
 
     // Data Loss Protection
     const isDirty = items.length > 0 || selectedClient !== null;
@@ -76,6 +84,9 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
     // Reset state when drawer opens/closes or order changes
     useEffect(() => {
         if (isOpen) {
+            // Limpiar errores de stock al abrir
+            setStockErrors([]);
+            
             if (order && (mode === 'edit' || mode === 'view')) {
                 // Pre-fill for edit
                 setSelectedClient(order.clientId);
@@ -102,6 +113,7 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
             } else {
                 // Reset for create
                 setItems([]);
+                setProductPage(1);
                 setHeader({
                     date: new Date().toISOString().split('T')[0],
                     salesRepId: '',
@@ -166,11 +178,16 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
             const [cData, sData, pData] = await Promise.all([
                 getClients(),
                 getSellers(),
-                getProducts()
+                getProducts({ page: 1, limit: 20 })
             ]);
-            setClients(cData || []);
+            setClients(cData?.clients || cData || []);
             setSellers(sData || []);
             setProducts(pData?.products || pData || []);
+            setProductPagination({ 
+                total: pData?.total || pData?.products?.length || 0, 
+                totalPages: pData?.totalPages || 1 
+            });
+            setProductPage(1);
         } catch (error) {
             console.error('Error fetching data:', error);
         } finally {
@@ -180,18 +197,40 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
 
     const handleSearchClient = async (query) => {
         setSearchQuery(query);
-        const data = await getClients(query);
-        setClients(data);
+        const data = await getClients({ search: query });
+        setClients(data?.clients || []);
     };
 
     const handleSearchProduct = async (query) => {
         try {
             setSearchQuery(query);
             setLoading(true);
-            const data = await getProducts(query);
-            setProducts(data?.products || data || []);
+            setProductPage(1);
+            const data = await getProducts({ search: query, page: 1, limit: 20 });
+            setProducts(data?.products || []);
+            setProductPagination({ 
+                total: data?.total || data?.products?.length || 0, 
+                totalPages: data?.totalPages || 1 
+            });
         } catch (error) {
             console.error('Error searching products:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleProductPageChange = async (page) => {
+        try {
+            setProductPage(page);
+            setLoading(true);
+            const data = await getProducts({ search: searchQuery, page, limit: 20 });
+            setProducts(data?.products || []);
+            setProductPagination({ 
+                total: data?.total || data?.products?.length || 0, 
+                totalPages: data?.totalPages || 1 
+            });
+        } catch (error) {
+            console.error('Error loading products:', error);
         } finally {
             setLoading(false);
         }
@@ -222,6 +261,9 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
 
     const addItem = (product, quantityToAdd = 1, initialDiscount = 0) => {
         if (!product) return;
+        
+        // Limpiar errores de stock al agregar items
+        if (stockErrors.length > 0) setStockErrors([]);
 
         const pricing = product.pricing || { list1: 0, list2: 0 };
         const priceListNum = header.priceList || 1;
@@ -271,10 +313,12 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
     };
 
     const removeItem = (lineId) => {
+        if (stockErrors.length > 0) setStockErrors([]);
         setItems(items.filter(i => i.lineId !== lineId));
     };
 
     const updateItem = (lineId, field, value) => {
+        if (stockErrors.length > 0) setStockErrors([]);
         setItems(items.map(i => i.lineId === lineId ? { ...i, [field]: value } : i));
     };
 
@@ -350,14 +394,35 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
             }
             
             setNavigationBlocked(false);
-            onSave();
+            // Primero iniciar el cierre (AnimatePresence manejará la animación)
             onClose();
+            // Después de la animación, notificar al padre para refrescar datos
+            setTimeout(() => {
+                onSave();
+            }, 300);
         } catch (error) {
             console.error('Error saving budget:', error);
-            addToast('Error al guardar: ' + (error.response?.data?.message || error.message), 'error');
+            
+            // Manejar errores de stock
+            const stockIssues = error.response?.data?.stockIssues;
+            if (stockIssues && Array.isArray(stockIssues) && stockIssues.length > 0) {
+                setStockErrors(stockIssues);
+                addToast(error.response?.data?.message || 'Stock insuficiente', 'error');
+                // NO cambiar de paso - quedarse en el summary para ver el error claro
+            } else {
+                addToast('Error al guardar: ' + (error.response?.data?.message || error.message), 'error');
+            }
         } finally {
             setLoading(false);
         }
+    };
+    
+    // Limpiar errores de stock al modificar items
+    const updateItemsWithStockClear = (newItemsOrFn) => {
+        if (stockErrors.length > 0) {
+            setStockErrors([]);
+        }
+        setItems(newItemsOrFn);
     };
 
     const handleCancel = () => {
@@ -372,18 +437,21 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
     const handleConfirmExit = () => {
         setShowExitModal(false);
         setNavigationBlocked(false);
+        setStockErrors([]); // Limpiar errores de stock
+        // Animación de cierre suave - AnimatePresence manejará la animación
         onClose();
     };
 
     if (authLoading) {
         return createPortal(
-            <AnimatePresence>
+            <AnimatePresence mode="wait">
                 {isOpen && (
                     <>
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
+                            transition={{ duration: 0.3 }}
                             onClick={handleCancel}
                             className="fixed top-0 left-0 w-screen h-screen bg-secondary-900/40 dark:bg-black/60 backdrop-blur-[2px] z-[9999]"
                         />
@@ -391,8 +459,8 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                             initial={{ x: '100%' }}
                             animate={{ x: 0 }}
                             exit={{ x: '100%' }}
-                            transition={{ type: 'spring', damping: 28, stiffness: 220 }}
-                            className="fixed top-4 right-4 h-[calc(100vh-2rem)] w-full max-w-[1100px] bg-[var(--bg-card)] shadow-2xl dark:shadow-soft-lg-dark z-[10000] flex items-center justify-center border border-[var(--border-color)] rounded-[1.25rem]"
+                            transition={{ type: 'spring', damping: 28, stiffness: 220, duration: 0.3 }}
+                            className="fixed top-4 left-4 right-4 md:left-auto h-[calc(100vh-2rem)] w-auto md:w-full md:max-w-[1100px] bg-[var(--bg-card)] shadow-2xl dark:shadow-soft-lg-dark z-[10000] flex items-center justify-center border border-[var(--border-color)] rounded-[1.25rem]"
                         >
                             <Loader2 size={40} className="animate-spin text-primary-600" />
                         </motion.div>
@@ -406,7 +474,7 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
     return (
         <>
             {createPortal(
-                <AnimatePresence>
+                <AnimatePresence mode="wait">
                     {isOpen && (
                         <>
                             {/* Backdrop */}
@@ -414,6 +482,7 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
+                                transition={{ duration: 0.3 }}
                         onClick={handleCancel}
                         className="fixed top-0 left-0 w-screen h-screen bg-secondary-900/40 dark:bg-black/60 backdrop-blur-[2px] z-[150]"
                     />
@@ -423,20 +492,34 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                         initial={{ x: '100%' }}
                         animate={{ x: 0 }}
                         exit={{ x: '100%' }}
-                        transition={{ type: 'spring', damping: 28, stiffness: 220 }}
-                        className="fixed top-4 right-4 h-[calc(100vh-2rem)] w-full max-w-[1100px] bg-[var(--bg-card)] shadow-2xl dark:shadow-soft-lg-dark z-[160] flex flex-col border border-[var(--border-color)] rounded-2xl overflow-hidden"
+                        transition={{ type: 'spring', damping: 28, stiffness: 220, duration: 0.3 }}
+                        className="fixed top-4 left-4 right-4 md:left-auto h-[calc(100vh-2rem)] w-auto md:w-full md:max-w-[1100px] bg-[var(--bg-card)] shadow-2xl dark:shadow-soft-lg-dark z-[160] flex flex-col border border-[var(--border-color)] rounded-2xl overflow-hidden"
                     >
                         {/* Header - Estilo Modal */}
-                        <div className="px-6 py-4 border-b border-[var(--border-color)] flex items-center justify-between shrink-0 bg-[var(--bg-card)]">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-xl flex items-center justify-center text-primary-600 dark:text-primary-400">
-                                    {type === 'order' ? <ShoppingBag size={20} /> : <FileText size={20} />}
+                        <div className="px-4 md:px-6 py-3 md:py-4 border-b border-[var(--border-color)] flex items-center justify-between shrink-0 bg-[var(--bg-card)]">
+                            <div className="flex items-center gap-2 md:gap-3">
+                                {/* Botón Volver - desde el paso 2 en adelante */}
+                                {!effectiveReadOnly && step > 1 && !(isClient && step <= 2) && (
+                                    <button
+                                        onClick={() => {
+                                            if (step === 2) setStep(features.priceLists ? 1.5 : 1);
+                                            else if (step === 1.5) setStep(1);
+                                            else setStep(step - 1);
+                                        }}
+                                        className="p-2 hover:bg-[var(--bg-hover)] rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors -ml-2 md:ml-0"
+                                        title="Volver"
+                                    >
+                                        <ChevronLeft size={20} />
+                                    </button>
+                                )}
+                                <div className="w-8 h-8 md:w-10 md:h-10 bg-primary-100 dark:bg-primary-900/30 rounded-xl flex items-center justify-center text-primary-600 dark:text-primary-400">
+                                    {type === 'order' ? <ShoppingBag size={18} className="md:w-5 md:h-5" /> : <FileText size={18} className="md:w-5 md:h-5" />}
                                 </div>
                                 <div>
-                                    <h2 className="text-base font-bold text-[var(--text-primary)]">
+                                    <h2 className="text-sm md:text-base font-bold text-[var(--text-primary)]">
                                         {isViewMode || readOnly ? `Ver ${type === 'order' ? 'Pedido' : 'Presupuesto'}` : (mode === 'edit' ? `Editar ${type === 'order' ? 'Pedido' : 'Presupuesto'}` : `Nuevo ${type === 'order' ? 'Pedido' : 'Presupuesto'}`)}
                                     </h2>
-                                    <p className="text-[11px] text-[var(--text-muted)] font-medium">
+                                    <p className="text-[10px] md:text-[11px] text-[var(--text-muted)] font-medium">
                                         {isViewMode ? 'Mostrando detalle' : (() => {
                                             if (isClient) {
                                                 // Cliente ve solo 2 pasos: Productos y Resumen
@@ -465,8 +548,8 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                         </div>
 
                         {/* Content - Scrolleable */}
-                        <div className="flex-1 overflow-y-auto bg-[var(--bg-body)] p-6">
-                            <div className="p-4">
+                        <div className="flex-1 overflow-y-auto bg-[var(--bg-body)] p-3 md:p-6">
+                            <div className="p-0 md:p-2">
                                 <AnimatePresence mode="wait">
                                     {step === 1 && (
                                         <ClientSelection
@@ -500,6 +583,9 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                                             isClient={isClient}
                                             showPricesWithTax={showPricesWithTax}
                                             company={user?.company}
+                                            page={productPage}
+                                            pagination={productPagination}
+                                            onPageChange={handleProductPageChange}
                                         />
                                     )}
 
@@ -527,6 +613,7 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                                             selectedClient={selectedClient}
                                             priceList={header.priceList}
                                             features={features}
+                                            stockErrors={stockErrors}
                                             // Commission props
                                             commissionRate={commissionRate}
                                             setCommissionRate={setCommissionRate}
@@ -548,18 +635,19 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                         </div>
 
                         {/* Footer - Acciones siempre abajo */}
-                        <div className="px-6 py-4 border-t border-[var(--border-color)] bg-[var(--bg-hover)] flex items-center justify-between shrink-0">
+                        <div className="px-4 md:px-6 py-3 md:py-4 border-t border-[var(--border-color)] bg-[var(--bg-hover)] flex items-center justify-between shrink-0">
                             <div className="flex items-center gap-3">
                                 {!effectiveReadOnly && items.length > 0 && (
                                     <>
+                                        {/* Botón del carrito más grande - mismo alto que el botón Siguiente */}
                                         <button
                                             onClick={() => setIsCartOpen(true)}
-                                            className="flex items-center gap-2 px-3 py-2 bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 rounded-lg hover:bg-primary-200 dark:hover:bg-primary-800/50 transition-colors"
+                                            className="flex items-center gap-2 px-4 py-2.5 bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 rounded-lg hover:bg-primary-200 dark:hover:bg-primary-800/50 transition-colors"
                                         >
-                                            <ShoppingBag size={18} />
+                                            <ShoppingBag size={20} />
                                             <span className="text-sm font-semibold">{items.length}</span>
                                         </button>
-                                        <div className="text-[11px] text-[var(--text-muted)]">
+                                        <div className="hidden sm:block text-[11px] text-[var(--text-muted)]">
                                             Total: <span className="font-bold text-[var(--text-primary)]">${calculateTotal().toLocaleString()}</span>
                                         </div>
                                     </>
@@ -577,19 +665,7 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                                     </Button>
                                 ) : (
                                     <>
-                                        {step > 1 && !(isClient && step <= 2) && (
-                                            <Button
-                                                variant="secondary"
-                                                onClick={() => {
-                                                    if (step === 2) setStep(features.priceLists ? 1.5 : 1);
-                                                    else if (step === 1.5) setStep(1);
-                                                    else setStep(step - 1);
-                                                }}
-                                                className="!px-4 !py-2 !text-sm"
-                                            >
-                                                Volver
-                                            </Button>
-                                        )}
+                                        {/* Botón Volver eliminado - ahora está en el header */}
                                         
                                         {step < 3 && (
                                             (step === 1 && selectedClient) ||
@@ -646,7 +722,9 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                             items={items}
                             updateItem={updateItem}
                             removeItem={removeItem}
+                            subtotal={calculateSubtotal()}
                             total={calculateTotal()}
+                            globalDiscount={header.discount}
                             onCheckout={() => { setIsCartOpen(false); setStep(3); }}
                             products={products}
                             company={user?.company}
@@ -662,6 +740,7 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                             features={features}
                             company={user?.company}
                             priceList={header.priceList}
+                            user={user}
                         />
                     </motion.div>
                 </>

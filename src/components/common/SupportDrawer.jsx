@@ -80,7 +80,7 @@ const SupportDrawer = ({ isOpen, onClose, user = null }) => {
                         animate={{ x: 0 }}
                         exit={{ x: '110%' }}
                         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-                        className="fixed top-4 right-4 bottom-4 w-full max-w-100 bg-(--bg-card) shadow-2xl dark:shadow-soft-lg-dark z-[10000] flex flex-col border border-(--border-color) rounded-3xl overflow-hidden"
+                        className="fixed top-4 left-4 right-4 md:left-auto bottom-4 w-auto md:w-full md:max-w-100 bg-(--bg-card) shadow-2xl dark:shadow-soft-lg-dark z-[10000] flex flex-col border border-(--border-color) rounded-3xl overflow-hidden"
                     >
                         {/* Drawer Header */}
                         <div className="flex items-center justify-between p-6 border-b border-(--border-color)">

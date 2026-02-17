@@ -13,8 +13,6 @@ import {
     Building2,
     Ruler,
     Percent,
-    DollarSign,
-    Sparkles,
     AlertCircle,
     ChevronLeft,
     ChevronRight,
@@ -22,7 +20,7 @@ import {
 } from 'lucide-react';
 import Button from '../common/Button';
 
-const ProductQuickView = ({ isOpen, onClose, product, onAddToCart, isClient = false, viewOnly = false, showPricesWithTax = false, features, company, priceList = 1 }) => {
+const ProductQuickView = ({ isOpen, onClose, product, onAddToCart, isClient = false, viewOnly = false, showPricesWithTax = false, features, company, priceList = 1, user = null }) => {
     const [quantity, setQuantity] = React.useState(1);
     const [discount, setDiscount] = React.useState(0);
     const [quantityError, setQuantityError] = React.useState(null);
@@ -119,6 +117,9 @@ const ProductQuickView = ({ isOpen, onClose, product, onAddToCart, isClient = fa
     // Feature flags
     const hasStockFeature = features ? features.stock === true : true;
     const hasPriceListsFeature = features ? features.priceLists === true : true;
+    
+    // Verificar si es admin o superadmin para mostrar detalles de stock
+    const isAdmin = user?.role?.name === 'admin' || user?.role?.name === 'superadmin';
 
     // Datos del producto
     const taxRate = product.pricing?.tax || 0;
@@ -167,17 +168,17 @@ const ProductQuickView = ({ isOpen, onClose, product, onAddToCart, isClient = fa
                         animate={{ x: 0 }}
                         exit={{ x: '100%' }}
                         transition={{ type: 'spring', damping: 28, stiffness: 220 }}
-                        className="fixed top-4 right-4 h-[calc(100vh-2rem)] w-full max-w-[480px] bg-[var(--bg-card)] shadow-2xl z-[210] flex flex-col border border-[var(--border-color)] rounded-2xl overflow-hidden"
+                        className="fixed top-4 left-4 right-4 md:left-auto h-[calc(100vh-2rem)] w-auto md:w-full md:max-w-[420px] bg-[var(--bg-card)] shadow-2xl z-[210] flex flex-col border border-[var(--border-color)] rounded-2xl overflow-hidden"
                     >
-                        {/* Header */}
-                        <div className="px-6 py-4 border-b border-[var(--border-color)] flex items-center justify-between shrink-0 bg-[var(--bg-card)]">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-xl flex items-center justify-center text-primary-600 dark:text-primary-400">
-                                    <Package size={20} />
+                        {/* Header - Más compacto */}
+                        <div className="px-4 md:px-6 py-3 md:py-4 border-b border-[var(--border-color)] flex items-center justify-between shrink-0 bg-[var(--bg-card)]">
+                            <div className="flex items-center gap-2 md:gap-3">
+                                <div className="w-8 h-8 md:w-10 md:h-10 bg-primary-100 dark:bg-primary-900/30 rounded-xl flex items-center justify-center text-primary-600 dark:text-primary-400">
+                                    <Package size={18} className="md:w-5 md:h-5" />
                                 </div>
                                 <div>
-                                    <h2 className="text-base font-bold text-[var(--text-primary)]">Detalle del Producto</h2>
-                                    <p className="text-[11px] text-[var(--text-muted)] font-medium">{product.code} • {product.category || 'General'}</p>
+                                    <h2 className="text-sm md:text-base font-bold text-[var(--text-primary)]">Detalle del Producto</h2>
+                                    <p className="text-[10px] md:text-[11px] text-[var(--text-muted)] font-medium">{product.code}</p>
                                 </div>
                             </div>
                             <button
@@ -188,8 +189,8 @@ const ProductQuickView = ({ isOpen, onClose, product, onAddToCart, isClient = fa
                             </button>
                         </div>
 
-                        {/* Content - Scrolleable */}
-                        <div className="flex-1 overflow-y-auto p-6 space-y-5">
+                        {/* Content - Scrolleable - Padding reducido */}
+                        <div className="flex-1 overflow-y-auto p-3 md:p-5 space-y-3 md:space-y-4">
                             {/* Image Slider Section */}
                             <div className="aspect-video bg-[var(--bg-hover)] rounded-2xl overflow-hidden relative border border-[var(--border-color)]">
                                 {hasImages ? (
@@ -256,229 +257,245 @@ const ProductQuickView = ({ isOpen, onClose, product, onAddToCart, isClient = fa
                                 </div>
                             )}
 
-                            {/* Nombre y descripción corta */}
-                            <div>
-                                <h4 className="text-lg font-bold text-[var(--text-primary)] mb-2">{product.name}</h4>
+                            {/* Nombre, Precio y descripción - Reorganizado */}
+                            <div className="space-y-2 md:space-y-3">
+                                {/* Nombre */}
+                                <h4 className="text-base font-semibold text-[var(--text-primary)] leading-tight">{product.name}</h4>
+                                
+                                {/* Precio principal - Destacado según priceList */}
+                                <div className="space-y-1">
+                                    {/* Precio de Oferta (tiene prioridad) */}
+                                    {hasOffer && (
+                                        <div className="flex items-baseline gap-2">
+                                            <span className="text-xl md:text-2xl font-semibold text-warning-600">
+                                                {formatPrice(showPricesWithTax && hasTax ? getPriceWithTax(offerPrice) : offerPrice)}
+                                            </span>
+                                            <span className="text-sm text-[var(--text-muted)] line-through">
+                                                {formatPrice(showPricesWithTax && hasTax ? getPriceWithTax(regularPrice) : regularPrice)}
+                                            </span>
+                                        </div>
+                                    )}
+                                    
+                                    {/* Precio según lista seleccionada (si no hay oferta) */}
+                                    {!hasOffer && (
+                                        <>
+                                            {/* En modo viewOnly, mostrar ambas listas si están disponibles */}
+                                            {viewOnly && hasPriceListsFeature && product.pricing?.list2 > 0 ? (
+                                                <div className="space-y-2">
+                                                    {/* Lista 1 */}
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[11px] text-[var(--text-muted)]">Lista 1:</span>
+                                                            <span className="text-lg md:text-xl font-semibold text-[var(--text-primary)]">
+                                                                {formatPrice(finalPrice)}
+                                                            </span>
+                                                        </div>
+                                                        {hasDiscount && (
+                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-success-50 dark:bg-success-900/30 text-success-600 rounded-md text-[10px] font-semibold">
+                                                                <Tag size={10} />
+                                                                {product.pricing.discount}% dto.
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    {/* Lista 2 */}
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[11px] text-[var(--text-muted)]">Lista 2:</span>
+                                                            <span className="text-lg md:text-xl font-semibold text-primary-600">
+                                                                {formatPrice(showPricesWithTax && hasTax ? getPriceWithTax(product.pricing.list2 * (hasDiscount ? (1 - product.pricing.discount / 100) : 1)) : product.pricing.list2 * (hasDiscount ? (1 - product.pricing.discount / 100) : 1))}
+                                                            </span>
+                                                        </div>
+                                                        {hasDiscount && (
+                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-success-50 dark:bg-success-900/30 text-success-600 rounded-md text-[10px] font-semibold">
+                                                                <Tag size={10} />
+                                                                {product.pricing.discount}% dto.
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    {/* Lista 1 */}
+                                                    {(!priceList || priceList === 1) && (
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-xl md:text-2xl font-semibold text-[var(--text-primary)]">
+                                                                {formatPrice(finalPrice)}
+                                                            </span>
+                                                            {hasDiscount && (
+                                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-success-50 dark:bg-success-900/30 text-success-600 rounded-md text-[10px] font-semibold">
+                                                                    <Tag size={10} />
+                                                                    {product.pricing.discount}% dto.
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                    
+                                                    {/* Lista 2 */}
+                                                    {hasPriceListsFeature && priceList === 2 && product.pricing?.list2 > 0 && (
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-xl md:text-2xl font-semibold text-primary-600">
+                                                                {formatPrice(showPricesWithTax && hasTax ? getPriceWithTax(product.pricing.list2 * (hasDiscount ? (1 - product.pricing.discount / 100) : 1)) : product.pricing.list2 * (hasDiscount ? (1 - product.pricing.discount / 100) : 1))}
+                                                            </span>
+                                                            {hasDiscount && (
+                                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-success-50 dark:bg-success-900/30 text-success-600 rounded-md text-[10px] font-semibold">
+                                                                    <Tag size={10} />
+                                                                    {product.pricing.discount}% dto.
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </>
+                                            )}
+                                        </>
+                                    )}
+                                    
+                                    {/* Info de IVA */}
+                                    {hasTax && (
+                                        <p className="text-[11px] text-[var(--text-muted)]">
+                                            {showPricesWithTax ? `Incluye IVA (${taxRate}%)` : `IVA: ${taxRate}% (no incluido)`}
+                                        </p>
+                                    )}
+                                </div>
+                                
+                                {/* Descripción */}
                                 {product.description && (
-                                    <p className="text-[13px] text-[var(--text-secondary)]">{product.description}</p>
+                                    <p className="text-[13px] text-[var(--text-secondary)] pt-1">{product.description}</p>
                                 )}
                             </div>
 
-                            {/* Info adicional en grid */}
+                            {/* Info adicional - Versión minimalista inline */}
                             {(showBarcode || showSubcategory || showBrand || showUnit) && (
-                                <div className="grid grid-cols-2 gap-3">
-                                    {showBarcode && (
-                                        <div className="p-3 bg-[var(--bg-hover)] rounded-xl border border-[var(--border-color)]">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <Barcode size={12} className="text-[var(--text-muted)]" />
-                                                <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase">Código de Barras</span>
-                                            </div>
-                                            <p className="text-[12px] font-medium">{product.barcode}</p>
-                                        </div>
+                                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] md:text-xs text-[var(--text-muted)]">
+                                    {showBrand && (
+                                        <span className="flex items-center gap-1">
+                                            <Building2 size={12} /> {product.brand}
+                                        </span>
                                     )}
                                     {showSubcategory && (
-                                        <div className="p-3 bg-[var(--bg-hover)] rounded-xl border border-[var(--border-color)]">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <Layers size={12} className="text-[var(--text-muted)]" />
-                                                <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase">Subcategoría</span>
-                                            </div>
-                                            <p className="text-[12px] font-medium">{product.subcategory}</p>
-                                        </div>
-                                    )}
-                                    {showBrand && (
-                                        <div className="p-3 bg-[var(--bg-hover)] rounded-xl border border-[var(--border-color)]">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <Building2 size={12} className="text-[var(--text-muted)]" />
-                                                <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase">Marca/Proveedor</span>
-                                            </div>
-                                            <p className="text-[12px] font-medium">{product.brand}</p>
-                                        </div>
+                                        <span className="flex items-center gap-1">
+                                            <Layers size={12} /> {product.subcategory}
+                                        </span>
                                     )}
                                     {showUnit && (
-                                        <div className="p-3 bg-[var(--bg-hover)] rounded-xl border border-[var(--border-color)]">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <Ruler size={12} className="text-[var(--text-muted)]" />
-                                                <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase">Unidad</span>
-                                            </div>
-                                            <p className="text-[12px] font-medium">{product.unit}</p>
-                                        </div>
+                                        <span className="flex items-center gap-1">
+                                            <Ruler size={12} /> {product.unit}
+                                        </span>
+                                    )}
+                                    {showBarcode && (
+                                        <span className="flex items-center gap-1">
+                                            <Barcode size={12} /> {product.barcode}
+                                        </span>
                                     )}
                                 </div>
                             )}
 
-                            {/* Descripción larga */}
+                            {/* Descripción larga - Minimalista */}
                             {showLongDescription && (
-                                <div className="p-4 bg-[var(--bg-hover)] rounded-2xl border border-[var(--border-color)]">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <Info size={14} className="text-[var(--text-muted)]" />
-                                        <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Descripción Completa</span>
-                                    </div>
-                                    <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed">{product.longDescription}</p>
+                                <div className="pt-2 border-t border-[var(--border-color)]">
+                                    <p className="text-[12px] md:text-[13px] text-[var(--text-secondary)] leading-relaxed">{product.longDescription}</p>
                                 </div>
                             )}
 
-                            {/* Stock */}
+                            {/* Stock - Completo para admin, simplificado para otros */}
                             {hasStockFeature && (
-                                <div className="flex items-center gap-3 p-3 bg-[var(--bg-hover)] rounded-xl border border-[var(--border-color)]">
-                                    <div className={`w-3 h-3 rounded-full ${product.stock > 0 ? 'bg-success-500' : 'bg-danger-500'}`} />
-                                    <div>
-                                        <p className="text-[11px] text-[var(--text-muted)] font-medium">Stock disponible</p>
-                                        <p className="text-[14px] font-bold text-[var(--text-primary)]">{product.stock || 0} unidades</p>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Configuración de Pedidos */}
-                            {showPackageInfo && (
-                                <div className="p-4 bg-primary-50 dark:bg-primary-900/20 rounded-2xl border border-primary-100 dark:border-primary-800">
-                                    <div className="flex items-center gap-2 mb-3">
-                                        <Package size={16} className="text-primary-600" />
-                                        <span className="text-[11px] font-bold text-primary-600 uppercase tracking-wider">Configuración de Pedido</span>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        {unitsPerPackage > 1 && (
-                                            <div>
-                                                <p className="text-[10px] text-[var(--text-muted)]">Unidades por bulto</p>
-                                                <p className="text-lg font-bold text-[var(--text-primary)]">{unitsPerPackage}</p>
-                                                {sellOnlyFullPackages && (
-                                                    <p className="text-[10px] text-primary-600 font-medium">Solo bultos cerrados</p>
-                                                )}
-                                            </div>
-                                        )}
-                                        {minOrderQuantity > 1 && (
-                                            <div>
-                                                <p className="text-[10px] text-[var(--text-muted)]">Cantidad mínima</p>
-                                                <p className="text-lg font-bold text-[var(--text-primary)]">{minOrderQuantity}</p>
-                                                <p className="text-[10px] text-warning-600 font-medium">Mínimo requerido</p>
-                                            </div>
-                                        )}
-                                    </div>
-                                    {sellOnlyFullPackages && unitsPerPackage > 1 && (
-                                        <p className="mt-3 text-[11px] text-primary-700 dark:text-primary-400 bg-primary-100 dark:bg-primary-800/50 px-3 py-2 rounded-lg">
-                                            Solo se permiten pedidos en múltiplos de {unitsPerPackage} unidades
-                                        </p>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Precios */}
-                            <div className="space-y-3">
-                                <h5 className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
-                                    <DollarSign size={14} />
-                                    {showPricesWithTax ? 'Precio (IVA incluido)' : 'Precio (sin IVA)'}
-                                </h5>
-                                
-                                {/* Precio de Oferta */}
-                                {hasOffer && (
-                                    <div className="p-4 bg-warning-50 dark:bg-warning-900/20 rounded-2xl border border-warning-100 dark:border-warning-800">
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <Sparkles size={16} className="text-warning-600" />
-                                            <span className="text-[11px] font-bold text-warning-600 uppercase tracking-wider">Precio Especial</span>
+                                <div className="bg-[var(--bg-hover)] rounded-xl border border-[var(--border-color)] p-3 md:p-4 space-y-2 md:space-y-3">
+                                    {/* Header de Stock */}
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <div className={`w-2.5 h-2.5 rounded-full ${product.stock > 0 ? 'bg-success-500' : 'bg-danger-500'}`} />
+                                            <span className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Stock</span>
                                         </div>
-                                        <p className="text-3xl font-bold text-warning-600">
-                                            {formatPrice(showPricesWithTax && hasTax ? getPriceWithTax(offerPrice) : offerPrice)}
-                                        </p>
-                                        {showPricesWithTax && hasTax && (
-                                            <p className="text-[11px] text-warning-600/70 mt-1">Incluye IVA ({taxRate}%)</p>
+                                        {/* Alerta de stock bajo (solo admin) */}
+                                        {isAdmin && product.minStock > 0 && (product.stock || 0) <= product.minStock && (
+                                            <span className="px-2 py-0.5 bg-[var(--bg-card)] border border-danger-200 dark:border-danger-800 text-danger-600 dark:text-danger-400 text-[10px] font-bold rounded-full">
+                                                CRÍTICO
+                                            </span>
                                         )}
-                                        {!showPricesWithTax && hasTax && (
-                                            <p className="text-[11px] text-warning-600/70 mt-1">+{taxRate}% IVA = {formatPrice(getPriceWithTax(offerPrice))}</p>
-                                        )}
-                                        {company?.excludeOfferProductsFromGlobalDiscount && (
-                                            <div className="mt-3 px-3 py-2 bg-pink-100 dark:bg-pink-900/30 border border-pink-200 dark:border-pink-800 rounded-lg">
-                                                <p className="text-[11px] text-pink-600 dark:text-pink-400 font-medium flex items-center gap-1">
-                                                    <Tag size={12} />
-                                                    No aplica descuento global del pedido
-                                                </p>
-                                            </div>
-                                        )}
-                                        <div className="mt-3 pt-3 border-t border-warning-200 dark:border-warning-700">
-                                            <p className="text-[11px] text-[var(--text-muted)] mb-1">Precio regular</p>
-                                            <p className="text-lg font-medium text-[var(--text-muted)] line-through">
-                                                {formatPrice(showPricesWithTax && hasTax ? getPriceWithTax(regularPrice) : regularPrice)}
+                                    </div>
+                                    
+                                    {/* Stock principal - visible para todos */}
+                                    <div className="flex items-center gap-4">
+                                        <div>
+                                            <p className="text-[10px] text-[var(--text-muted)]">Disponible</p>
+                                            <p className="text-lg md:text-xl font-bold text-[var(--text-primary)]">
+                                                {Math.max(0, (product.stock || 0) - (product.stockReserved || 0))}
                                             </p>
                                         </div>
+                                        {isAdmin && (
+                                            <>
+                                                <div className="text-[var(--text-muted)]">/</div>
+                                                <div>
+                                                    <p className="text-[10px] text-[var(--text-muted)]">Físico</p>
+                                                    <p className="text-lg md:text-xl font-bold text-[var(--text-secondary)]">{product.stock || 0}</p>
+                                                </div>
+                                                {product.minStock > 0 && (
+                                                    <div className="ml-auto text-right">
+                                                        <p className="text-[10px] text-[var(--text-muted)]">Mínimo</p>
+                                                        <p className="text-sm font-medium text-[var(--text-muted)]">{product.minStock}</p>
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
                                     </div>
-                                )}
-                                
-                                {/* Precio Lista 1 */}
-                                {!hasOffer && (!priceList || priceList === 1) && (
-                                    <div className="p-4 bg-[var(--bg-hover)] rounded-2xl border border-[var(--border-color)]">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <span className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
-                                                {showPricesWithTax ? 'Precio' : (hasPriceListsFeature && priceList === 1 ? 'Lista 1' : 'Precio')}
-                                            </span>
-                                            {hasDiscount && (
-                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-success-50 dark:bg-success-900/30 text-success-600 dark:text-success-400 rounded-md text-[10px] font-bold">
-                                                    <Tag size={10} />
-                                                    {product.pricing.discount}% dto.
-                                                </span>
-                                            )}
-                                        </div>
-                                        <p className="text-3xl font-bold text-[var(--text-primary)]">
-                                            {formatPrice(finalPrice)}
-                                        </p>
-                                        {showPricesWithTax && hasTax && (
-                                            <p className="text-[11px] text-[var(--text-muted)] mt-1">Incluye IVA ({taxRate}%)</p>
-                                        )}
-                                        {!showPricesWithTax && hasTax && (
-                                            <p className="text-[11px] text-[var(--text-muted)] mt-1">+{taxRate}% IVA = {formatPrice(finalPriceWithTax)}</p>
-                                        )}
-                                        {hasDiscount && (
-                                            <div className="mt-3 pt-3 border-t border-[var(--border-color)]">
-                                                <p className="text-[11px] text-[var(--text-muted)] mb-1">Precio sin descuento</p>
-                                                <p className="text-lg font-medium text-[var(--text-muted)] line-through">
-                                                    {formatPrice(showPricesWithTax && hasTax ? getPriceWithTax(regularPrice) : regularPrice)}
-                                                </p>
+                                    
+                                    {/* Detalles de stock - solo admin - Versión sobria */}
+                                    {isAdmin && (
+                                        <div className="grid grid-cols-2 gap-2 md:gap-3 pt-2 md:pt-3 border-t border-[var(--border-color)]">
+                                            <div className="p-2 bg-[var(--bg-card)] rounded-lg border border-[var(--border-color)]">
+                                                <p className="text-[10px] text-[var(--text-muted)] font-medium">Reservado</p>
+                                                <p className="text-base md:text-lg font-bold text-[var(--text-primary)]">{product.stockReserved || 0}</p>
+                                                <p className="text-[9px] text-[var(--text-muted)]">En pedidos</p>
                                             </div>
-                                        )}
-                                    </div>
-                                )}
+                                            <div className="p-2 bg-[var(--bg-card)] rounded-lg border border-[var(--border-color)]">
+                                                <p className="text-[10px] text-[var(--text-muted)] font-medium">Presupuestado</p>
+                                                <p className="text-base md:text-lg font-bold text-[var(--text-primary)]">{product.stockQuoted || 0}</p>
+                                                <p className="text-[9px] text-[var(--text-muted)]">En presupuestos</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
-                                {/* Precio Lista 2 */}
-                                {!hasOffer && hasPriceListsFeature && product.pricing?.list2 > 0 && (!priceList || priceList === 2) && (
-                                    <div className="p-4 bg-primary-50 dark:bg-primary-900/20 rounded-2xl border border-primary-100 dark:border-primary-800">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <span className="text-[11px] font-bold text-primary-500 uppercase tracking-wider">
-                                                {priceList === 2 ? 'Precio' : 'Lista 2'}
-                                            </span>
-                                            {hasDiscount && (
-                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-white dark:bg-primary-800 text-success-600 dark:text-success-400 rounded-md text-[10px] font-bold">
-                                                    <Tag size={10} />
-                                                    {product.pricing.discount}% dto.
-                                                </span>
-                                            )}
-                                        </div>
-                                        <p className="text-3xl font-bold text-primary-600">
-                                            {formatPrice(showPricesWithTax && hasTax ? getPriceWithTax(product.pricing.list2 * (hasDiscount ? (1 - product.pricing.discount / 100) : 1)) : product.pricing.list2 * (hasDiscount ? (1 - product.pricing.discount / 100) : 1))}
-                                        </p>
-                                        {showPricesWithTax && hasTax && (
-                                            <p className="text-[11px] text-primary-500/70 mt-1">Incluye IVA ({taxRate}%)</p>
-                                        )}
-                                        {!showPricesWithTax && hasTax && (
-                                            <p className="text-[11px] text-primary-500/70 mt-1">+{taxRate}% IVA = {formatPrice(getPriceWithTax(product.pricing.list2 * (hasDiscount ? (1 - product.pricing.discount / 100) : 1)))}</p>
-                                        )}
-                                        {hasDiscount && (
-                                            <div className="mt-3 pt-3 border-t border-primary-200 dark:border-primary-700">
-                                                <p className="text-[11px] text-primary-500/70 mb-1">Sin descuento</p>
-                                                <p className="text-lg font-medium text-primary-500/50 line-through">
-                                                    {formatPrice(showPricesWithTax && hasTax ? getPriceWithTax(product.pricing.list2) : product.pricing.list2)}
-                                                </p>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
+                            {/* Configuración de Pedidos - Minimalista */}
+                            {showPackageInfo && (
+                                <div className="flex flex-wrap gap-2">
+                                    {unitsPerPackage > 1 && (
+                                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-primary-50 dark:bg-primary-900/20 text-primary-600 text-[11px] rounded-md">
+                                            <Package size={12} />
+                                            {unitsPerPackage} uds/bulto
+                                        </span>
+                                    )}
+                                    {minOrderQuantity > 1 && (
+                                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-warning-50 dark:bg-warning-900/20 text-warning-600 text-[11px] rounded-md">
+                                            Mín: {minOrderQuantity}
+                                        </span>
+                                    )}
+                                    {sellOnlyFullPackages && (
+                                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-50 dark:bg-orange-900/20 text-orange-600 text-[11px] rounded-md">
+                                            Solo bultos
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Info adicional de precios */}
+                            {company?.excludeOfferProductsFromGlobalDiscount && hasOffer && (
+                                <div className="flex items-center gap-1 text-[11px] text-pink-600">
+                                    <Tag size={12} />
+                                    No aplica descuento global del pedido
+                                </div>
+                            )}
                         </div>
 
-                        {/* Footer - Acciones de pedido */}
+                        {/* Footer - Acciones de pedido - Estilo BudgetDrawer */}
                         {!viewOnly && (
-                            <div className="px-6 py-4 border-t border-[var(--border-color)] bg-[var(--bg-hover)] space-y-4">
-                                <div className={`flex ${(!isClient || discount > 0) ? 'flex-row gap-6' : 'flex-col'}`}>
+                            <div className="px-4 md:px-6 py-3 md:py-4 border-t border-[var(--border-color)] bg-[var(--bg-hover)] space-y-3">
+                                {/* En mobile: apilado, en desktop: lado a lado */}
+                                <div className="flex flex-col md:flex-row md:items-end gap-3">
                                     {/* Quantity Selector */}
-                                    <div className={`${(!isClient || discount > 0) ? 'flex-1 pr-2' : 'max-w-xs mx-auto w-full'}`}>
-                                        <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">
-                                            Cantidad {sellOnlyFullPackages && unitsPerPackage > 1 && `(x${unitsPerPackage})`}
+                                    <div className="flex-1">
+                                        <label className="text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">
+                                            Cantidad {sellOnlyFullPackages && unitsPerPackage > 1 && <span className="text-[9px]">(x{unitsPerPackage})</span>}
                                         </label>
                                         <div className="flex items-center gap-2">
                                             <button
@@ -489,7 +506,7 @@ const ProductQuickView = ({ isOpen, onClose, product, onAddToCart, isClient = fa
                                                     setQuantityError(null);
                                                 }}
                                                 disabled={quantity <= effectiveMinQuantity}
-                                                className="w-10 h-10 flex items-center justify-center rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-muted)] hover:text-primary-600 hover:border-primary-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                                className="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-muted)] hover:text-primary-600 hover:border-primary-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                                             >
                                                 <Minus size={16} />
                                             </button>
@@ -520,7 +537,7 @@ const ProductQuickView = ({ isOpen, onClose, product, onAddToCart, isClient = fa
                                                     setQuantity(finalQty);
                                                     setQuantityError(null);
                                                 }}
-                                                className="flex-1 h-10 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg text-center font-semibold text-[15px] text-[var(--text-primary)] outline-none focus:border-primary-300"
+                                                className="flex-1 h-9 md:h-10 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg text-center font-semibold text-[15px] text-[var(--text-primary)] outline-none focus:border-primary-300"
                                             />
                                             <button
                                                 type="button"
@@ -528,7 +545,7 @@ const ProductQuickView = ({ isOpen, onClose, product, onAddToCart, isClient = fa
                                                     setQuantity(quantity + quantityStep);
                                                     setQuantityError(null);
                                                 }}
-                                                className="w-10 h-10 flex items-center justify-center rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-muted)] hover:text-primary-600 hover:border-primary-300 transition-colors"
+                                                className="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-muted)] hover:text-primary-600 hover:border-primary-300 transition-colors"
                                             >
                                                 <Plus size={16} />
                                             </button>
@@ -541,17 +558,17 @@ const ProductQuickView = ({ isOpen, onClose, product, onAddToCart, isClient = fa
                                         {(minOrderQuantity > 1 || (sellOnlyFullPackages && unitsPerPackage > 1)) && !quantityError && (
                                             <p className="text-[10px] text-[var(--text-muted)] mt-1">
                                                 {sellOnlyFullPackages && unitsPerPackage > 1 
-                                                    ? `Múltiplos de ${unitsPerPackage} unidades` 
-                                                    : `Mínimo: ${minOrderQuantity} unidades`}
+                                                    ? `Múltiplos de ${unitsPerPackage}` 
+                                                    : `Mínimo: ${minOrderQuantity}`}
                                             </p>
                                         )}
                                     </div>
 
-                                    {/* Discount Input */}
+                                    {/* Discount Input - Visible en todos los tamaños */}
                                     {(!isClient || discount > 0) && (
-                                        <div className="min-w-0 flex-1 pl-2">
-                                            <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">Descuento</label>
-                                            <div className="flex items-center justify-center h-10 bg-success-50 dark:bg-success-900/30 border border-success-100 dark:border-success-800 rounded-lg px-3">
+                                        <div className="w-full md:w-auto md:min-w-[100px]">
+                                            <label className="text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">Dto. %</label>
+                                            <div className="flex items-center justify-center h-9 md:h-10 bg-success-50 dark:bg-success-900/30 border border-success-100 dark:border-success-800 rounded-lg px-3">
                                                 <Percent size={14} className="text-success-600 mr-2 flex-shrink-0" />
                                                 <input
                                                     type="number"
@@ -565,13 +582,14 @@ const ProductQuickView = ({ isOpen, onClose, product, onAddToCart, isClient = fa
                                     )}
                                 </div>
 
+                                {/* Botón consistente con BudgetDrawer */}
                                 <Button
                                     variant="primary"
-                                    className="w-full !py-3 !text-sm font-bold uppercase tracking-wider"
+                                    className="w-full !py-2.5 !text-sm font-semibold uppercase tracking-wider"
                                     onClick={handleAdd}
                                 >
                                     <Plus size={18} strokeWidth={2.5} className="mr-2" />
-                                    Agregar al Presupuesto
+                                    Agregar
                                 </Button>
                             </div>
                         )}

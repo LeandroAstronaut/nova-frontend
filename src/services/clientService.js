@@ -21,8 +21,7 @@ clientApi.interceptors.request.use(
     (error) => Promise.reject(error)
 );
 
-export const getClients = async (search = '') => {
-    const params = search ? { search } : {};
+export const getClients = async (params = {}) => {
     const response = await clientApi.get('/clients', { params });
     return response.data;
 };

@@ -7,6 +7,7 @@ import { useToast } from '../../context/ToastContext';
 import Button from '../../components/common/Button';
 import ConfirmModal from '../../components/common/ConfirmModal';
 import OrderActivityDrawer from '../../components/orders/OrderActivityDrawer';
+import ReceiptDetailContent from '../../components/receipts/ReceiptDetailContent';
 import SendEmailModal from '../../components/receipts/SendEmailModal';
 import SendWhatsAppModal from '../../components/receipts/SendWhatsAppModal';
 import { generateReceiptPDF } from '../../utils/receiptPdfGenerator';
@@ -232,137 +233,9 @@ const ReceiptDetailPage = () => {
                 </div>
             </div>
 
-            {/* Main Content Card */}
+            {/* Main Content - Usando componente reutilizable */}
             <div className="card p-0! overflow-hidden border-none shadow-sm ring-1 ring-(--border-color)">
-                {/* Header de la card */}
-                <div className="bg-(--bg-card) p-4 border-b border-(--border-color)">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <StatusBadge status={receipt.status} />
-                            <TypeBadge type={receipt.type} />
-                        </div>
-                        <div className="text-right">
-                            <p className="text-[10px] text-(--text-muted) font-bold uppercase tracking-wider">Monto</p>
-                            <p className={`text-xl font-black ${receipt.type === 'ingreso' ? 'text-success-600' : 'text-warning-600'}`}>
-                                {receipt.type === 'egreso' ? '-' : ''}${receipt.amount.toLocaleString('es-AR')}
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Contenido */}
-                <div className="p-6">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {/* Columna izquierda */}
-                        <div className="space-y-6">
-                            <div>
-                                <h3 className="text-sm font-bold text-(--text-muted) uppercase tracking-wider mb-4">
-                                    Información del Recibo
-                                </h3>
-                                <InfoRow 
-                                    label="Concepto" 
-                                    value={receipt.concept}
-                                    icon={FileText}
-                                />
-                                <InfoRow 
-                                    label="Método de Pago" 
-                                    value={receipt.paymentMethod?.charAt(0).toUpperCase() + receipt.paymentMethod?.slice(1)}
-                                    icon={DollarSign}
-                                />
-                                <InfoRow 
-                                    label="Fecha" 
-                                    value={new Date(receipt.date).toLocaleDateString('es-AR', { 
-                                        weekday: 'long', 
-                                        year: 'numeric', 
-                                        month: 'long', 
-                                        day: 'numeric' 
-                                    })}
-                                    icon={Calendar}
-                                />
-                            </div>
-
-                            {receipt.notes && (
-                                <div className="pt-6 border-t border-(--border-color)">
-                                    <h3 className="text-sm font-bold text-(--text-muted) uppercase tracking-wider mb-4">
-                                        Notas
-                                    </h3>
-                                    <p className="text-(--text-secondary) whitespace-pre-wrap bg-(--bg-hover) p-4 rounded-xl">
-                                        {receipt.notes}
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Columna derecha */}
-                        <div className="space-y-6">
-                            <div>
-                                <h3 className="text-sm font-bold text-(--text-muted) uppercase tracking-wider mb-4">
-                                    Información de Terceros
-                                </h3>
-                                <InfoRow 
-                                    label="Cliente" 
-                                    value={receipt.clientId?.businessName}
-                                    icon={Building2}
-                                />
-                                <InfoRow 
-                                    label="Vendedor" 
-                                    value={`${receipt.salesRepId?.firstName} ${receipt.salesRepId?.lastName}`}
-                                    icon={User}
-                                />
-                            </div>
-
-                            <div className="pt-6 border-t border-(--border-color)">
-                                <h3 className="text-sm font-bold text-(--text-muted) uppercase tracking-wider mb-4">
-                                    Historial
-                                </h3>
-                                <div className="space-y-3">
-                                    <div className="flex items-center gap-3 text-sm">
-                                        <div className="w-2 h-2 rounded-full bg-success-500"></div>
-                                        <span className="text-(--text-muted)">Creado</span>
-                                        <span className="ml-auto text-(--text-secondary) text-[11px]">
-                                            {new Date(receipt.createdAt).toLocaleString('es-AR')}
-                                        </span>
-                                    </div>
-                                    {receipt.status === 'anulado' && (
-                                        <div className="flex items-center gap-3 text-sm">
-                                            <div className="w-2 h-2 rounded-full bg-danger-500"></div>
-                                            <span className="text-(--text-muted)">Anulado</span>
-                                            <span className="ml-auto text-(--text-secondary) text-[11px]">
-                                                {new Date(receipt.cancelledAt).toLocaleString('es-AR')}
-                                            </span>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {receipt.status === 'anulado' && (
-                                <div className="pt-6 border-t border-(--border-color)">
-                                    <h3 className="text-sm font-bold text-danger-600 uppercase tracking-wider mb-4">
-                                        Información de Anulación
-                                    </h3>
-                                    <InfoRow 
-                                        label="Anulado por" 
-                                        value={`${receipt.cancelledBy?.firstName} ${receipt.cancelledBy?.lastName}`}
-                                        icon={User}
-                                    />
-                                    {receipt.cancellationReason && (
-                                        <div className="mt-3 p-3 bg-danger-50 dark:bg-danger-900/20 rounded-lg border border-danger-100 dark:border-danger-800">
-                                            <p className="text-[11px] font-bold text-danger-600 uppercase tracking-wider mb-1">Motivo</p>
-                                            <p className="text-sm text-danger-700 dark:text-danger-400">{receipt.cancellationReason}</p>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Footer */}
-                <div className="px-6 py-3 border-t border-(--border-color) bg-(--bg-hover)">
-                    <p className="text-[11px] text-(--text-muted) text-center font-medium">
-                        Última actualización: {new Date(receipt.updatedAt).toLocaleString('es-AR')}
-                    </p>
-                </div>
+                <ReceiptDetailContent receipt={receipt} />
             </div>
 
             {/* Cancel Modal */}

@@ -17,6 +17,7 @@ import ProfilePage from './pages/Profile/ProfilePage';
 import BudgetCreationPage from './pages/Orders/BudgetCreationPage';
 import CompaniesPage from './pages/Admin/CompaniesPage';
 import ProductsPage from './pages/Products/ProductsPage';
+import ProductDetailPage from './pages/Products/ProductDetailPage';
 import MainLayout from './components/layout/MainLayout';
 import './App.css';
 
@@ -82,6 +83,7 @@ function App() {
         <Route path="/recibos" element={<ProtectedRoute><ReceiptsPage /></ProtectedRoute>} />
         <Route path="/recibos/:id" element={<ProtectedRoute><ReceiptDetailPage /></ProtectedRoute>} />
         <Route path="/productos" element={<ProtectedRoute><ProductsPage /></ProtectedRoute>} />
+        <Route path="/productos/:id" element={<ProtectedRoute><ProductDetailPage /></ProtectedRoute>} />
         <Route path="/clientes" element={<ProtectedRoute><ClientsPage /></ProtectedRoute>} />
           <Route path="/clientes/:id" element={<ProtectedRoute><ClientDetailPage /></ProtectedRoute>} />
         <Route path="/usuarios" element={<ProtectedRoute><UsersPage /></ProtectedRoute>} />

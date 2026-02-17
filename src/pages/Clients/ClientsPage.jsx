@@ -11,6 +11,7 @@ import Button from '../../components/common/Button';
 import ConfirmModal from '../../components/common/ConfirmModal';
 import ClientDrawer from '../../components/clients/ClientDrawer';
 import ClientActivityDrawer from '../../components/clients/ClientActivityDrawer';
+import ClientQuickView from '../../components/clients/ClientQuickView';
 
 // Action Menu Component
 const ActionMenu = ({ items, onClose, position, openAbove = false }) => {
@@ -121,6 +122,19 @@ const ClientsPage = () => {
     const [selectedClient, setSelectedClient] = useState(null);
     const [editClient, setEditClient] = useState(null);
     const [activityClient, setActivityClient] = useState(null);
+    
+    // Quick View Drawer state
+    const [isQuickViewOpen, setIsQuickViewOpen] = useState(false);
+    const [quickViewClient, setQuickViewClient] = useState(null);
+    
+    // Limpiar client después de que termine la animación de cierre
+    useEffect(() => {
+        if (!isQuickViewOpen && quickViewClient) {
+            const timer = setTimeout(() => setQuickViewClient(null), 300);
+            return () => clearTimeout(timer);
+        }
+    }, [isQuickViewOpen]);
+    
     const [statusModal, setStatusModal] = useState({ isOpen: false, client: null, loading: false });
     const [openMenu, setOpenMenu] = useState({ id: null, position: null, openAbove: false });
     const [exportMenu, setExportMenu] = useState({ open: false, position: null });
@@ -393,7 +407,10 @@ const ClientsPage = () => {
                                 clients.map((c) => (
                                     <tr 
                                         key={c._id} 
-                                        onClick={() => navigate(`/clientes/${c._id}`)}
+                                        onClick={() => {
+                                            setQuickViewClient(c);
+                                            setIsQuickViewOpen(true);
+                                        }}
                                         className="hover:bg-(--bg-hover) transition-colors even:bg-(--bg-hover)/50 group cursor-pointer"
                                     >
                                         <td className="px-6 py-4">
@@ -452,16 +469,16 @@ const ClientsPage = () => {
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <div className="flex items-center justify-end gap-1">
-                                                {/* Botón Editar - Siempre visible */}
+                                                {/* Botón Ver Detalle - Siempre visible */}
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        handleEdit(c);
+                                                        navigate(`/clientes/${c._id}`);
                                                     }}
-                                                    className="p-2 rounded-lg text-(--text-muted) hover:text-info-600 hover:bg-info-50 dark:hover:bg-info-900/20 transition-all"
-                                                    title="Editar"
+                                                    className="p-2 rounded-lg text-(--text-muted) hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-all"
+                                                    title="Ver detalle"
                                                 >
-                                                    <Edit2 size={16} />
+                                                    <Eye size={16} strokeWidth={2.5} />
                                                 </button>
                                                 
                                                 {/* Menú de 3 puntitos - Otras acciones */}
@@ -480,8 +497,13 @@ const ClientsPage = () => {
                                                         items={[
                                                             {
                                                                 icon: <Eye size={16} />,
-                                                                label: 'Ver detalle',
+                                                                label: 'Ver detalle completo',
                                                                 onClick: () => navigate(`/clientes/${c._id}`)
+                                                            },
+                                                            {
+                                                                icon: <Edit2 size={16} />,
+                                                                label: 'Editar',
+                                                                onClick: () => handleEdit(c)
                                                             },
                                                             {
                                                                 icon: <Activity size={16} />,
@@ -525,7 +547,10 @@ const ClientsPage = () => {
                         clients.map((c) => (
                             <div 
                                 key={c._id}
-                                onClick={() => navigate(`/clientes/${c._id}`)}
+                                onClick={() => {
+                                    setQuickViewClient(c);
+                                    setIsQuickViewOpen(true);
+                                }}
                                 className="p-4 border-b border-(--border-color) hover:bg-(--bg-hover) cursor-pointer even:bg-(--bg-hover)/50"
                             >
                                 <div className="flex items-start justify-between">
@@ -571,16 +596,16 @@ const ClientsPage = () => {
                                 </div>
                                 {/* Acciones Mobile */}
                                 <div className="flex items-center justify-end gap-2 pt-3 mt-3 border-t border-(--border-color)">
-                                    {/* Botón Editar - Siempre visible */}
+                                    {/* Botón Ver Detalle - Siempre visible */}
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            handleEdit(c);
+                                            navigate(`/clientes/${c._id}`);
                                         }}
-                                        className="p-2 text-(--text-muted) hover:text-info-600 hover:bg-info-50 dark:hover:bg-info-900/20 rounded-lg"
-                                        title="Editar"
+                                        className="p-2 text-(--text-muted) hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/30 rounded-lg"
+                                        title="Ver detalle"
                                     >
-                                        <Edit2 size={18} />
+                                        <Eye size={18} strokeWidth={2.5} />
                                     </button>
                                     
                                     {/* Menú de 3 puntitos - Otras acciones */}
@@ -602,8 +627,13 @@ const ClientsPage = () => {
                                         items={[
                                             {
                                                 icon: <Eye size={16} />,
-                                                label: 'Ver detalle',
+                                                label: 'Ver detalle completo',
                                                 onClick: () => navigate(`/clientes/${c._id}`)
+                                            },
+                                            {
+                                                icon: <Edit2 size={16} />,
+                                                label: 'Editar',
+                                                onClick: () => handleEdit(c)
                                             },
                                             {
                                                 icon: <Activity size={16} />,
@@ -710,6 +740,14 @@ const ClientsPage = () => {
                     setActivityClient(null);
                 }}
                 client={activityClient}
+            />
+
+            {/* Client Quick View Drawer */}
+            <ClientQuickView
+                isOpen={isQuickViewOpen}
+                onClose={() => setIsQuickViewOpen(false)}
+                client={quickViewClient}
+                showCompany={user?.role?.name === 'superadmin'}
             />
         </div>
     );

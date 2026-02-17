@@ -142,8 +142,8 @@ const Sidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }) => {
         { name: 'Presupuestos', path: '/presupuestos', icon: FileEdit, visible: features.orders !== false },
         { name: 'Recibos', path: '/recibos', icon: Receipt, visible: features.receipts === true },
         { name: 'Productos', path: '/productos', icon: Box, visible: isAdmin || isSuperadmin },
-        { name: 'Clientes', path: '/clientes', icon: Users, visible: !isClient },
-        { name: 'Usuarios', path: '/usuarios', icon: Briefcase, visible: isAdmin || isSuperadmin },
+        { name: 'Clientes', path: '/clientes', icon: Briefcase, visible: !isClient },
+        { name: 'Usuarios', path: '/usuarios', icon: Users, visible: isAdmin || isSuperadmin },
         { name: 'Cuentas Corrientes', path: '/cuentas', icon: Landmark, visible: !isClient && features.currentAccount === true },
         { name: 'Compañías', path: '/admin/companies', icon: Building2, visible: isSuperadmin },
     ].filter(item => item.visible !== false);

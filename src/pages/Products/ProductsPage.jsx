@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     Plus,
     Search,
@@ -18,11 +19,12 @@ import { useToast } from '../../context/ToastContext';
 import { getProducts, exportProducts, deleteProduct } from '../../services/productService';
 import Button from '../../components/common/Button';
 import ConfirmModal from '../../components/common/ConfirmModal';
-import ProductQuickView from '../../components/products/ProductQuickView';
+import ProductQuickViewAdmin from '../../components/products/ProductQuickViewAdmin';
 import ProductDrawer from '../../components/products/ProductDrawer';
 import StockMovementsDrawer from '../../components/products/StockMovementsDrawer';
 
 const ProductsPage = () => {
+    const navigate = useNavigate();
     const { user } = useAuth();
     const { addToast } = useToast();
     
@@ -148,8 +150,14 @@ const ProductsPage = () => {
     };
 
     const handleViewProduct = (product) => {
+        // Abrir drawer de quick view (click en fila)
         setSelectedProduct(product);
         setIsQuickViewOpen(true);
+    };
+
+    const handleNavigateToDetail = (product) => {
+        // Navegar a la página de detalle completa (menú "Ver detalle")
+        navigate(`/productos/${product._id}`);
     };
 
     const handleCreateProduct = () => {
@@ -461,6 +469,19 @@ const ProductsPage = () => {
                                         )}
                                         <td className="px-6 py-4 text-right">
                                             <div className="flex items-center justify-end gap-1">
+                                                {/* Botón Ver Detalle - Siempre visible */}
+                                                <button
+                                                    onClick={(e) => { 
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        navigate(`/productos/${product._id}`);
+                                                    }}
+                                                    className="p-1.5 rounded-lg text-(--text-muted) hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-colors"
+                                                    title="Ver detalle"
+                                                >
+                                                    <Eye size={16} strokeWidth={2.5} />
+                                                </button>
+                                                
                                                 {/* Botón Editar - Siempre visible */}
                                                 <button
                                                     onClick={(e) => handleEditProduct(product, e)}
@@ -484,8 +505,13 @@ const ProductsPage = () => {
                                                             items={[
                                                                 {
                                                                     icon: <Eye size={16} />,
-                                                                    label: 'Ver detalle',
-                                                                    onClick: () => handleViewProduct(product)
+                                                                    label: 'Ver detalle completo',
+                                                                    onClick: () => handleNavigateToDetail(product)
+                                                                },
+                                                                {
+                                                                    icon: <Edit2 size={16} />,
+                                                                    label: 'Editar',
+                                                                    onClick: (e) => handleEditProduct(product, e)
                                                                 },
                                                                 ...(hasStockFeature ? [{
                                                                     icon: <History size={16} />,
@@ -584,16 +610,35 @@ const ProductsPage = () => {
                                 {/* Código */}
                                 <p className="text-[12px] text-(--text-muted) mb-3">{product.code}</p>
                                 
-                                {/* Info Grid: Precio y Stock */}
-                                <div className="flex items-center justify-between mb-3">
-                                    <div className="flex flex-col">
-                                        <span className="text-[14px] font-bold text-(--text-primary)">
-                                            {formatPrice(product.pricing?.list1)}
-                                        </span>
-                                        {hasPriceListsFeature && product.pricing?.list2 > 0 && (
-                                            <span className="text-[11px] text-primary-600">
-                                                L2: {formatPrice(product.pricing.list2)}
+                                {/* Info Grid: Precios y Stock */}
+                                <div className="flex items-start justify-between mb-3">
+                                    <div className="flex flex-col gap-2">
+                                        {/* Lista 1 */}
+                                        <div className="flex flex-col">
+                                            <span className="text-[10px] text-(--text-muted) uppercase tracking-wider">Lista 1</span>
+                                            <span className="text-[14px] font-bold text-(--text-primary)">
+                                                {formatPrice(product.pricing?.list1)}
                                             </span>
+                                            {product.pricing?.discount > 0 && (
+                                                <span className="text-[10px] text-success-600 font-medium">
+                                                    {formatPrice((product.pricing.list1 * (1 - product.pricing.discount / 100)).toFixed(2))} final
+                                                </span>
+                                            )}
+                                        </div>
+                                        
+                                        {/* Lista 2 */}
+                                        {hasPriceListsFeature && (
+                                            <div className="flex flex-col">
+                                                <span className="text-[10px] text-(--text-muted) uppercase tracking-wider">Lista 2</span>
+                                                <span className="text-[14px] font-bold text-primary-600">
+                                                    {formatPrice(product.pricing?.list2)}
+                                                </span>
+                                                {product.pricing?.discount > 0 && (
+                                                    <span className="text-[10px] text-success-600 font-medium">
+                                                        {formatPrice((product.pricing.list2 * (1 - product.pricing.discount / 100)).toFixed(2))} final
+                                                    </span>
+                                                )}
+                                            </div>
                                         )}
                                     </div>
                                     {hasStockFeature && (() => {
@@ -622,6 +667,15 @@ const ProductsPage = () => {
                                 
                                 {/* Acciones */}
                                 <div className="flex items-center justify-end gap-2 pt-2">
+                                    {/* Botón Ver Detalle - Siempre visible */}
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); handleNavigateToDetail(product); }}
+                                        className="p-2 rounded-lg text-(--text-muted) hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-all"
+                                        title="Ver detalle"
+                                    >
+                                        <Eye size={18} strokeWidth={2.5} />
+                                    </button>
+                                    
                                     {/* Botón Editar - Siempre visible */}
                                     <button
                                         onClick={(e) => handleEditProduct(product, e)}
@@ -646,8 +700,13 @@ const ProductsPage = () => {
                                         items={[
                                             {
                                                 icon: <Eye size={16} />,
-                                                label: 'Ver detalle',
-                                                onClick: () => handleViewProduct(product)
+                                                label: 'Ver detalle completo',
+                                                onClick: () => handleNavigateToDetail(product)
+                                            },
+                                            {
+                                                icon: <Edit2 size={16} />,
+                                                label: 'Editar',
+                                                onClick: (e) => handleEditProduct(product, e)
                                             },
                                             ...(hasStockFeature ? [{
                                                 icon: <History size={16} />,
@@ -679,15 +738,12 @@ const ProductsPage = () => {
             </div>
 
             {/* QuickView Drawer */}
-            <ProductQuickView
+            <ProductQuickViewAdmin
                 isOpen={isQuickViewOpen}
                 onClose={() => setIsQuickViewOpen(false)}
                 product={selectedProduct}
-                viewOnly={true}
                 showPricesWithTax={showPricesWithTax}
                 features={features}
-                company={user?.company}
-                user={user}
             />
 
             {/* Product Drawer (Create/Edit) */}

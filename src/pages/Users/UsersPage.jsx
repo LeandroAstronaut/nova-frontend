@@ -13,6 +13,7 @@ import Button from '../../components/common/Button';
 import ConfirmModal from '../../components/common/ConfirmModal';
 import UserDrawer from '../../components/users/UserDrawer';
 import UserActivityDrawer from '../../components/users/UserActivityDrawer';
+import UserQuickView from '../../components/users/UserQuickView';
 
 
 // Action Menu Component
@@ -162,6 +163,18 @@ const UsersPage = () => {
     // Activity Drawer state
     const [isActivityDrawerOpen, setIsActivityDrawerOpen] = useState(false);
     const [activityUser, setActivityUser] = useState(null);
+    
+    // Quick View Drawer state
+    const [isQuickViewOpen, setIsQuickViewOpen] = useState(false);
+    const [quickViewUser, setQuickViewUser] = useState(null);
+    
+    // Limpiar user después de que termine la animación de cierre
+    useEffect(() => {
+        if (!isQuickViewOpen && quickViewUser) {
+            const timer = setTimeout(() => setQuickViewUser(null), 300);
+            return () => clearTimeout(timer);
+        }
+    }, [isQuickViewOpen]);
     
     // Edit Drawer state
     const [isEditDrawerOpen, setIsEditDrawerOpen] = useState(false);
@@ -462,7 +475,10 @@ const UsersPage = () => {
                                 users.map((u) => (
                                     <tr 
                                         key={u._id} 
-                                        onClick={() => navigate(`/usuarios/${u._id}`)}
+                                        onClick={() => {
+                                            setQuickViewUser(u);
+                                            setIsQuickViewOpen(true);
+                                        }}
                                         className="hover:bg-(--bg-hover) transition-colors even:bg-(--bg-hover)/50 group cursor-pointer"
                                     >
                                         <td className="px-6 py-4">
@@ -530,16 +546,16 @@ const UsersPage = () => {
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <div className="flex items-center justify-end gap-1">
-                                                {/* Botón Editar - Siempre visible */}
+                                                {/* Botón Ver Detalle - Siempre visible */}
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        handleEdit(u);
+                                                        navigate(`/usuarios/${u._id}`);
                                                     }}
-                                                    className="p-2 rounded-lg text-(--text-muted) hover:text-info-600 hover:bg-info-50 dark:hover:bg-info-900/20 transition-all"
-                                                    title="Editar"
+                                                    className="p-2 rounded-lg text-(--text-muted) hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-all"
+                                                    title="Ver detalle"
                                                 >
-                                                    <Edit2 size={16} />
+                                                    <Eye size={16} strokeWidth={2.5} />
                                                 </button>
                                                 
                                                 {/* Menú de 3 puntitos - Otras acciones */}
@@ -559,8 +575,13 @@ const UsersPage = () => {
                                                         items={[
                                                             {
                                                                 icon: <Eye size={16} />,
-                                                                label: 'Ver detalle',
+                                                                label: 'Ver detalle completo',
                                                                 onClick: () => navigate(`/usuarios/${u._id}`)
+                                                            },
+                                                            {
+                                                                icon: <Edit2 size={16} />,
+                                                                label: 'Editar',
+                                                                onClick: () => handleEdit(u)
                                                             },
                                                             {
                                                                 icon: <Activity size={16} />,
@@ -607,7 +628,14 @@ const UsersPage = () => {
                     ) : users.length > 0 ? (
                         <div className="divide-y divide-(--border-color)">
                             {users.map((u) => (
-                                <div key={u._id} className="p-4 hover:bg-(--bg-hover) transition-colors even:bg-(--bg-hover)/50">
+                                <div 
+                                    key={u._id} 
+                                    onClick={() => {
+                                        setQuickViewUser(u);
+                                        setIsQuickViewOpen(true);
+                                    }}
+                                    className="p-4 hover:bg-(--bg-hover) transition-colors even:bg-(--bg-hover)/50 cursor-pointer"
+                                >
                                     <div className="flex items-start justify-between mb-3">
                                         <div className="flex items-center gap-3">
                                             <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${
@@ -664,16 +692,16 @@ const UsersPage = () => {
                                     
                                     {/* Acciones Mobile */}
                                     <div className="flex items-center justify-end gap-2 pt-2 border-t border-(--border-color)">
-                                        {/* Botón Editar - Siempre visible */}
+                                        {/* Botón Ver Detalle - Siempre visible */}
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                handleEdit(u);
+                                                navigate(`/usuarios/${u._id}`);
                                             }}
-                                            className="p-2 text-(--text-muted) hover:text-info-600 hover:bg-info-50 dark:hover:bg-info-900/20 rounded-lg transition-colors"
-                                            title="Editar"
+                                            className="p-2 text-(--text-muted) hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/30 rounded-lg transition-colors"
+                                            title="Ver detalle"
                                         >
-                                            <Edit2 size={18} />
+                                            <Eye size={18} strokeWidth={2.5} />
                                         </button>
                                         
                                         {/* Menú de 3 puntitos - Otras acciones */}
@@ -695,8 +723,13 @@ const UsersPage = () => {
                                             items={[
                                                 {
                                                     icon: <Eye size={16} />,
-                                                    label: 'Ver detalle',
+                                                    label: 'Ver detalle completo',
                                                     onClick: () => navigate(`/usuarios/${u._id}`)
+                                                },
+                                                {
+                                                    icon: <Edit2 size={16} />,
+                                                    label: 'Editar',
+                                                    onClick: () => handleEdit(u)
                                                 },
                                                 {
                                                     icon: <Activity size={16} />,
@@ -792,6 +825,14 @@ const UsersPage = () => {
                     setActivityUser(null);
                 }}
                 user={activityUser}
+                isSuperadmin={isSuperadmin}
+            />
+
+            {/* User Quick View Drawer */}
+            <UserQuickView
+                isOpen={isQuickViewOpen}
+                onClose={() => setIsQuickViewOpen(false)}
+                user={quickViewUser}
                 isSuperadmin={isSuperadmin}
             />
 

@@ -12,6 +12,7 @@ import {
     FileText,
     Ban,
     Eye,
+    Edit2,
     History
 } from 'lucide-react';
 import { getReceipts, cancelReceipt, createReceipt, sendReceiptEmail } from '../../services/receiptService';
@@ -19,6 +20,7 @@ import { getClients } from '../../services/orderService';
 import Button from '../../components/common/Button';
 import ConfirmModal from '../../components/common/ConfirmModal';
 import ReceiptDrawer from '../../components/receipts/ReceiptDrawer';
+import ReceiptQuickView from '../../components/receipts/ReceiptQuickView';
 import SendEmailModal from '../../components/receipts/SendEmailModal';
 import SendWhatsAppModal from '../../components/receipts/SendWhatsAppModal';
 import OrderActivityDrawer from '../../components/orders/OrderActivityDrawer';
@@ -96,6 +98,18 @@ const ReceiptsPage = () => {
     // Activity Drawer state
     const [isActivityDrawerOpen, setIsActivityDrawerOpen] = useState(false);
     const [selectedReceiptForActivity, setSelectedReceiptForActivity] = useState(null);
+    
+    // Quick View Drawer state
+    const [isQuickViewOpen, setIsQuickViewOpen] = useState(false);
+    const [quickViewReceipt, setQuickViewReceipt] = useState(null);
+    
+    // Limpiar receipt después de que termine la animación de cierre
+    useEffect(() => {
+        if (!isQuickViewOpen && quickViewReceipt) {
+            const timer = setTimeout(() => setQuickViewReceipt(null), 300);
+            return () => clearTimeout(timer);
+        }
+    }, [isQuickViewOpen]);
 
     useEffect(() => {
         fetchData();
@@ -183,6 +197,13 @@ const ReceiptsPage = () => {
     };
 
     const handleViewReceipt = (receipt) => {
+        // Abrir drawer de quick view (click en fila)
+        setQuickViewReceipt(receipt);
+        setIsQuickViewOpen(true);
+    };
+
+    const handleNavigateToDetail = (receipt) => {
+        // Navegar a la página de detalle completa (menú "Ver detalle")
         navigate(`/recibos/${receipt._id}`);
     };
 
@@ -410,6 +431,15 @@ const ReceiptsPage = () => {
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <div className="flex items-center justify-end gap-2">
+                                                {/* Botón Ver Detalle - Siempre visible */}
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); handleNavigateToDetail(receipt); }}
+                                                    className="p-1.5 rounded-lg text-(--text-muted) hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-all"
+                                                    title="Ver detalle"
+                                                >
+                                                    <Eye size={16} strokeWidth={2.5} />
+                                                </button>
+                                                
                                                 {/* Botón Imprimir - Siempre visible */}
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); handlePrintPDF(receipt); }}
@@ -434,8 +464,8 @@ const ReceiptsPage = () => {
                                                             items={[
                                                                 {
                                                                     icon: <Eye size={16} />,
-                                                                    label: 'Ver detalle',
-                                                                    onClick: () => handleViewReceipt(receipt)
+                                                                    label: 'Ver detalle completo',
+                                                                    onClick: () => handleNavigateToDetail(receipt)
                                                                 },
                                                                 {
                                                                     icon: <History size={16} />,
@@ -528,6 +558,15 @@ const ReceiptsPage = () => {
                                     
                                     {/* Acciones */}
                                     <div className="flex items-center justify-end gap-2 pt-2 border-t border-(--border-color)">
+                                        {/* Botón Ver Detalle - Siempre visible */}
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); handleNavigateToDetail(receipt); }}
+                                            className="p-2 rounded-lg text-(--text-muted) hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-all"
+                                            title="Ver detalle"
+                                        >
+                                            <Eye size={18} strokeWidth={2.5} />
+                                        </button>
+                                        
                                         {/* Botón Imprimir - Siempre visible */}
                                         <button
                                             onClick={(e) => { e.stopPropagation(); handlePrintPDF(receipt); }}
@@ -553,8 +592,8 @@ const ReceiptsPage = () => {
                                             items={[
                                                 {
                                                     icon: <Eye size={16} />,
-                                                    label: 'Ver detalle',
-                                                    onClick: () => handleViewReceipt(receipt)
+                                                    label: 'Ver detalle completo',
+                                                    onClick: () => handleNavigateToDetail(receipt)
                                                 },
                                                 {
                                                     icon: <History size={16} />,
@@ -681,6 +720,13 @@ const ReceiptsPage = () => {
                 entityId={selectedReceiptForActivity?._id}
                 entityNumber={selectedReceiptForActivity?.receiptNumber}
                 clientName={selectedReceiptForActivity?.clientId?.businessName}
+            />
+
+            {/* Receipt Quick View Drawer */}
+            <ReceiptQuickView
+                isOpen={isQuickViewOpen}
+                onClose={() => setIsQuickViewOpen(false)}
+                receipt={quickViewReceipt}
             />
         </div>
     );

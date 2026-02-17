@@ -50,6 +50,7 @@ import UpdateOrderStatusModal from '../../components/orders/UpdateOrderStatusMod
 import SendEmailModal from '../../components/orders/SendEmailModal';
 import SendWhatsAppModal from '../../components/orders/SendWhatsAppModal';
 import OrderActivityDrawer from '../../components/orders/OrderActivityDrawer';
+import OrderQuickView from '../../components/orders/OrderQuickView';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { Building2, History } from 'lucide-react';
@@ -527,10 +528,27 @@ const OrdersPage = ({ mode = 'order' }) => {
         setIsDrawerOpen(true);
     };
 
+    // QuickView drawer state
+    const [isQuickViewOpen, setIsQuickViewOpen] = useState(false);
+    const [quickViewOrder, setQuickViewOrder] = useState(null);
+    
+    // Limpiar order después de que termine la animación de cierre
+    useEffect(() => {
+        if (!isQuickViewOpen && quickViewOrder) {
+            const timer = setTimeout(() => setQuickViewOrder(null), 300);
+            return () => clearTimeout(timer);
+        }
+    }, [isQuickViewOpen]);
+
     const handleViewOrder = (order) => {
-        // Navegar a la página de detalle
-        const path = order.type === 'order' ? '/pedidos' : '/presupuestos';
-        navigate(`${path}/${order._id}`);
+        // Abrir drawer de quick view (click en fila)
+        setQuickViewOrder(order);
+        setIsQuickViewOpen(true);
+    };
+
+    const handleNavigateToDetail = (order) => {
+        // Navegar a la página de detalle completa
+        navigate(`/pedidos/${order._id}`);
     };
 
     const handleDeleteClick = (order) => {
@@ -944,16 +962,14 @@ const OrdersPage = ({ mode = 'order' }) => {
                                                     </button>
                                                 )}
 
-                                                {/* Botón Editar - Cuando es editable */}
-                                                {canEdit(order) && (
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); handleEditOrder(order); }}
-                                                        className="p-1.5 rounded-lg text-(--text-muted) hover:text-info-600 hover:bg-info-50 dark:hover:bg-info-900/30 transition-all"
-                                                        title="Editar"
-                                                    >
-                                                        <Edit2 size={16} strokeWidth={2.5} />
-                                                    </button>
-                                                )}
+                                                {/* Botón Ver Detalle - Siempre visible */}
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); handleNavigateToDetail(order); }}
+                                                    className="p-1.5 rounded-lg text-(--text-muted) hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-all"
+                                                    title="Ver detalle"
+                                                >
+                                                    <Eye size={16} strokeWidth={2.5} />
+                                                </button>
 
                                                 {/* Menú de 3 puntos - Acciones adicionales */}
                                                 <div>
@@ -968,11 +984,11 @@ const OrdersPage = ({ mode = 'order' }) => {
                                                         <ActionMenu
                                                             openAbove={openMenu.openAbove}
                                                             items={[
-                                                                {
-                                                                    icon: <Eye size={16} />,
-                                                                    label: 'Ver detalle',
-                                                                    onClick: () => handleViewOrder(order)
-                                                                },
+                                                                ...(canEdit(order) ? [{
+                                                                    icon: <Edit2 size={16} />,
+                                                                    label: 'Editar',
+                                                                    onClick: () => handleEditOrder(order)
+                                                                }] : []),
                                                                 ...(isClient ? [] : [{  // Clientes no pueden enviar emails/WhatsApp
                                                                     icon: <Send size={16} />,
                                                                     label: 'Enviar por email',
@@ -1138,16 +1154,14 @@ const OrdersPage = ({ mode = 'order' }) => {
                                                 Completar
                                             </button>
                                         )}
-                                        {/* Botón Editar - Cuando es editable */}
-                                        {canEdit(order) && (
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); handleEditOrder(order); }}
-                                                className="flex items-center justify-center p-2 rounded-lg text-(--text-muted) hover:text-info-600 hover:bg-info-50 dark:hover:bg-info-900/30 transition-all"
-                                                title="Editar"
-                                            >
-                                                <Edit2 size={18} strokeWidth={2.5} />
-                                            </button>
-                                        )}
+                                        {/* Botón Ver Detalle - Siempre visible */}
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); handleNavigateToDetail(order); }}
+                                            className="flex items-center justify-center p-2 rounded-lg text-(--text-muted) hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-all"
+                                            title="Ver detalle"
+                                        >
+                                            <Eye size={18} strokeWidth={2.5} />
+                                        </button>
                                         <button
                                             onClick={(e) => { e.stopPropagation(); handleOpenMenu(e, order._id); }}
                                             className="flex items-center justify-center p-2 rounded-lg text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-hover) transition-all"
@@ -1161,7 +1175,7 @@ const OrdersPage = ({ mode = 'order' }) => {
                                         <ActionMenu
                                             openAbove={openMenu.openAbove}
                                             items={[
-                                                { icon: <Eye size={16} />, label: 'Ver detalle', onClick: () => handleViewOrder(order) },
+                                                ...(canEdit(order) ? [{ icon: <Edit2 size={16} />, label: 'Editar', onClick: () => handleEditOrder(order) }] : []),
                                                 ...(isClient ? [] : [{ icon: <Send size={16} />, label: 'Enviar por email', onClick: () => handleSendEmailClick(order) }]),
                                                 ...(isClient ? [] : [{ icon: <MessageCircle size={16} />, label: 'Enviar WhatsApp', onClick: () => handleSendWhatsAppClick(order) }]),
                                                 { icon: <Printer size={16} />, label: 'Imprimir / PDF', onClick: () => { try { generateOrderPDF(order, order.companyId); } catch (error) { addToast('Error al generar PDF: ' + error.message, 'error'); } } },
@@ -1307,6 +1321,15 @@ const OrdersPage = ({ mode = 'order' }) => {
                 entityId={selectedOrderForActivity?._id}
                 entityNumber={selectedOrderForActivity?.orderNumber}
                 clientName={selectedOrderForActivity?.clientId?.businessName}
+            />
+
+            {/* Order Quick View Drawer */}
+            <OrderQuickView
+                isOpen={isQuickViewOpen}
+                onClose={() => setIsQuickViewOpen(false)}
+                order={quickViewOrder}
+                showPricesWithTax={user?.company?.showPricesWithTax}
+                canViewCommission={canViewCommission}
             />
         </div>
     );

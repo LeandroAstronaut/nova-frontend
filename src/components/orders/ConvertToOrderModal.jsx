@@ -38,6 +38,12 @@ const StockIssueItem = ({ issue }) => (
             <p className="text-sm font-medium text-danger-700 dark:text-danger-300 truncate">
                 {issue.name} <span className="text-danger-500">({issue.code})</span>
             </p>
+            {/* Mostrar nombre de variante si existe */}
+            {issue.variantName && (
+                <p className="text-xs text-primary-600 dark:text-primary-400 font-medium mt-0.5">
+                    Variante: {issue.variantName}
+                </p>
+            )}
             <div className="flex items-center gap-4 mt-1 text-xs text-danger-600 dark:text-danger-400">
                 <span>Solicitado: <strong>{issue.requested}</strong></span>
                 <span>Disponible: <strong>{issue.available}</strong></span>

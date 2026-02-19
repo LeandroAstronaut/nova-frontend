@@ -12,11 +12,14 @@ import {
     Eye,
     MoreHorizontal,
     Tag,
-    History
+    History,
+    Power,
+    PowerOff,
+    AlertCircle
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { getProducts, exportProducts, deleteProduct } from '../../services/productService';
+import { getProducts, exportProducts, deleteProduct, toggleProductActive } from '../../services/productService';
 import Button from '../../components/common/Button';
 import ConfirmModal from '../../components/common/ConfirmModal';
 import ProductQuickViewAdmin from '../../components/products/ProductQuickViewAdmin';
@@ -43,11 +46,17 @@ const ProductsPage = () => {
         sortBy: 'name',
         order: 'asc'
     });
+    const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'active', 'inactive'
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [isQuickViewOpen, setIsQuickViewOpen] = useState(false);
     const [isProductDrawerOpen, setIsProductDrawerOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null);
     const [deleteModal, setDeleteModal] = useState({
+        isOpen: false,
+        product: null,
+        loading: false
+    });
+    const [toggleActiveModal, setToggleActiveModal] = useState({
         isOpen: false,
         product: null,
         loading: false
@@ -70,14 +79,22 @@ const ProductsPage = () => {
     const isSuperadmin = user?.role?.name === 'superadmin';
     const features = user?.company?.features || {};
     const showPricesWithTax = user?.company?.showPricesWithTax === true;
+    const inputPricesWithTax = user?.company?.inputPricesWithTax === true;
+    
+    // Helper: Aplicar IVA al precio si es necesario
+    const applyTax = (price, taxRate) => {
+        if (!price || price <= 0) return 0;
+        const tax = parseFloat(taxRate) || 0;
+        return price * (1 + tax / 100);
+    };
     
     const hasStockFeature = features.stock === true;
     const hasPriceListsFeature = features.priceLists === true;
     
     const totalColumns = useMemo(() => {
-        let cols = 6;
-        if (hasPriceListsFeature) cols++;
-        if (hasStockFeature) cols++;
+        let cols = 4; // Producto, Lista 1, IVA, Acciones
+        if (hasPriceListsFeature) cols++; // Lista 2
+        if (hasStockFeature) cols++; // Disponible
         return cols;
     }, [hasPriceListsFeature, hasStockFeature]);
     
@@ -121,7 +138,8 @@ const ProductsPage = () => {
                 page: pagination.page,
                 limit: pagination.limit,
                 sortBy: sort.sortBy,
-                order: sort.order
+                order: sort.order,
+                status: statusFilter
             });
             
             setProducts(response.products || []);
@@ -136,7 +154,7 @@ const ProductsPage = () => {
         } finally {
             setLoading(false);
         }
-    }, [debouncedSearchTerm, pagination.page, pagination.limit, sort, addToast]);
+    }, [debouncedSearchTerm, pagination.page, pagination.limit, sort, statusFilter, addToast]);
 
     useEffect(() => {
         fetchProducts();
@@ -253,15 +271,112 @@ const ProductsPage = () => {
             fetchProducts();
         } catch (error) {
             console.error('Error deleting product:', error);
-            addToast('Error al eliminar producto', 'error');
+            const errorMessage = error.response?.data?.message || 'Error al eliminar producto';
+            if (errorMessage.includes('pedidos') || errorMessage.includes('presupuestos')) {
+                addToast(errorMessage, 'warning');
+            } else {
+                addToast(errorMessage, 'error');
+            }
         } finally {
             setDeleteModal({ isOpen: false, product: null, loading: false });
+        }
+    };
+
+    const handleToggleActiveClick = (product, e) => {
+        if (e) e.stopPropagation();
+        setToggleActiveModal({
+            isOpen: true,
+            product,
+            loading: false
+        });
+    };
+
+    const handleToggleActiveConfirm = async () => {
+        if (!toggleActiveModal.product) return;
+        
+        try {
+            setToggleActiveModal(prev => ({ ...prev, loading: true }));
+            const result = await toggleProductActive(toggleActiveModal.product._id);
+            addToast(result.message, 'success');
+            fetchProducts();
+        } catch (error) {
+            console.error('Error toggling product active state:', error);
+            addToast('Error al cambiar estado del producto', 'error');
+        } finally {
+            setToggleActiveModal({ isOpen: false, product: null, loading: false });
         }
     };
 
     const formatPrice = (price) => {
         if (!price && price !== 0) return '-';
         return `$${Number(price).toLocaleString('es-AR')}`;
+    };
+
+    // Helper: Obtener precio a mostrar según tipo de producto
+    const getProductDisplayPrice = (product) => {
+        if (!product.hasVariants) {
+            // Producto simple: precio del padre
+            return {
+                price: product.pricing?.list1?.price || 0,
+                discount: product.pricing?.list1?.discount || 0,
+                offer: product.pricing?.list1?.offer || 0,
+                isRange: false
+            };
+        }
+        
+        if (product.hasUniformVariantPricing) {
+            // Variantes con precio uniforme: precio del padre
+            return {
+                price: product.pricing?.list1?.price || 0,
+                discount: product.pricing?.list1?.discount || 0,
+                offer: product.pricing?.list1?.offer || 0,
+                isRange: false
+            };
+        } else {
+            // Variantes con precios individuales: rango (min - max)
+            if (!product.variants || product.variants.length === 0) {
+                return { price: 0, discount: 0, offer: 0, isRange: false };
+            }
+            
+            const prices = product.variants
+                .filter(v => v.active)
+                .map(v => v.pricing?.list1?.price || 0)
+                .filter(p => p > 0);
+            
+            if (prices.length === 0) {
+                return { price: 0, discount: 0, offer: 0, isRange: false };
+            }
+            
+            const minPrice = Math.min(...prices);
+            const maxPrice = Math.max(...prices);
+            
+            return {
+                price: minPrice,
+                maxPrice: maxPrice,
+                isRange: minPrice !== maxPrice
+            };
+        }
+    };
+
+    // Helper: Obtener stock total (para productos con variantes suma todo)
+    const getProductStock = (product) => {
+        if (!product.hasVariants) {
+            return {
+                stock: product.stock || 0,
+                reserved: product.stockReserved || 0,
+                available: Math.max(0, (product.stock || 0) - (product.stockReserved || 0))
+            };
+        }
+        
+        // Sumar stock de todas las variantes
+        const totalStock = product.variants?.reduce((sum, v) => sum + (v.stock || 0), 0) || 0;
+        const totalReserved = product.variants?.reduce((sum, v) => sum + (v.stockReserved || 0), 0) || 0;
+        
+        return {
+            stock: totalStock,
+            reserved: totalReserved,
+            available: Math.max(0, totalStock - totalReserved)
+        };
     };
 
     return (
@@ -316,7 +431,22 @@ const ProductsPage = () => {
             <div className="card p-0! overflow-hidden border-none shadow-sm ring-1 ring-(--border-color)">
                 {/* Filters Header */}
                 <div className="bg-(--bg-card) p-4 border-b border-(--border-color)">
-                    <div className="flex justify-end">
+                    <div className="flex flex-col sm:flex-row justify-between gap-3">
+                        {/* Filtro de Estado */}
+                        <div className="flex items-center gap-2">
+                            <span className="text-[11px] text-(--text-muted)">Estado:</span>
+                            <select
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value)}
+                                className="px-3 py-2 bg-(--bg-input) border border-(--border-color) rounded-lg text-xs font-medium text-(--text-primary) focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900 focus:bg-(--bg-card) transition-all"
+                            >
+                                <option value="all">Todos</option>
+                                <option value="active">Activos</option>
+                                <option value="inactive">Inactivos</option>
+                            </select>
+                        </div>
+                        
+                        {/* Búsqueda */}
                         <div className="relative w-full max-w-xs">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-(--text-muted)" size={14} strokeWidth={2.5} />
                             <input
@@ -339,22 +469,22 @@ const ProductsPage = () => {
                                 <th className="px-6 py-3 cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('name')}>
                                     <div className="flex items-center">Producto <SortIcon field="name" /></div>
                                 </th>
-                                <th className="px-6 py-3 cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('code')}>
-                                    <div className="flex items-center">Código <SortIcon field="code" /></div>
-                                </th>
-                                <th className="px-6 py-3 text-right cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('pricing.list1')}>
-                                    <div className="flex items-center justify-end">Lista 1 <SortIcon field="pricing.list1" /></div>
-                                </th>
-                                <th className="px-6 py-3 text-center cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('pricing.tax')}>
-                                    <div className="flex items-center justify-center">IVA <SortIcon field="pricing.tax" /></div>
+                                <th className="px-6 py-3 text-right cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('pricing.list1.price')}>
+                                    <div className="flex items-center justify-end">
+                                        <span>Lista 1 {inputPricesWithTax ? <span className="text-[9px] normal-case">(con IVA)</span> : <span className="text-[9px] normal-case">(sin IVA)</span>}</span>
+                                        <SortIcon field="pricing.list1.price" />
+                                    </div>
                                 </th>
                                 {hasPriceListsFeature && (
-                                    <th className="px-6 py-3 text-right cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('pricing.list2')}>
-                                        <div className="flex items-center justify-end">Lista 2 <SortIcon field="pricing.list2" /></div>
+                                    <th className="px-6 py-3 text-right cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('pricing.list2.price')}>
+                                        <div className="flex items-center justify-end">
+                                            <span>Lista 2 {inputPricesWithTax ? <span className="text-[9px] normal-case">(con IVA)</span> : <span className="text-[9px] normal-case">(sin IVA)</span>}</span>
+                                            <SortIcon field="pricing.list2.price" />
+                                        </div>
                                     </th>
                                 )}
-                                <th className="px-6 py-3 text-right cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('pricing.offer')}>
-                                    <div className="flex items-center justify-end">Oferta <SortIcon field="pricing.offer" /></div>
+                                <th className="px-6 py-3 text-center cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('pricing.tax')}>
+                                    <div className="flex items-center justify-center">IVA <SortIcon field="pricing.tax" /></div>
                                 </th>
                                 {hasStockFeature && (
                                     <th className="px-6 py-3 text-center cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('stock')}>
@@ -395,73 +525,192 @@ const ProductsPage = () => {
                                                     )}
                                                 </div>
                                                 <div>
-                                                    <span className="font-semibold text-(--text-primary) text-[13px] block">{product.name}</span>
-                                                    {product.pricing?.discount > 0 && (
-                                                        <span className="inline-flex items-center gap-1 text-[10px] text-success-600 font-medium mt-0.5">
-                                                            <Tag size={10} />
-                                                            {product.pricing.discount}% dto.
-                                                        </span>
-                                                    )}
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className={`font-semibold text-[13px] block ${product.active ? 'text-(--text-primary)' : 'text-(--text-muted) line-through'}`}>{product.name}</span>
+                                                        {!product.active && (
+                                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded text-[9px] font-medium">
+                                                                Inactivo
+                                                            </span>
+                                                        )}
+                                                        {product.hasVariants && (
+                                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 rounded text-[9px] font-medium">
+                                                                <Package size={10} />
+                                                                {product.variants?.filter(v => v.active).length || 0} var.
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <span className="text-[11px] text-(--text-muted)">{product.code}</span>
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 text-[13px] text-(--text-secondary)">{product.code}</td>
+                                        {/* Lista 1 - Precio, Descuento, Final */}
                                         <td className="px-6 py-4 text-right">
-                                            <div className="flex flex-col items-end">
-                                                <span className="text-[13px] font-medium text-(--text-primary)">
-                                                    {formatPrice(product.pricing?.list1)}
-                                                </span>
-                                                {product.pricing?.discount > 0 && (
-                                                    <span className="text-[10px] text-success-600 font-medium">
-                                                        {formatPrice((product.pricing.list1 * (1 - product.pricing.discount / 100)).toFixed(2))} final
-                                                    </span>
-                                                )}
-                                            </div>
+                                            {(() => {
+                                                const taxRate = product.pricing?.tax || 0;
+                                                
+                                                if (product.hasVariants && !product.hasUniformVariantPricing) {
+                                                    // Variantes con precios individuales - buscar el precio final mínimo
+                                                    const variantsActive = product.variants?.filter(v => v.active) || [];
+                                                    const finalPrices = variantsActive.map(v => {
+                                                        const price = v.pricing?.list1?.price || 0;
+                                                        const discount = v.pricing?.list1?.discount || 0;
+                                                        const offer = v.pricing?.list1?.offer || 0;
+                                                        const baseForDiscount = offer > 0 ? offer : price;
+                                                        const finalWithoutTax = baseForDiscount * (1 - discount / 100);
+                                                        // Aplicar IVA si el admin carga con IVA
+                                                        return inputPricesWithTax ? applyTax(finalWithoutTax, taxRate) : finalWithoutTax;
+                                                    }).filter(p => p > 0);
+                                                    
+                                                    const minFinalPrice = finalPrices.length > 0 ? Math.min(...finalPrices) : 0;
+                                                    const maxFinalPrice = finalPrices.length > 0 ? Math.max(...finalPrices) : 0;
+                                                    
+                                                    // Buscar también el precio base mínimo para mostrar
+                                                    const basePrices = variantsActive.map(v => {
+                                                        const price = v.pricing?.list1?.price || 0;
+                                                        return inputPricesWithTax ? applyTax(price, taxRate) : price;
+                                                    }).filter(p => p > 0);
+                                                    const minBasePrice = basePrices.length > 0 ? Math.min(...basePrices) : 0;
+                                                    
+                                                    return (
+                                                        <div className="flex flex-col items-end gap-0.5">
+                                                            <span className="text-[13px] font-medium text-(--text-primary)">
+                                                                {minFinalPrice === maxFinalPrice 
+                                                                    ? formatPrice(minBasePrice)
+                                                                    : `Desde ${formatPrice(minBasePrice)}`}
+                                                            </span>
+                                                            {minFinalPrice < minBasePrice && (
+                                                                <span className="text-[10px] text-success-600">
+                                                                    Final: {formatPrice(minFinalPrice)}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                }
+                                                
+                                                const price = product.pricing?.list1?.price || 0;
+                                                const discount = product.pricing?.list1?.discount || 0;
+                                                const offer = product.pricing?.list1?.offer || 0;
+                                                // Si hay oferta, aplicar descuento sobre la oferta
+                                                const baseForDiscount = offer > 0 ? offer : price;
+                                                const finalPriceWithoutTax = baseForDiscount * (1 - discount / 100);
+                                                // Aplicar IVA si el admin carga con IVA
+                                                const displayPrice = inputPricesWithTax ? applyTax(price, taxRate) : price;
+                                                const displayOffer = inputPricesWithTax ? applyTax(offer, taxRate) : offer;
+                                                const displayFinalPrice = inputPricesWithTax ? applyTax(finalPriceWithoutTax, taxRate) : finalPriceWithoutTax;
+                                                
+                                                return (
+                                                    <div className="flex flex-col items-end gap-0.5">
+                                                        <span className="text-[13px] font-medium text-(--text-primary)">
+                                                            {formatPrice(displayPrice)}
+                                                        </span>
+                                                        {offer > 0 && (
+                                                            <span className="text-[10px] text-warning-600">
+                                                                Oferta: {formatPrice(displayOffer)}
+                                                            </span>
+                                                        )}
+                                                        {discount > 0 && (
+                                                            <span className="text-[10px] text-success-600">
+                                                                -{discount}% → {formatPrice(displayFinalPrice)}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
                                         </td>
+                                        {/* Lista 2 - Precio, Descuento, Final */}
+                                        {hasPriceListsFeature && (
+                                            <td className="px-6 py-4 text-right">
+                                                {(() => {
+                                                    const taxRate = product.pricing?.tax || 0;
+                                                    
+                                                    if (product.hasVariants && !product.hasUniformVariantPricing) {
+                                                        // Variantes con precios individuales - buscar el precio final mínimo
+                                                        const variantsActive = product.variants?.filter(v => v.active) || [];
+                                                        const finalPrices = variantsActive.map(v => {
+                                                            const price = v.pricing?.list2?.price || 0;
+                                                            const discount = v.pricing?.list2?.discount || 0;
+                                                            const offer = v.pricing?.list2?.offer || 0;
+                                                            const baseForDiscount = offer > 0 ? offer : price;
+                                                            const finalWithoutTax = baseForDiscount * (1 - discount / 100);
+                                                            return inputPricesWithTax ? applyTax(finalWithoutTax, taxRate) : finalWithoutTax;
+                                                        }).filter(p => p > 0);
+                                                        
+                                                        const minFinalPrice = finalPrices.length > 0 ? Math.min(...finalPrices) : 0;
+                                                        const maxFinalPrice = finalPrices.length > 0 ? Math.max(...finalPrices) : 0;
+                                                        
+                                                        // Buscar también el precio base mínimo para mostrar
+                                                        const basePrices = variantsActive.map(v => {
+                                                            const price = v.pricing?.list2?.price || 0;
+                                                            return inputPricesWithTax ? applyTax(price, taxRate) : price;
+                                                        }).filter(p => p > 0);
+                                                        const minBasePrice = basePrices.length > 0 ? Math.min(...basePrices) : 0;
+                                                        
+                                                        return (
+                                                            <div className="flex flex-col items-end gap-0.5">
+                                                                <span className="text-[13px] font-medium text-primary-600">
+                                                                    {minFinalPrice === maxFinalPrice 
+                                                                        ? formatPrice(minBasePrice)
+                                                                        : `Desde ${formatPrice(minBasePrice)}`}
+                                                                </span>
+                                                                {minFinalPrice < minBasePrice && (
+                                                                    <span className="text-[10px] text-success-600">
+                                                                        Final: {formatPrice(minFinalPrice)}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    }
+                                                    
+                                                    const price = product.pricing?.list2?.price || 0;
+                                                    const discount = product.pricing?.list2?.discount || 0;
+                                                    const offer = product.pricing?.list2?.offer || 0;
+                                                    // Si hay oferta, aplicar descuento sobre la oferta
+                                                    const baseForDiscount = offer > 0 ? offer : price;
+                                                    const finalPriceWithoutTax = baseForDiscount * (1 - discount / 100);
+                                                    // Aplicar IVA si el admin carga con IVA
+                                                    const displayPrice = inputPricesWithTax ? applyTax(price, taxRate) : price;
+                                                    const displayOffer = inputPricesWithTax ? applyTax(offer, taxRate) : offer;
+                                                    const displayFinalPrice = inputPricesWithTax ? applyTax(finalPriceWithoutTax, taxRate) : finalPriceWithoutTax;
+                                                    
+                                                    return (
+                                                        <div className="flex flex-col items-end gap-0.5">
+                                                            <span className="text-[13px] font-medium text-primary-600">
+                                                                {formatPrice(displayPrice)}
+                                                            </span>
+                                                            {offer > 0 && (
+                                                                <span className="text-[10px] text-warning-600">
+                                                                    Oferta: {formatPrice(displayOffer)}
+                                                                </span>
+                                                            )}
+                                                            {discount > 0 && (
+                                                                <span className="text-[10px] text-success-600">
+                                                                    -{discount}% → {formatPrice(displayFinalPrice)}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })()}
+                                            </td>
+                                        )}
+                                        {/* IVA */}
                                         <td className="px-6 py-4 text-center">
                                             <span className="text-[13px] font-medium text-(--text-secondary)">
                                                 {product.pricing?.tax > 0 ? `${product.pricing.tax}%` : '-'}
                                             </span>
                                         </td>
-                                        {hasPriceListsFeature && (
-                                            <td className="px-6 py-4 text-right">
-                                                <div className="flex flex-col items-end">
-                                                    <span className="text-[13px] font-medium text-primary-600">
-                                                        {formatPrice(product.pricing?.list2)}
-                                                    </span>
-                                                    {product.pricing?.discount > 0 && (
-                                                        <span className="text-[10px] text-success-600 font-medium">
-                                                            {formatPrice((product.pricing.list2 * (1 - product.pricing.discount / 100)).toFixed(2))} final
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </td>
-                                        )}
-                                        <td className="px-6 py-4 text-right">
-                                            {product.pricing?.offer > 0 ? (
-                                                <div className="flex flex-col items-end">
-                                                    <span className="text-[13px] font-bold text-warning-600">
-                                                        {formatPrice(product.pricing?.offer)}
-                                                    </span>
-
-                                                </div>
-                                            ) : (
-                                                <span className="text-[13px] text-(--text-muted)">-</span>
-                                            )}
-                                        </td>
                                         {hasStockFeature && (
                                             <td className="px-6 py-4 text-center">
                                                 {(() => {
-                                                    const available = Math.max(0, (product.stock || 0) - (product.stockReserved || 0));
+                                                    const stockInfo = getProductStock(product);
                                                     return (
                                                         <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${
-                                                            available > 10 
+                                                            stockInfo.available > 10 
                                                                 ? 'bg-success-50 dark:bg-success-900/30 text-success-600 dark:text-success-400 border-success-100 dark:border-success-800' 
-                                                                : available > 0 
+                                                                : stockInfo.available > 0 
                                                                     ? 'bg-warning-50 dark:bg-warning-900/30 text-warning-600 dark:text-warning-400 border-warning-100 dark:border-warning-800' 
                                                                     : 'bg-danger-50 dark:bg-danger-900/30 text-danger-600 dark:text-danger-400 border-danger-100 dark:border-danger-800'
                                                         }`}>
-                                                            {available}
+                                                            {stockInfo.available}
                                                         </span>
                                                     );
                                                 })()}
@@ -518,6 +767,12 @@ const ProductsPage = () => {
                                                                     label: 'Ver movimientos',
                                                                     onClick: () => handleViewStockMovements(product)
                                                                 }] : []),
+                                                                {
+                                                                    icon: product.active ? <PowerOff size={16} /> : <Power size={16} />,
+                                                                    label: product.active ? 'Desactivar' : 'Activar',
+                                                                    variant: product.active ? 'warning' : 'success',
+                                                                    onClick: () => handleToggleActiveClick(product)
+                                                                },
                                                                 {
                                                                     icon: <Trash2 size={16} />,
                                                                     label: 'Eliminar',
@@ -598,11 +853,24 @@ const ProductsPage = () => {
                             >
                                 {/* Header: Nombre y código */}
                                 <div className="flex items-start justify-between mb-2">
-                                    <h3 className="font-bold text-(--text-primary) text-[15px]">{product.name}</h3>
-                                    {product.pricing?.discount > 0 && (
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <h3 className={`font-bold text-[15px] ${product.active ? 'text-(--text-primary)' : 'text-(--text-muted) line-through'}`}>{product.name}</h3>
+                                        {!product.active && (
+                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded text-[9px] font-medium">
+                                                Inactivo
+                                            </span>
+                                        )}
+                                        {product.hasVariants && (
+                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-primary-100 text-primary-700 rounded text-[9px] font-medium">
+                                                <Package size={10} />
+                                                {product.variants?.filter(v => v.active).length || 0}
+                                            </span>
+                                        )}
+                                    </div>
+                                    {!product.hasVariants && product.pricing?.list1?.discount > 0 && (
                                         <span className="inline-flex items-center gap-1 text-[10px] text-success-600 font-medium">
                                             <Tag size={10} />
-                                            {product.pricing.discount}% dto.
+                                            {product.pricing.list1.discount}% dto.
                                         </span>
                                     )}
                                 </div>
@@ -612,46 +880,156 @@ const ProductsPage = () => {
                                 
                                 {/* Info Grid: Precios y Stock */}
                                 <div className="flex items-start justify-between mb-3">
-                                    <div className="flex flex-col gap-2">
+                                    <div className="flex flex-col gap-3">
                                         {/* Lista 1 */}
                                         <div className="flex flex-col">
-                                            <span className="text-[10px] text-(--text-muted) uppercase tracking-wider">Lista 1</span>
-                                            <span className="text-[14px] font-bold text-(--text-primary)">
-                                                {formatPrice(product.pricing?.list1)}
+                                            <span className="text-[10px] text-(--text-muted) uppercase tracking-wider">
+                                                Lista 1 {inputPricesWithTax ? <span className="text-[8px]">(con IVA)</span> : <span className="text-[8px]">(sin IVA)</span>}
                                             </span>
-                                            {product.pricing?.discount > 0 && (
-                                                <span className="text-[10px] text-success-600 font-medium">
-                                                    {formatPrice((product.pricing.list1 * (1 - product.pricing.discount / 100)).toFixed(2))} final
-                                                </span>
-                                            )}
+                                            {(() => {
+                                                const taxRate = product.pricing?.tax || 0;
+                                                
+                                                if (product.hasVariants && !product.hasUniformVariantPricing) {
+                                                    // Variante con precios individuales - buscar el precio final mínimo
+                                                    const variantsActive = product.variants?.filter(v => v.active) || [];
+                                                    const finalPrices = variantsActive.map(v => {
+                                                        const price = v.pricing?.list1?.price || 0;
+                                                        const discount = v.pricing?.list1?.discount || 0;
+                                                        const offer = v.pricing?.list1?.offer || 0;
+                                                        const baseForDiscount = offer > 0 ? offer : price;
+                                                        const finalWithoutTax = baseForDiscount * (1 - discount / 100);
+                                                        return inputPricesWithTax ? applyTax(finalWithoutTax, taxRate) : finalWithoutTax;
+                                                    }).filter(p => p > 0);
+                                                    
+                                                    const minFinalPrice = finalPrices.length > 0 ? Math.min(...finalPrices) : 0;
+                                                    const basePrices = variantsActive.map(v => {
+                                                        const price = v.pricing?.list1?.price || 0;
+                                                        return inputPricesWithTax ? applyTax(price, taxRate) : price;
+                                                    }).filter(p => p > 0);
+                                                    const minBasePrice = basePrices.length > 0 ? Math.min(...basePrices) : 0;
+                                                    
+                                                    return (
+                                                        <>
+                                                            <span className="text-[14px] font-bold text-(--text-primary)">
+                                                                {minFinalPrice === Math.max(...finalPrices) 
+                                                                    ? formatPrice(minBasePrice)
+                                                                    : `Desde ${formatPrice(minBasePrice)}`
+                                                                }
+                                                            </span>
+                                                            {minFinalPrice < minBasePrice && (
+                                                                <span className="text-[10px] text-success-600">
+                                                                    Final: {formatPrice(minFinalPrice)}
+                                                                </span>
+                                                            )}
+                                                        </>
+                                                    );
+                                                }
+                                                const price = product.pricing?.list1?.price || 0;
+                                                const discount = product.pricing?.list1?.discount || 0;
+                                                const offer = product.pricing?.list1?.offer || 0;
+                                                // Si hay oferta, aplicar descuento sobre la oferta
+                                                const baseForDiscount = offer > 0 ? offer : price;
+                                                const finalPriceWithoutTax = baseForDiscount * (1 - discount / 100);
+                                                // Aplicar IVA si el admin carga con IVA
+                                                const displayPrice = inputPricesWithTax ? applyTax(price, taxRate) : price;
+                                                const displayOffer = inputPricesWithTax ? applyTax(offer, taxRate) : offer;
+                                                const displayFinalPrice = inputPricesWithTax ? applyTax(finalPriceWithoutTax, taxRate) : finalPriceWithoutTax;
+                                                
+                                                return (
+                                                    <>
+                                                        <span className="text-[14px] font-bold text-(--text-primary)">{formatPrice(displayPrice)}</span>
+                                                        {offer > 0 && (
+                                                            <span className="text-[10px] text-warning-600">Oferta: {formatPrice(displayOffer)}</span>
+                                                        )}
+                                                        {discount > 0 && (
+                                                            <span className="text-[10px] text-success-600">-{discount}% → {formatPrice(displayFinalPrice)}</span>
+                                                        )}
+                                                    </>
+                                                );
+                                            })()}
                                         </div>
                                         
                                         {/* Lista 2 */}
                                         {hasPriceListsFeature && (
                                             <div className="flex flex-col">
-                                                <span className="text-[10px] text-(--text-muted) uppercase tracking-wider">Lista 2</span>
-                                                <span className="text-[14px] font-bold text-primary-600">
-                                                    {formatPrice(product.pricing?.list2)}
+                                                <span className="text-[10px] text-(--text-muted) uppercase tracking-wider">
+                                                    Lista 2 {inputPricesWithTax ? <span className="text-[8px]">(con IVA)</span> : <span className="text-[8px]">(sin IVA)</span>}
                                                 </span>
-                                                {product.pricing?.discount > 0 && (
-                                                    <span className="text-[10px] text-success-600 font-medium">
-                                                        {formatPrice((product.pricing.list2 * (1 - product.pricing.discount / 100)).toFixed(2))} final
-                                                    </span>
-                                                )}
+                                                {(() => {
+                                                    const taxRate = product.pricing?.tax || 0;
+                                                    
+                                                    if (product.hasVariants && !product.hasUniformVariantPricing) {
+                                                        // Variantes con precios individuales - buscar el precio final mínimo
+                                                        const variantsActive = product.variants?.filter(v => v.active) || [];
+                                                        const finalPrices = variantsActive.map(v => {
+                                                            const price = v.pricing?.list2?.price || 0;
+                                                            const discount = v.pricing?.list2?.discount || 0;
+                                                            const offer = v.pricing?.list2?.offer || 0;
+                                                            const baseForDiscount = offer > 0 ? offer : price;
+                                                            const finalWithoutTax = baseForDiscount * (1 - discount / 100);
+                                                            return inputPricesWithTax ? applyTax(finalWithoutTax, taxRate) : finalWithoutTax;
+                                                        }).filter(p => p > 0);
+                                                        
+                                                        const minFinalPrice = finalPrices.length > 0 ? Math.min(...finalPrices) : 0;
+                                                        const basePrices = variantsActive.map(v => {
+                                                            const price = v.pricing?.list2?.price || 0;
+                                                            return inputPricesWithTax ? applyTax(price, taxRate) : price;
+                                                        }).filter(p => p > 0);
+                                                        const minBasePrice = basePrices.length > 0 ? Math.min(...basePrices) : 0;
+                                                        
+                                                        return (
+                                                            <>
+                                                                <span className="text-[14px] font-bold text-primary-600">
+                                                                    {minFinalPrice === Math.max(...finalPrices) 
+                                                                        ? formatPrice(minBasePrice)
+                                                                        : `Desde ${formatPrice(minBasePrice)}`
+                                                                    }
+                                                                </span>
+                                                                {minFinalPrice < minBasePrice && (
+                                                                    <span className="text-[10px] text-success-600">
+                                                                        Final: {formatPrice(minFinalPrice)}
+                                                                    </span>
+                                                                )}
+                                                            </>
+                                                        );
+                                                    }
+                                                    const price = product.pricing?.list2?.price || 0;
+                                                    const discount = product.pricing?.list2?.discount || 0;
+                                                    const offer = product.pricing?.list2?.offer || 0;
+                                                    // Si hay oferta, aplicar descuento sobre la oferta
+                                                    const baseForDiscount = offer > 0 ? offer : price;
+                                                    const finalPriceWithoutTax = baseForDiscount * (1 - discount / 100);
+                                                    // Aplicar IVA si el admin carga con IVA
+                                                    const displayPrice = inputPricesWithTax ? applyTax(price, taxRate) : price;
+                                                    const displayOffer = inputPricesWithTax ? applyTax(offer, taxRate) : offer;
+                                                    const displayFinalPrice = inputPricesWithTax ? applyTax(finalPriceWithoutTax, taxRate) : finalPriceWithoutTax;
+                                                    
+                                                    return (
+                                                        <>
+                                                            <span className="text-[14px] font-bold text-primary-600">{formatPrice(displayPrice)}</span>
+                                                            {offer > 0 && (
+                                                                <span className="text-[10px] text-warning-600">Oferta: {formatPrice(displayOffer)}</span>
+                                                            )}
+                                                            {discount > 0 && (
+                                                                <span className="text-[10px] text-success-600">-{discount}% → {formatPrice(displayFinalPrice)}</span>
+                                                            )}
+                                                        </>
+                                                    );
+                                                })()}
                                             </div>
                                         )}
                                     </div>
                                     {hasStockFeature && (() => {
-                                        const available = Math.max(0, (product.stock || 0) - (product.stockReserved || 0));
+                                        const stockInfo = getProductStock(product);
                                         return (
                                             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${
-                                                available > 10 
+                                                stockInfo.available > 10 
                                                     ? 'bg-success-50 text-success-600 border-success-100' 
-                                                    : available > 0 
+                                                    : stockInfo.available > 0 
                                                         ? 'bg-warning-50 text-warning-600 border-warning-100' 
                                                         : 'bg-danger-50 text-danger-600 border-danger-100'
                                             }`}>
-                                                Disp: {available}
+                                                Disp: {stockInfo.available}
                                             </span>
                                         );
                                     })()}
@@ -714,6 +1092,12 @@ const ProductsPage = () => {
                                                 onClick: () => handleViewStockMovements(product)
                                             }] : []),
                                             {
+                                                icon: product.active ? <PowerOff size={16} /> : <Power size={16} />,
+                                                label: product.active ? 'Desactivar' : 'Activar',
+                                                variant: product.active ? 'warning' : 'success',
+                                                onClick: () => handleToggleActiveClick(product)
+                                            },
+                                            {
                                                 icon: <Trash2 size={16} />,
                                                 label: 'Eliminar',
                                                 variant: 'danger',
@@ -744,6 +1128,7 @@ const ProductsPage = () => {
                 product={selectedProduct}
                 showPricesWithTax={showPricesWithTax}
                 features={features}
+                inputPricesWithTax={inputPricesWithTax}
             />
 
             {/* Product Drawer (Create/Edit) */}
@@ -764,6 +1149,21 @@ const ProductsPage = () => {
                 description={`¿Está seguro que desea eliminar "${deleteModal.product?.name}"? Esta acción no se puede deshacer.`}
                 confirmText={deleteModal.loading ? 'Eliminando...' : 'Eliminar'}
                 type="danger"
+            />
+
+            {/* Toggle Active Confirmation Modal */}
+            <ConfirmModal
+                isOpen={toggleActiveModal.isOpen}
+                onClose={() => setToggleActiveModal({ isOpen: false, product: null, loading: false })}
+                onConfirm={handleToggleActiveConfirm}
+                title={toggleActiveModal.product?.active ? 'Desactivar Producto' : 'Activar Producto'}
+                description={toggleActiveModal.product?.active 
+                    ? `¿Está seguro que desea desactivar "${toggleActiveModal.product?.name}"? El producto no se mostrará en catálogos ni estará disponible para nuevos pedidos.` 
+                    : `¿Está seguro que desea activar "${toggleActiveModal.product?.name}"? El producto volverá a estar disponible en catálogos y pedidos.`}
+                confirmText={toggleActiveModal.loading 
+                    ? (toggleActiveModal.product?.active ? 'Desactivando...' : 'Activando...') 
+                    : (toggleActiveModal.product?.active ? 'Desactivar' : 'Activar')}
+                type={toggleActiveModal.product?.active ? 'warning' : 'success'}
             />
 
             {/* Stock Movements Drawer */}

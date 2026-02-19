@@ -163,11 +163,18 @@ const BudgetCreationPage = () => {
     const addItem = (product, quantityToAdd = 1, initialDiscount = 0) => {
         if (!product) return;
 
-        const pricing = product.pricing || { list1: 0, list2: 0 };
+        const pricing = product.pricing || { list1: { price: 0, discount: 0, offer: null }, list2: { price: 0, discount: 0, offer: null } };
         const priceListNum = header.priceList || 1;
-        const price = (priceListNum === 2 ? (pricing.list2 || 0) : (pricing.list1 || 0)) || 0;
-        const hasOffer = pricing.offer > 0;
-
+        const listData = priceListNum === 2 ? pricing.list2 : pricing.list1;
+        
+        // Calcular precio base aplicando descuento sobre oferta si existe
+        const basePrice = listData?.price || 0;
+        const discount = listData?.discount || 0;
+        const offer = listData?.offer || 0;
+        const baseForDiscount = offer > 0 ? offer : basePrice;
+        const finalPrice = baseForDiscount * (1 - discount / 100);
+        
+        const hasOffer = offer > 0;
         const qty = parseInt(quantityToAdd) || 1;
         const disc = parseFloat(initialDiscount) || 0;
         const productId = product._id || Math.random().toString(36).substr(2, 9);
@@ -191,7 +198,7 @@ const BudgetCreationPage = () => {
                 name: product.name || 'Sin nombre',
                 code: product.code || 'S/N',
                 quantity: qty,
-                listPrice: hasOffer ? pricing.offer : price,
+                listPrice: finalPrice,
                 discount: disc,
                 hasOffer: hasOffer
             }]);

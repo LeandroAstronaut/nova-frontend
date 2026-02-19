@@ -30,6 +30,7 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
     
     const features = user?.company?.features || {};
     const showPricesWithTax = user?.company?.showPricesWithTax === true;
+    const taxRate = user?.company?.defaultTaxRate || 21;
     const isAdmin = user?.role?.name === 'admin';
     const isSuperadmin = user?.role?.name === 'superadmin';
     const isVendedor = user?.role?.name === 'vendedor';
@@ -97,7 +98,9 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                     code: item.productId.code || item.code || '',
                     quantity: item.quantity,
                     listPrice: item.listPrice,
-                    discount: item.discount || 0
+                    discount: item.discount || 0,
+                    variantId: item.variantId || null,
+                    variantName: item.variantName || null
                     // Nota: hasOffer se recalcula en el backend según estado actual del producto
                 })));
                 setHeader({
@@ -265,32 +268,56 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
         // Limpiar errores de stock al agregar items
         if (stockErrors.length > 0) setStockErrors([]);
 
-        const pricing = product.pricing || { list1: 0, list2: 0 };
-        const priceListNum = header.priceList || 1;
+        // Verificar si es una variante
+        const selectedVariant = product.selectedVariant;
+        const hasVariant = !!selectedVariant;
         
-        // Verificar si el producto tiene precio de oferta (tiene prioridad)
-        const hasOffer = pricing.offer > 0;
-        
-        // Usar precio de oferta si existe, sino el precio de la lista seleccionada
-        let price;
-        if (hasOffer) {
-            price = pricing.offer;
+        // Obtener pricing según variante o producto
+        let pricing;
+        if (hasVariant && product.hasUniformVariantPricing === false) {
+            // Variante con precio individual
+            pricing = selectedVariant.pricing || { list1: { price: 0, discount: 0, offer: null }, list2: { price: 0, discount: 0, offer: null } };
         } else {
-            price = (priceListNum === 2 ? (pricing.list2 || 0) : (pricing.list1 || 0)) || 0;
+            pricing = product.pricing || { list1: { price: 0, discount: 0, offer: null }, list2: { price: 0, discount: 0, offer: null } };
         }
-
+        
+        const priceListNum = header.priceList || 1;
+        const listData = priceListNum === 2 ? pricing.list2 : pricing.list1;
+        
+        // Calcular precio base aplicando descuento sobre oferta si existe
+        const basePrice = listData?.price || 0;
+        const productDiscount = listData?.discount || 0;
+        const offer = listData?.offer || 0;
+        const baseForDiscount = offer > 0 ? offer : basePrice;
+        const finalPrice = baseForDiscount * (1 - productDiscount / 100);
+        
+        const hasOffer = offer > 0;
         const qty = parseInt(quantityToAdd) || 1;
-        // Cliente: usar siempre el descuento del producto, no editable
-        const disc = isClient ? (parseFloat(pricing.discount) || 0) : (parseFloat(initialDiscount) || 0);
+        // Cliente: usar siempre el descuento del producto (ya aplicado en finalPrice)
+        // Vendedor: puede aplicar descuento adicional
+        const disc = isClient ? 0 : (parseFloat(initialDiscount) || 0);
         const productId = product._id || Math.random().toString(36).substr(2, 9);
         
-        // Buscar si existe una línea con el MISMO productId Y MISMO descuento
+        // Generar nombre con variante si aplica
+        let itemName = product.name || 'Sin nombre';
+        let variantName = null;
+        if (hasVariant) {
+            variantName = selectedVariant.value1 + (selectedVariant.value2 ? ` / ${selectedVariant.value2}` : '');
+            itemName = `${product.name} (${variantName})`;
+        }
+        
+        // Usar el id de la variante (nota: en MongoDB las variantes usan 'id' no '_id')
+        const variantId = selectedVariant?.id || selectedVariant?._id || null;
+        
+        // Buscar si existe una línea con el MISMO productId, MISMA variante Y MISMO descuento
         const existing = items.find(i => 
-            i.productId === productId && Number(i.discount || 0) === disc
+            i.productId === productId && 
+            i.variantId === variantId &&
+            Number(i.discount || 0) === disc
         );
 
         if (existing) {
-            // Si existe una línea con el mismo producto y mismo descuento, sumar cantidades
+            // Si existe una línea con el mismo producto, variante y descuento, sumar cantidades
             setItems(items.map(i => 
                 i.lineId === existing.lineId
                     ? { ...i, quantity: i.quantity + qty }
@@ -298,14 +325,16 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
             ));
         } else {
             // Crear una nueva línea con un ID único
-            const lineId = `${productId}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+            const lineId = `${productId}-${variantId || 'main'}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
             setItems([...items, {
                 lineId: lineId,
                 productId: productId,
-                name: product.name || 'Sin nombre',
+                variantId: variantId,
+                variantName: variantName,
+                name: itemName,
                 code: product.code || 'S/N',
                 quantity: qty,
-                listPrice: price,
+                listPrice: finalPrice,
                 discount: disc,
                 hasOffer: hasOffer
             }]);
@@ -343,11 +372,9 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
         let totalWithoutGlobalDiscount = 0;
         
         items.forEach(item => {
-            const product = products.find(p => p._id === item.productId);
-            const hasOffer = product?.pricing?.offer > 0;
             const itemTotal = Number(item.quantity || 0) * Number(item.listPrice || 0) * (1 - (Number(item.discount || 0) / 100));
             
-            if (hasOffer) {
+            if (item.hasOffer) {
                 // Productos con oferta: no aplican descuento global
                 totalWithoutGlobalDiscount += itemTotal;
             } else {
@@ -362,7 +389,9 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
     
     const calculateCommissionAmount = () => {
         const total = calculateTotal();
-        return total * (Number(commissionRate || 0) / 100);
+        // Si se muestran precios con IVA, calcular comisión sobre el total con IVA
+        const totalWithTax = showPricesWithTax ? total * (1 + (taxRate || 21) / 100) : total;
+        return totalWithTax * (Number(commissionRate || 0) / 100);
     };
 
     const openQuickView = (product) => {
@@ -614,6 +643,8 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                                             priceList={header.priceList}
                                             features={features}
                                             stockErrors={stockErrors}
+                                            showPricesWithTax={showPricesWithTax}
+                                            taxRate={taxRate}
                                             // Commission props
                                             commissionRate={commissionRate}
                                             setCommissionRate={setCommissionRate}
@@ -623,8 +654,6 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                                             // Discount permissions
                                             canEditProductDiscount={canEditProductDiscount}
                                             canEditBudgetDiscount={canEditBudgetDiscount}
-                                            // Price display
-                                            showPricesWithTax={showPricesWithTax}
                                             // Products y company para reglas de cantidad
                                             products={products}
                                             company={user?.company}
@@ -648,7 +677,10 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                                             <span className="text-sm font-semibold">{items.length}</span>
                                         </button>
                                         <div className="hidden sm:block text-[11px] text-[var(--text-muted)]">
-                                            Total: <span className="font-bold text-[var(--text-primary)]">${calculateTotal().toLocaleString()}</span>
+                                            Total: <span className="font-bold text-[var(--text-primary)]">
+                                                ${(showPricesWithTax ? calculateTotal() * (1 + (taxRate || 21) / 100) : calculateTotal()).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </span>
+                                            {showPricesWithTax && <span className="ml-1 text-success-600">(c/IVA)</span>}
                                         </div>
                                     </>
                                 )}
@@ -728,6 +760,8 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                             onCheckout={() => { setIsCartOpen(false); setStep(3); }}
                             products={products}
                             company={user?.company}
+                            showPricesWithTax={showPricesWithTax}
+                            taxRate={taxRate}
                         />
 
                         <ProductQuickView

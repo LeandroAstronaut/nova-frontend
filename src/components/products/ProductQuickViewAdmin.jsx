@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Package } from 'lucide-react';
 import ProductDetailContent from './ProductDetailContent';
 
-const ProductQuickViewAdmin = ({ isOpen, onClose, product, showPricesWithTax = false, features = {} }) => {
+const ProductQuickViewAdmin = ({ isOpen, onClose, product, showPricesWithTax = false, features = {}, inputPricesWithTax = false }) => {
     if (!product) return null;
 
     return createPortal(
@@ -26,19 +26,19 @@ const ProductQuickViewAdmin = ({ isOpen, onClose, product, showPricesWithTax = f
                         animate={{ x: 0 }}
                         exit={{ x: '100%' }}
                         transition={{ type: 'spring', damping: 28, stiffness: 220 }}
-                        className="fixed top-4 left-4 right-4 md:left-auto h-[calc(100vh-2rem)] w-auto md:w-full md:max-w-[850px] bg-[var(--bg-card)] shadow-2xl z-[210] flex flex-col border border-[var(--border-color)] rounded-2xl overflow-hidden"
+                        className="fixed top-4 left-4 right-4 md:left-auto md:right-4 h-[calc(100vh-2rem)] w-auto md:w-full md:max-w-[850px] bg-[var(--bg-card)] shadow-2xl z-[210] flex flex-col border border-[var(--border-color)] rounded-2xl overflow-hidden"
                     >
-                        {/* Header */}
-                        <div className="px-4 md:px-6 py-3 md:py-4 border-b border-[var(--border-color)] flex items-center justify-between shrink-0 bg-[var(--bg-card)]">
-                            <div className="flex items-center gap-2 md:gap-3">
-                                <div className="w-8 h-8 md:w-10 md:h-10 bg-primary-100 dark:bg-primary-900/30 rounded-xl flex items-center justify-center text-primary-600 dark:text-primary-400">
-                                    <Package size={18} className="md:w-5 md:h-5" />
+                        {/* Header sin imagen */}
+                        <div className="px-6 py-4 border-b border-[var(--border-color)] flex items-center justify-between shrink-0 bg-[var(--bg-card)]">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-xl flex items-center justify-center text-primary-600 dark:text-primary-400">
+                                    <Package size={20} />
                                 </div>
-                                <div>
-                                    <h2 className="text-sm md:text-base font-bold text-[var(--text-primary)]">
+                                <div className="min-w-0">
+                                    <h2 className="text-base font-bold text-[var(--text-primary)] truncate max-w-[300px] md:max-w-[500px]">
                                         {product.name}
                                     </h2>
-                                    <p className="text-[10px] md:text-[11px] text-[var(--text-muted)] font-medium">
+                                    <p className="text-[12px] text-[var(--text-muted)]">
                                         {product.code || 'Sin código'}
                                     </p>
                                 </div>
@@ -51,12 +51,13 @@ const ProductQuickViewAdmin = ({ isOpen, onClose, product, showPricesWithTax = f
                             </button>
                         </div>
 
-                        {/* Content */}
-                        <div className="flex-1 overflow-y-auto p-4 md:p-6">
+                        {/* Content - ProductDetailContent con su propia galería */}
+                        <div className="flex-1 overflow-y-auto p-6">
                             <ProductDetailContent 
                                 product={product}
                                 showPricesWithTax={showPricesWithTax}
                                 features={features}
+                                inputPricesWithTax={inputPricesWithTax}
                             />
                         </div>
                     </motion.div>

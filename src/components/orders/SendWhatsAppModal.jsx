@@ -54,9 +54,22 @@ const WhatsAppButton = ({ onClick, icon: Icon, label, phone, disabled, variant =
     );
 };
 
-const SendWhatsAppModal = ({ isOpen, onClose, order }) => {
+const SendWhatsAppModal = ({ isOpen, onClose, order, showPricesWithTax = false, taxRate = 21 }) => {
     const handleClose = () => {
         onClose();
+    };
+
+    // Helper functions for price display
+    const applyTax = (price) => {
+        if (!showPricesWithTax) return price;
+        return price * (1 + (taxRate || 21) / 100);
+    };
+    
+    const formatPrice = (price) => {
+        return Number(price).toLocaleString('es-AR', { 
+            minimumFractionDigits: 2, 
+            maximumFractionDigits: 2 
+        });
     };
 
     const generateWhatsAppMessage = () => {
@@ -96,15 +109,28 @@ const SendWhatsAppModal = ({ isOpen, onClose, order }) => {
             const name = item.name || item.productId?.name || 'Producto';
             const discountText = item.discount > 0 ? ` (-${item.discount}%)` : '';
             const offerBadge = (item.hasOffer && excludeOfferFromGlobalDiscount) ? ' [OFERTA]' : '';
-            return `- ${item.quantity}x ${name}${offerBadge} ($${Number(item.listPrice).toLocaleString()})${discountText}`;
+            // Mostrar precio con o sin IVA según configuración
+            const displayPrice = applyTax(item.listPrice);
+            return `- ${item.quantity}x ${name}${offerBadge} ($${formatPrice(displayPrice)})${discountText}`;
         }).join('\n') || '';
 
+        // Calcular totales con IVA si corresponde
+        const subtotalWithTax = applyTax(subtotal);
+        const discountWithTax = applyTax(discountAmount);
+        const totalWithTax = applyTax(total);
+
         // Construir totales
-        let totalsText = `*Subtotal:* $${Number(subtotal).toLocaleString()}`;
-        if (orderDiscount > 0) {
-            totalsText += `\n*Descuento:* -$${Number(discountAmount).toLocaleString()} (${orderDiscount}%)`;
+        let totalsText = `*Subtotal:* $${formatPrice(subtotalWithTax)}`;
+        if (showPricesWithTax) {
+            totalsText += ` (IVA incluido)`;
         }
-        totalsText += `\n*Total:* $${Number(total).toLocaleString()}`;
+        if (orderDiscount > 0) {
+            totalsText += `\n*Descuento:* -$${formatPrice(discountWithTax)} (${orderDiscount}%)`;
+        }
+        totalsText += `\n*Total:* $${formatPrice(totalWithTax)}`;
+        if (showPricesWithTax) {
+            totalsText += ` (IVA incluido)`;
+        }
         
         // Nota sobre productos con oferta
         let offerNote = '';

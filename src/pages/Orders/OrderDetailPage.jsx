@@ -81,6 +81,7 @@ const OrderDetailPage = () => {
     
     // Price display setting
     const showPricesWithTax = user?.company?.showPricesWithTax === true;
+    const taxRate = user?.company?.defaultTaxRate || 21;
 
     useEffect(() => {
         fetchOrder();
@@ -519,6 +520,7 @@ const OrderDetailPage = () => {
                     order={order}
                     showPricesWithTax={showPricesWithTax}
                     canViewCommission={canViewCommission}
+                    taxRate={taxRate}
                 />
                 
                 {/* Footer de la card */}
@@ -591,6 +593,8 @@ const OrderDetailPage = () => {
                 isOpen={isSendWhatsAppModalOpen}
                 onClose={() => setIsSendWhatsAppModalOpen(false)}
                 order={order}
+                showPricesWithTax={showPricesWithTax}
+                taxRate={taxRate}
             />
 
             <OrderActivityDrawer

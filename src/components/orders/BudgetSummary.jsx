@@ -35,12 +35,24 @@ const BudgetSummary = ({
     canEditBudgetDiscount = true,
     // Price display
     showPricesWithTax = false,
+    taxRate = 21,
     // Products y company para reglas de cantidad
     products = [],
     company = null,
     // Stock errors
     stockErrors = []
 }) => {
+    // Helper para aplicar IVA si corresponde
+    const applyTax = (price) => {
+        if (!showPricesWithTax) return price;
+        return price * (1 + (taxRate || 21) / 100);
+    };
+    
+    // Helper para formatear precio con 2 decimales
+    const formatPrice = (price) => {
+        return Number(price).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
+    
     // Helper para obtener datos del producto
     const getProductData = (productId) => {
         return products.find(p => p._id === productId) || {};
@@ -190,6 +202,12 @@ const BudgetSummary = ({
                                             <p className="text-sm font-medium text-(--text-primary) truncate">
                                                 {error.name} <span className="text-(--text-muted)">({error.code})</span>
                                             </p>
+                                            {/* Mostrar nombre de variante si existe */}
+                                            {error.variantName && (
+                                                <p className="text-[10px] text-primary-600 mt-0.5">
+                                                    Variante: {error.variantName}
+                                                </p>
+                                            )}
                                         </div>
                                         <div className="flex items-center gap-3 text-xs">
                                             <span className="text-danger-600 dark:text-danger-400 font-medium">
@@ -297,25 +315,23 @@ const BudgetSummary = ({
                                                             ) : null}
                                                             
                                                             {/* Badge de protección de oferta */}
-                                                            {(() => {
-                                                                const product = getProductData(item.productId);
-                                                                const hasOffer = product.pricing?.offer > 0;
-                                                                if (hasOffer && company?.excludeOfferProductsFromGlobalDiscount) {
-                                                                    return (
-                                                                        <div className="px-2 py-1 bg-pink-100 dark:bg-pink-900/30 border border-pink-200 dark:border-pink-800 rounded-lg text-[9px] font-bold text-pink-600 dark:text-pink-400 flex items-center gap-1">
-                                                                            <Tag size={10} />
-                                                                            Sin desc. global
-                                                                        </div>
-                                                                    );
-                                                                }
-                                                                return null;
-                                                            })()}
+                                                            {item.hasOffer && company?.excludeOfferProductsFromGlobalDiscount && (
+                                                                <div className="px-2 py-1 bg-pink-100 dark:bg-pink-900/30 border border-pink-200 dark:border-pink-800 rounded-lg text-[9px] font-bold text-pink-600 dark:text-pink-400 flex items-center gap-1">
+                                                                    <Tag size={10} />
+                                                                    Sin desc. global
+                                                                </div>
+                                                            )}
                                                         </>
                                                     )}
                                                 </div>
-                                                <p className="text-sm font-bold text-(--text-primary)">
-                                                    ${(Number(item.quantity || 0) * Number(item.listPrice || 0) * (1 - (Number(item.discount || 0) / 100))).toLocaleString('es-AR')}
-                                                </p>
+                                                <div className="text-right">
+                                                    <p className="text-sm font-bold text-(--text-primary)">
+                                                        ${formatPrice(applyTax(Number(item.quantity || 0) * Number(item.listPrice || 0) * (1 - (Number(item.discount || 0) / 100))))}
+                                                    </p>
+                                                    {showPricesWithTax && (
+                                                        <p className="text-[9px] text-success-600">c/IVA</p>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -346,38 +362,68 @@ const BudgetSummary = ({
                         <h3 className="text-sm font-bold text-(--text-primary) border-b border-(--border-color) pb-3">Resumen de Totales</h3>
                         
                         <div className="space-y-3">
-                            <div className="flex justify-between text-xs font-bold text-(--text-muted) uppercase tracking-wider">
-                                <span>Subtotal</span>
-                                <span>${Number(subtotal || 0).toLocaleString('es-AR')}</span>
-                            </div>
-                            <div className="flex justify-between text-xs font-bold text-success-600 dark:text-success-400 uppercase tracking-wider">
-                                <span>Descuento</span>
-                                <span>{discountGlobal}%</span>
-                            </div>
-                            
-                            {/* Nota sobre productos con oferta */}
                             {(() => {
-                                const offerItems = items.filter(item => {
-                                    const product = getProductData(item.productId);
-                                    return product?.pricing?.offer > 0;
+                                // Calcular desglose considerando protección de ofertas
+                                const excludeOfferFromGlobal = company?.excludeOfferProductsFromGlobalDiscount === true;
+                                
+                                let subtotalConDescuentoGlobal = 0;
+                                let subtotalSinDescuentoGlobal = 0;
+                                let protectedItemsCount = 0;
+                                
+                                items.forEach(item => {
+                                    const itemTotal = Number(item.quantity || 0) * Number(item.listPrice || 0) * (1 - (Number(item.discount || 0) / 100));
+                                    const itemTotalWithTax = applyTax(itemTotal);
+                                    
+                                    if (excludeOfferFromGlobal && item.hasOffer) {
+                                        subtotalSinDescuentoGlobal += itemTotalWithTax;
+                                        protectedItemsCount++;
+                                    } else {
+                                        subtotalConDescuentoGlobal += itemTotalWithTax;
+                                    }
                                 });
-                                if (company?.excludeOfferProductsFromGlobalDiscount && offerItems.length > 0) {
-                                    const offerTotal = offerItems.reduce((acc, item) => {
-                                        return acc + (Number(item.quantity || 0) * Number(item.listPrice || 0) * (1 - (Number(item.discount || 0) / 100)));
-                                    }, 0);
-                                    return (
-                                        <div className="px-3 py-2 bg-pink-50 dark:bg-pink-900/20 border border-pink-100 dark:border-pink-800 rounded-lg">
-                                            <p className="text-[10px] text-pink-600 dark:text-pink-400 flex items-center gap-1">
-                                                <Tag size={12} />
-                                                {offerItems.length} producto{offerItems.length > 1 ? 's' : ''} con oferta no aplica descuento global
-                                            </p>
-                                            <p className="text-[10px] text-pink-500 dark:text-pink-400/70 mt-0.5">
-                                                Subtotal protegido: ${offerTotal.toLocaleString('es-AR')}
-                                            </p>
+                                
+                                const totalSubtotal = subtotalConDescuentoGlobal + subtotalSinDescuentoGlobal;
+                                const discountAmount = subtotalConDescuentoGlobal * (Number(discountGlobal || 0) / 100);
+                                const actualDiscountPercent = totalSubtotal > 0 ? (discountAmount / totalSubtotal * 100).toFixed(1) : 0;
+                                
+                                return (
+                                    <>
+                                        {/* Subtotal */}
+                                        <div className="flex justify-between text-xs font-bold text-(--text-muted) uppercase tracking-wider">
+                                            <span>Subtotal</span>
+                                            <span>${formatPrice(totalSubtotal)}</span>
                                         </div>
-                                    );
-                                }
-                                return null;
+                                        
+                                        {/* Productos protegidos (si hay) */}
+                                        {protectedItemsCount > 0 && (
+                                            <div className="flex justify-between text-xs font-bold text-pink-600 dark:text-pink-400 uppercase tracking-wider">
+                                                <span className="flex items-center gap-1">
+                                                    <Tag size={10} />
+                                                    Sin dto. global
+                                                </span>
+                                                <span>${formatPrice(subtotalSinDescuentoGlobal)}</span>
+                                            </div>
+                                        )}
+                                        
+                                        {/* Descuento Global (solo si aplica a algo) */}
+                                        {Number(discountGlobal) > 0 && subtotalConDescuentoGlobal > 0 && (
+                                            <div className="flex justify-between text-xs font-bold text-success-600 dark:text-success-400 uppercase tracking-wider">
+                                                <span>Descuento ({discountGlobal}%)</span>
+                                                <span>-${formatPrice(discountAmount)}</span>
+                                            </div>
+                                        )}
+                                        
+                                        {/* Nota cuando todo está protegido */}
+                                        {protectedItemsCount > 0 && subtotalConDescuentoGlobal === 0 && Number(discountGlobal) > 0 && (
+                                            <div className="px-3 py-2 bg-pink-50 dark:bg-pink-900/20 border border-pink-100 dark:border-pink-800 rounded-lg">
+                                                <p className="text-[10px] text-pink-600 dark:text-pink-400 flex items-center gap-1">
+                                                    <Tag size={12} />
+                                                    Todos los productos tienen oferta - no aplica descuento global
+                                                </p>
+                                            </div>
+                                        )}
+                                    </>
+                                );
                             })()}
                             
                             <div className="pt-3 border-t border-(--border-color) flex justify-between items-end">
@@ -385,7 +431,10 @@ const BudgetSummary = ({
                                     <p className="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-1">
                                         Total Final
                                     </p>
-                                    <p className="text-2xl font-black text-(--text-primary)">${Number(total || 0).toLocaleString('es-AR')}</p>
+                                    {showPricesWithTax && (
+                                        <p className="text-[10px] text-success-600 font-medium">Incluye IVA ({taxRate || 21}%)</p>
+                                    )}
+                                    <p className="text-2xl font-black text-(--text-primary)">${formatPrice(applyTax(Number(total || 0)))}</p>
                                 </div>
                             </div>
                         </div>
@@ -415,12 +464,13 @@ const BudgetSummary = ({
                                     <div className="flex-1">
                                         <label className="text-[10px] text-(--text-muted) mb-1 block">Monto</label>
                                         <div className="px-3 py-2 bg-(--bg-hover) border border-(--border-color) rounded-lg text-sm font-bold text-success-600 dark:text-success-400">
-                                            ${Number(commissionAmount || 0).toLocaleString('es-AR')}
+                                            ${formatPrice(commissionAmount)}
                                         </div>
                                     </div>
                                 </div>
                                 <p className="text-[10px] text-(--text-muted) italic">
                                     * Esta comisión se aplicará al vendedor asignado
+                                    {showPricesWithTax && <span className="text-success-600 block mt-0.5">Calculada sobre precios con IVA incluido</span>}
                                 </p>
                             </div>
                         )}
@@ -431,16 +481,17 @@ const BudgetSummary = ({
                                 <div className="flex justify-between items-center">
                                     <span className="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider">
                                         Comisión ({commissionRate}%)
+                                        {showPricesWithTax && <span className="block text-[9px] text-success-600 font-normal">sobre precios c/IVA</span>}
                                     </span>
                                     <span className="text-sm font-bold text-success-600 dark:text-success-400">
-                                        ${Number(commissionAmount || 0).toLocaleString('es-AR')}
+                                        ${formatPrice(commissionAmount)}
                                     </span>
                                 </div>
                             </div>
                         )}
                         
                         <p className="text-[10px] text-center text-(--text-muted) font-medium leading-relaxed italic pt-3 border-t border-(--border-color)">
-                            * Los precios no incluyen IVA
+                            * {showPricesWithTax ? `Los precios incluyen IVA (${taxRate || 21}%)` : 'Los precios no incluyen IVA'}
                         </p>
                     </div>
                 </div>

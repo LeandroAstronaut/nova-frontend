@@ -17,7 +17,8 @@ import {
     ShoppingCart,
     RotateCcw,
     AlertCircle,
-    Hash
+    Hash,
+    ChevronDown
 } from 'lucide-react';
 import { getProductStockMovements } from '../../services/productService';
 import { useToast } from '../../context/ToastContext';
@@ -95,6 +96,7 @@ const StockMovementsDrawer = ({ isOpen, onClose, product }) => {
     const { addToast } = useToast();
     const [movements, setMovements] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [selectedVariantId, setSelectedVariantId] = useState(null);
     const [pagination, setPagination] = useState({
         page: 1,
         limit: 50,
@@ -102,21 +104,30 @@ const StockMovementsDrawer = ({ isOpen, onClose, product }) => {
         totalPages: 0
     });
 
+    // Reset selected variant when product changes
+    useEffect(() => {
+        setSelectedVariantId(null);
+    }, [product?._id]);
+
     useEffect(() => {
         if (isOpen && product?._id) {
             fetchMovements();
         }
-    }, [isOpen, product]);
+    }, [isOpen, product, selectedVariantId]);
 
     const fetchMovements = async (page = 1) => {
         if (!product?._id) return;
         
         setLoading(true);
         try {
-            const result = await getProductStockMovements(product._id, {
+            const params = {
                 page,
                 limit: pagination.limit
-            });
+            };
+            if (selectedVariantId) {
+                params.variantId = selectedVariantId;
+            }
+            const result = await getProductStockMovements(product._id, params);
             setMovements(result.movements || []);
             setPagination({
                 page: result.page,
@@ -133,6 +144,40 @@ const StockMovementsDrawer = ({ isOpen, onClose, product }) => {
     };
 
     if (!product) return null;
+
+    // Calcular stock total de todas las variantes
+    const getTotalStock = () => {
+        if (!product.hasVariants || !product.variants?.length) {
+            return {
+                stock: product.stock || 0,
+                stockReserved: product.stockReserved || 0,
+                stockQuoted: product.stockQuoted || 0
+            };
+        }
+        return product.variants.reduce((totals, variant) => {
+            totals.stock += variant.stock || 0;
+            totals.stockReserved += variant.stockReserved || 0;
+            totals.stockQuoted += variant.stockQuoted || 0;
+            return totals;
+        }, { stock: 0, stockReserved: 0, stockQuoted: 0 });
+    };
+
+    // Obtener stock de la variante seleccionada o totales
+    const getDisplayStock = () => {
+        if (!product.hasVariants || !selectedVariantId) {
+            return getTotalStock();
+        }
+        const variant = product.variants?.find(v => v.id === selectedVariantId);
+        if (!variant) return getTotalStock();
+        return {
+            stock: variant.stock || 0,
+            stockReserved: variant.stockReserved || 0,
+            stockQuoted: variant.stockQuoted || 0
+        };
+    };
+
+    const displayStock = getDisplayStock();
+    const hasVariants = product.hasVariants && product.variants?.length > 0;
 
     return createPortal(
         <AnimatePresence mode="wait">
@@ -179,24 +224,48 @@ const StockMovementsDrawer = ({ isOpen, onClose, product }) => {
                             </button>
                         </div>
 
+                        {/* Variant Selector */}
+                        {hasVariants && (
+                            <div className="px-6 py-3 bg-[var(--bg-hover)] border-b border-[var(--border-color)]">
+                                <label className="text-[11px] text-[var(--text-muted)] mb-1.5 block">Variante</label>
+                                <div className="relative">
+                                    <select
+                                        value={selectedVariantId || ''}
+                                        onChange={(e) => setSelectedVariantId(e.target.value || null)}
+                                        className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900 appearance-none cursor-pointer"
+                                    >
+                                        <option value="">Todas las variantes</option>
+                                        {product.variants.map(variant => (
+                                            <option key={variant.id} value={variant.id}>
+                                                {product.variantConfig?.label1}: {variant.value1}
+                                                {variant.value2 && ` • ${product.variantConfig?.label2}: ${variant.value2}`}
+                                                {variant.sku && ` (${variant.sku})`}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none" size={16} />
+                                </div>
+                            </div>
+                        )}
+
                         {/* Stock Summary */}
                         <div className="px-6 py-4 bg-[var(--bg-hover)] border-b border-[var(--border-color)]">
                             <div className="grid grid-cols-4 gap-3">
                                 <div className="text-center p-3 bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)]">
                                     <p className="text-[9px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Físico</p>
-                                    <p className="text-xl font-bold text-[var(--text-primary)]">{product.stock || 0}</p>
+                                    <p className="text-xl font-bold text-[var(--text-primary)]">{displayStock.stock}</p>
                                 </div>
                                 <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-800">
                                     <p className="text-[9px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1">Disponible</p>
-                                    <p className="text-xl font-bold text-blue-700 dark:text-blue-300">{Math.max(0, (product.stock || 0) - (product.stockReserved || 0))}</p>
+                                    <p className="text-xl font-bold text-blue-700 dark:text-blue-300">{Math.max(0, displayStock.stock - displayStock.stockReserved)}</p>
                                 </div>
                                 <div className="text-center p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-100 dark:border-amber-800">
                                     <p className="text-[9px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-1">Reservado</p>
-                                    <p className="text-xl font-bold text-amber-700 dark:text-amber-300">{product.stockReserved || 0}</p>
+                                    <p className="text-xl font-bold text-amber-700 dark:text-amber-300">{displayStock.stockReserved}</p>
                                 </div>
                                 <div className="text-center p-3 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-100 dark:border-purple-800">
                                     <p className="text-[9px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider mb-1">Presup.</p>
-                                    <p className="text-xl font-bold text-purple-700 dark:text-purple-300">{product.stockQuoted || 0}</p>
+                                    <p className="text-xl font-bold text-purple-700 dark:text-purple-300">{displayStock.stockQuoted}</p>
                                 </div>
                             </div>
                         </div>

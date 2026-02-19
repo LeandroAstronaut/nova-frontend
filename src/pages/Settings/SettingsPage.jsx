@@ -99,7 +99,8 @@ const SettingsPage = () => {
     
     // Estado para preferencias de visualización
     const [displayPrefs, setDisplayPrefs] = useState({
-        showPricesWithTax: user?.company?.showPricesWithTax === true
+        showPricesWithTax: user?.company?.showPricesWithTax === true,
+        inputPricesWithTax: user?.company?.inputPricesWithTax === true
     });
     const [savingPrefs, setSavingPrefs] = useState(false);
     
@@ -130,7 +131,8 @@ const SettingsPage = () => {
     useEffect(() => {
         if (user?.company) {
             setDisplayPrefs({
-                showPricesWithTax: user.company.showPricesWithTax === true
+                showPricesWithTax: user.company.showPricesWithTax === true,
+                inputPricesWithTax: user.company.inputPricesWithTax === true
             });
         }
     }, [user]);
@@ -569,6 +571,34 @@ const SettingsPage = () => {
                                         <div
                                             className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${
                                                 displayPrefs.showPricesWithTax ? 'translate-x-7' : 'translate-x-1'
+                                            }`}
+                                        />
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            {/* Toggle: Cargar precios con IVA incluido */}
+                            <div className="p-4 bg-(--bg-hover) rounded-xl border border-(--border-color)">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600">
+                                            <DollarSign size={16} />
+                                        </div>
+                                        <div>
+                                            <p className="text-[13px] font-semibold text-(--text-primary)">En alta/edición cargo precios con IVA incluido</p>
+                                            <p className="text-[11px] text-(--text-muted)">El sistema calculará el precio sin IVA automáticamente</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setDisplayPrefs(prev => ({ ...prev, inputPricesWithTax: !prev.inputPricesWithTax }))}
+                                        className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${
+                                            displayPrefs.inputPricesWithTax ? 'bg-primary-500' : 'bg-(--border-color)'
+                                        }`}
+                                    >
+                                        <div
+                                            className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${
+                                                displayPrefs.inputPricesWithTax ? 'translate-x-7' : 'translate-x-1'
                                             }`}
                                         />
                                     </button>

@@ -4,7 +4,18 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Trash2, ShoppingBag, Minus, Plus, Package, ShoppingCart, Tag } from 'lucide-react';
 import Button from '../../components/common/Button';
 
-const CartDrawer = ({ isOpen, onClose, items, updateItem, removeItem, onCheckout, subtotal, total, globalDiscount = 0, products = [], company = null }) => {
+const CartDrawer = ({ isOpen, onClose, items, updateItem, removeItem, onCheckout, subtotal, total, globalDiscount = 0, products = [], company = null, showPricesWithTax = false, taxRate = 21 }) => {
+    // Helper para aplicar IVA si corresponde
+    const applyTax = (price) => {
+        if (!showPricesWithTax) return price;
+        return price * (1 + (taxRate || 21) / 100);
+    };
+    
+    // Helper para formatear precio con 2 decimales
+    const formatPrice = (price) => {
+        return Number(price).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
+    
     // Helper para obtener datos del producto
     const getProductData = (productId) => {
         return products.find(p => p._id === productId) || {};
@@ -56,7 +67,7 @@ const CartDrawer = ({ isOpen, onClose, items, updateItem, removeItem, onCheckout
                         animate={{ x: 0 }}
                         exit={{ x: '100%' }}
                         transition={{ type: 'spring', damping: 28, stiffness: 220 }}
-                        className="fixed top-4 left-4 right-4 md:left-auto h-[calc(100vh-2rem)] w-auto md:w-full md:max-w-[400px] bg-[var(--bg-card)] shadow-2xl dark:shadow-soft-lg-dark z-[10000] flex flex-col border border-[var(--border-color)] rounded-2xl overflow-hidden"
+                        className="fixed top-4 left-4 right-4 md:left-auto h-[calc(100vh-2rem)] w-auto md:w-full md:max-w-[520px] bg-[var(--bg-card)] shadow-2xl dark:shadow-soft-lg-dark z-[10000] flex flex-col border border-[var(--border-color)] rounded-2xl overflow-hidden"
                     >
                         {/* Header - Estilo consistente */}
                         <div className="px-4 md:px-5 py-3 md:py-4 border-b border-[var(--border-color)] flex items-center justify-between shrink-0 bg-[var(--bg-card)]">
@@ -104,6 +115,12 @@ const CartDrawer = ({ isOpen, onClose, items, updateItem, removeItem, onCheckout
                                                     <div className="min-w-0 flex-1">
                                                         <h4 className="text-sm font-medium text-[var(--text-primary)] truncate">{item.name}</h4>
                                                         <p className="text-[11px] text-[var(--text-muted)]">{item.code}</p>
+                                                        {/* Mostrar variación si existe */}
+                                                        {item.variantName && (
+                                                            <p className="text-[10px] text-primary-600 font-medium mt-0.5">
+                                                                {item.variantName}
+                                                            </p>
+                                                        )}
                                                     </div>
                                                     <button
                                                         onClick={() => removeItem(item.lineId)}
@@ -113,22 +130,15 @@ const CartDrawer = ({ isOpen, onClose, items, updateItem, removeItem, onCheckout
                                                     </button>
                                                 </div>
                                                 {/* Badge de protección de oferta (arriba si aplica) */}
-                                                {(() => {
-                                                    const product = getProductData(item.productId);
-                                                    const hasOffer = product.pricing?.offer > 0;
-                                                    if (hasOffer && company?.excludeOfferProductsFromGlobalDiscount) {
-                                                        return (
-                                                            <div className="mb-1.5 px-2 py-0.5 bg-pink-100 dark:bg-pink-900/30 border border-pink-200 dark:border-pink-800 rounded text-[9px] font-medium text-pink-600 dark:text-pink-400 flex items-center gap-1 w-fit">
-                                                                <Tag size={9} />
-                                                                Sin dto. global
-                                                            </div>
-                                                        );
-                                                    }
-                                                    return null;
-                                                })()}
+                                                {item.hasOffer && company?.excludeOfferProductsFromGlobalDiscount && (
+                                                    <div className="mb-1.5 px-2 py-0.5 bg-pink-100 dark:bg-pink-900/30 border border-pink-200 dark:border-pink-800 rounded text-[9px] font-medium text-pink-600 dark:text-pink-400 flex items-center gap-1 w-fit">
+                                                        <Tag size={9} />
+                                                        Sin dto. global
+                                                    </div>
+                                                )}
 
-                                                <div className="flex items-center justify-between gap-2 mt-2">
-                                                    <div className="flex items-center gap-2">
+                                                <div className="flex items-center justify-between gap-3 mt-3">
+                                                    <div className="flex items-center gap-3">
                                                         {/* Qty Selector */}
                                                         {(() => {
                                                             const product = getProductData(item.productId);
@@ -144,13 +154,13 @@ const CartDrawer = ({ isOpen, onClose, items, updateItem, removeItem, onCheckout
                                                                         <button
                                                                             onClick={() => updateItem(item.lineId, 'quantity', getValidQuantity(item.productId, item.quantity, -step))}
                                                                             disabled={item.quantity <= (sellOnlyFullPackages ? unitsPerPackage : minOrderQuantity)}
-                                                                            className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center text-[var(--text-muted)] hover:text-primary-600 hover:bg-[var(--bg-card)] rounded-md transition-colors disabled:opacity-40"
+                                                                            className="w-7 h-7 md:w-8 md:h-8 flex items-center justify-center text-[var(--text-muted)] hover:text-primary-600 hover:bg-[var(--bg-card)] rounded-md transition-colors disabled:opacity-40"
                                                                         >
                                                                             <Minus size={14} />
                                                                         </button>
                                                                         <input
                                                                             type="number"
-                                                                            className="w-8 md:w-10 bg-transparent text-center text-xs font-semibold text-[var(--text-primary)] focus:outline-none"
+                                                                            className="w-10 md:w-12 bg-transparent text-center text-sm font-semibold text-[var(--text-primary)] focus:outline-none"
                                                                             value={item.quantity}
                                                                             onChange={(e) => {
                                                                                 const val = parseInt(e.target.value) || 0;
@@ -159,7 +169,7 @@ const CartDrawer = ({ isOpen, onClose, items, updateItem, removeItem, onCheckout
                                                                         />
                                                                         <button
                                                                             onClick={() => updateItem(item.lineId, 'quantity', getValidQuantity(item.productId, item.quantity, step))}
-                                                                            className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center text-[var(--text-muted)] hover:text-primary-600 hover:bg-[var(--bg-card)] rounded-md transition-colors"
+                                                                            className="w-7 h-7 md:w-8 md:h-8 flex items-center justify-center text-[var(--text-muted)] hover:text-primary-600 hover:bg-[var(--bg-card)] rounded-md transition-colors"
                                                                         >
                                                                             <Plus size={14} />
                                                                         </button>
@@ -176,19 +186,28 @@ const CartDrawer = ({ isOpen, onClose, items, updateItem, removeItem, onCheckout
                                                         })()}
 
                                                         {/* Disc Selector */}
-                                                        <div className="flex items-center gap-1 px-1.5 py-1 md:px-2 md:py-1.5 bg-success-50 dark:bg-success-900/30 rounded-lg border border-success-100 dark:border-success-800">
+                                                        <div className="flex items-center gap-1.5 px-2 py-1.5 md:px-2.5 md:py-2 bg-success-50 dark:bg-success-900/30 rounded-lg border border-success-100 dark:border-success-800">
                                                             <input
                                                                 type="number"
-                                                                className="w-7 md:w-8 bg-transparent text-center text-xs font-semibold text-success-700 dark:text-success-400 focus:outline-none"
+                                                                className="w-8 md:w-10 bg-transparent text-center text-sm font-semibold text-success-700 dark:text-success-400 focus:outline-none"
                                                                 value={item.discount || 0}
                                                                 onChange={(e) => updateItem(item.lineId, 'discount', Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
                                                             />
-                                                            <span className="text-[10px] font-medium text-success-600/50">%</span>
+                                                            <span className="text-xs font-medium text-success-600/50">%</span>
                                                         </div>
                                                     </div>
-                                                    <p className="text-sm font-semibold text-[var(--text-primary)] whitespace-nowrap">
-                                                        ${(Number(item.quantity || 0) * Number(item.listPrice || 0) * (1 - (Number(item.discount || 0) / 100))).toLocaleString('es-AR')}
-                                                    </p>
+                                                    
+                                                    {/* Precio Total */}
+                                                    <div className="text-right">
+                                                        <p className="text-base font-bold text-[var(--text-primary)] whitespace-nowrap">
+                                                            ${formatPrice(applyTax(Number(item.quantity || 0) * Number(item.listPrice || 0) * (1 - (Number(item.discount || 0) / 100))))}
+                                                        </p>
+                                                        {/* Precio unitario */}
+                                                        <p className="text-[10px] text-[var(--text-muted)]">
+                                                            ${formatPrice(applyTax(Number(item.listPrice || 0)))} c/u
+                                                            {showPricesWithTax && <span className="ml-1 text-success-600">(con IVA)</span>}
+                                                        </p>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -200,40 +219,92 @@ const CartDrawer = ({ isOpen, onClose, items, updateItem, removeItem, onCheckout
                         {/* Footer - Acciones siempre abajo */}
                         {items.length > 0 && (
                             <div className="px-4 md:px-5 py-3 md:py-4 border-t border-[var(--border-color)] bg-[var(--bg-hover)] space-y-3">
-                                <div className="space-y-2">
-                                    {/* Subtotal (antes de descuento global) */}
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wider">
-                                            Subtotal ({items.reduce((acc, i) => acc + Number(i.quantity || 0), 0)} items)
-                                        </span>
-                                        <span className="text-sm font-medium text-[var(--text-primary)]">
-                                            ${Number(subtotal || total || 0).toLocaleString('es-AR')}
-                                        </span>
-                                    </div>
+                                {(() => {
+                                    // Calcular subtotales considerando protección de ofertas
+                                    const excludeOfferFromGlobal = company?.excludeOfferProductsFromGlobalDiscount === true;
                                     
-                                    {/* Descuento Global (solo si > 0) */}
-                                    {Number(globalDiscount) > 0 && (
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-[11px] font-medium text-success-600 uppercase tracking-wider flex items-center gap-1">
-                                                <Tag size={10} />
-                                                Desc. Global ({globalDiscount}%)
-                                            </span>
-                                            <span className="text-sm font-medium text-success-600">
-                                                -${(Number(subtotal || total || 0) - Number(total || 0)).toLocaleString('es-AR')}
-                                            </span>
-                                        </div>
-                                    )}
+                                    let subtotalConDescuentoGlobal = 0;
+                                    let subtotalSinDescuentoGlobal = 0;
+                                    let protectedItemsCount = 0;
                                     
-                                    {/* Total Final */}
-                                    <div className="flex justify-between items-end pt-2 border-t border-[var(--border-color)]">
-                                        <div>
-                                            <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-0.5">Total Final</p>
+                                    items.forEach(item => {
+                                        const itemTotal = Number(item.quantity || 0) * Number(item.listPrice || 0) * (1 - (Number(item.discount || 0) / 100));
+                                        const itemTotalWithTax = applyTax(itemTotal);
+                                        
+                                        if (excludeOfferFromGlobal && item.hasOffer) {
+                                            subtotalSinDescuentoGlobal += itemTotalWithTax;
+                                            protectedItemsCount++;
+                                        } else {
+                                            subtotalConDescuentoGlobal += itemTotalWithTax;
+                                        }
+                                    });
+                                    
+                                    const discountAmount = subtotalConDescuentoGlobal * (Number(globalDiscount || 0) / 100);
+                                    const calculatedTotal = subtotalConDescuentoGlobal + subtotalSinDescuentoGlobal - discountAmount;
+                                    
+                                    return (
+                                        <div className="space-y-2">
+                                            {/* Subtotal */}
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wider">
+                                                    Subtotal ({items.reduce((acc, i) => acc + Number(i.quantity || 0), 0)} items)
+                                                </span>
+                                                <span className="text-sm font-medium text-[var(--text-primary)]">
+                                                    ${formatPrice(subtotalConDescuentoGlobal + subtotalSinDescuentoGlobal)}
+                                                </span>
+                                            </div>
+                                            
+                                            {/* Productos protegidos (si hay) */}
+                                            {protectedItemsCount > 0 && (
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-[11px] font-medium text-pink-600 uppercase tracking-wider flex items-center gap-1">
+                                                        <Tag size={10} />
+                                                        {protectedItemsCount} producto{protectedItemsCount > 1 ? 's' : ''} sin dto. global
+                                                    </span>
+                                                    <span className="text-sm font-medium text-pink-600">
+                                                        ${formatPrice(subtotalSinDescuentoGlobal)}
+                                                    </span>
+                                                </div>
+                                            )}
+                                            
+                                            {/* Descuento Global (solo sobre lo que aplica) */}
+                                            {Number(globalDiscount) > 0 && subtotalConDescuentoGlobal > 0 && (
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-[11px] font-medium text-success-600 uppercase tracking-wider flex items-center gap-1">
+                                                        <Tag size={10} />
+                                                        Desc. Global ({globalDiscount}%)
+                                                    </span>
+                                                    <span className="text-sm font-medium text-success-600">
+                                                        -${formatPrice(discountAmount)}
+                                                    </span>
+                                                </div>
+                                            )}
+                                            
+                                            {/* IVA Info */}
+                                            <div className="flex justify-between items-center pt-2 border-t border-[var(--border-color)]">
+                                                <span className="text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">
+                                                    IVA ({taxRate || 21}%)
+                                                </span>
+                                                <span className="text-[11px] font-medium text-[var(--text-secondary)]">
+                                                    {showPricesWithTax ? 'Incluido' : 'No incluye'}
+                                                </span>
+                                            </div>
+                                            
+                                            {/* Total Final */}
+                                            <div className="flex justify-between items-end pt-2 border-t border-[var(--border-color)]">
+                                                <div>
+                                                    <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-0.5">Total Final</p>
+                                                    {showPricesWithTax && (
+                                                        <p className="text-[9px] text-success-600">Precios con IVA incluido</p>
+                                                    )}
+                                                </div>
+                                                <p className="text-xl md:text-2xl font-semibold text-[var(--text-primary)]">
+                                                    ${formatPrice(calculatedTotal)}
+                                                </p>
+                                            </div>
                                         </div>
-                                        <p className="text-xl md:text-2xl font-semibold text-[var(--text-primary)]">
-                                            ${Number(total || 0).toLocaleString('es-AR')}
-                                        </p>
-                                    </div>
-                                </div>
+                                    );
+                                })()}
 
                                 <Button
                                     variant="primary"

@@ -48,24 +48,35 @@ const InfoRow = ({ label, value, icon: Icon }) => (
     </div>
 );
 
-const OrderDetailContent = ({ order, showPricesWithTax = false, canViewCommission = false }) => {
+const OrderDetailContent = ({ order, showPricesWithTax = false, canViewCommission = false, taxRate = 21 }) => {
     const { user } = useAuth();
     const isSuperadmin = user?.role?.name === 'superadmin';
 
     if (!order) return null;
+    
+    // Helper para aplicar IVA si corresponde
+    const applyTax = (price) => {
+        if (!showPricesWithTax) return price;
+        return price * (1 + (taxRate || 21) / 100);
+    };
 
-    // Calcular totales
-    const subtotal = order.subtotal !== undefined 
+    // Calcular totales (sin IVA - base)
+    const subtotalBase = order.subtotal !== undefined 
         ? parseFloat(order.subtotal) 
         : (order.items?.reduce((acc, item) => 
             acc + (item.quantity * item.listPrice * (1 - (item.discount || 0) / 100)), 0
         ) || 0);
     
-    const finalTotal = order.total !== undefined 
+    const finalTotalBase = order.total !== undefined 
         ? parseFloat(order.total) 
-        : (subtotal * (1 - (order.discount || 0) / 100));
+        : (subtotalBase * (1 - (order.discount || 0) / 100));
     
-    const discountAmount = subtotal - finalTotal;
+    const discountAmountBase = subtotalBase - finalTotalBase;
+    
+    // Helper para formatear precio con 2 decimales
+    const formatPrice = (price) => {
+        return Number(price).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
 
     return (
         <div className="space-y-4">
@@ -85,7 +96,7 @@ const OrderDetailContent = ({ order, showPricesWithTax = false, canViewCommissio
                     </div>
                     <div className="text-right">
                         <p className="text-[9px] text-(--text-muted) font-bold uppercase tracking-wider">Total</p>
-                        <p className="text-lg font-bold text-(--text-primary)">${finalTotal.toLocaleString('es-AR')}</p>
+                        <p className="text-lg font-bold text-(--text-primary)">${formatPrice(applyTax(finalTotalBase))}</p>
                     </div>
                 </div>
             </div>
@@ -125,7 +136,8 @@ const OrderDetailContent = ({ order, showPricesWithTax = false, canViewCommissio
                                         </div>
                                         <div className="text-right shrink-0">
                                             <p className="text-[11px] font-semibold text-(--text-primary)">
-                                                {item.quantity} x ${Number(item.listPrice || 0).toLocaleString('es-AR')}
+                                                {item.quantity} x ${formatPrice(applyTax(Number(item.listPrice || 0)))}
+                                                {showPricesWithTax && <span className="ml-1 text-[9px] text-success-600">(c/IVA)</span>}
                                             </p>
                                             {item.discount > 0 && (
                                                 <p className="text-[9px] text-success-600">
@@ -133,7 +145,7 @@ const OrderDetailContent = ({ order, showPricesWithTax = false, canViewCommissio
                                                 </p>
                                             )}
                                             <p className="text-[11px] font-bold text-primary-600 mt-0.5">
-                                                ${(item.quantity * item.listPrice * (1 - (item.discount || 0) / 100)).toLocaleString('es-AR')}
+                                                ${formatPrice(applyTax(item.quantity * item.listPrice * (1 - (item.discount || 0) / 100)))}
                                             </p>
                                         </div>
                                     </div>
@@ -162,12 +174,12 @@ const OrderDetailContent = ({ order, showPricesWithTax = false, canViewCommissio
                             <div className="space-y-2">
                                 <div className="flex justify-between text-[12px] text-(--text-muted)">
                                     <span>Subtotal</span>
-                                    <span className="font-medium">${subtotal.toLocaleString('es-AR')}</span>
+                                    <span className="font-medium">${formatPrice(applyTax(subtotalBase))}</span>
                                 </div>
-                                {discountAmount > 0 && (
+                                {discountAmountBase > 0 && (
                                     <div className="flex justify-between text-[12px] text-success-600 dark:text-success-400">
                                         <span>Descuento</span>
-                                        <span className="font-medium">-${discountAmount.toLocaleString('es-AR')}</span>
+                                        <span className="font-medium">-${formatPrice(applyTax(discountAmountBase))}</span>
                                     </div>
                                 )}
                                 {order.discount > 0 && (
@@ -178,13 +190,18 @@ const OrderDetailContent = ({ order, showPricesWithTax = false, canViewCommissio
                                 )}
                                 <div className="flex justify-between text-[13px] font-bold text-(--text-primary) pt-2 border-t border-(--border-color)">
                                     <span>Total Final</span>
-                                    <span>${finalTotal.toLocaleString('es-AR')}</span>
+                                    <div className="text-right">
+                                        <span>${formatPrice(applyTax(finalTotalBase))}</span>
+                                        {showPricesWithTax && (
+                                            <p className="text-[9px] text-success-600 font-normal">Incluye IVA ({taxRate || 21}%)</p>
+                                        )}
+                                    </div>
                                 </div>
                                 
                                 {/* IVA Info */}
                                 <div className="pt-2 mt-2 border-t border-(--border-color)/50">
                                     <div className="flex justify-between text-[11px] text-(--text-muted)">
-                                        <span>IVA</span>
+                                        <span>IVA ({taxRate || 21}%)</span>
                                         <span>{showPricesWithTax ? 'Incluido' : 'No incluye'}</span>
                                     </div>
                                 </div>
@@ -205,10 +222,13 @@ const OrderDetailContent = ({ order, showPricesWithTax = false, canViewCommissio
                                 {canViewCommission && (
                                     <div className="pt-2 mt-2 border-t border-(--border-color)/50">
                                         <div className="flex justify-between items-center">
-                                            <span className="text-[10px] font-medium text-(--text-muted) uppercase tracking-wider">Comisión</span>
+                                            <span className="text-[10px] font-medium text-(--text-muted) uppercase tracking-wider">
+                                                Comisión
+                                                {showPricesWithTax && <span className="block text-[9px] text-success-600 font-normal">sobre c/IVA</span>}
+                                            </span>
                                             {order.commissionAmount ? (
                                                 <p className="text-[12px] font-semibold text-success-600 dark:text-success-400">
-                                                    ${order.commissionAmount.toLocaleString('es-AR')}
+                                                    ${formatPrice(applyTax(order.commissionAmount))}
                                                     {order.commissionRate && (
                                                         <span className="text-[10px] text-(--text-muted) ml-1">
                                                             ({order.commissionRate}%)

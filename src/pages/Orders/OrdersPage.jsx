@@ -57,7 +57,7 @@ import { Building2, History } from 'lucide-react';
 import { generateOrderPDF } from '../../utils/pdfGenerator';
 
 // Función para exportar a CSV
-const exportToCSV = (data, mode, isSuperadmin, canViewCommission) => {
+const exportToCSV = (data, mode, isSuperadmin, canViewCommission, showPricesWithTax, taxRate) => {
     // Headers dinámicos según permisos
     const headers = ['Número'];
     if (isSuperadmin) headers.push('Compañía');
@@ -65,13 +65,27 @@ const exportToCSV = (data, mode, isSuperadmin, canViewCommission) => {
     if (canViewCommission) headers.push('Comisión');
     headers.push('Estado');
     
+    const applyTaxExport = (price) => {
+        if (!showPricesWithTax) return price;
+        return price * (1 + (taxRate || 21) / 100);
+    };
+    
+    const formatPriceExport = (price) => {
+        return Number(price).toLocaleString('es-AR', { 
+            minimumFractionDigits: 2, 
+            maximumFractionDigits: 2 
+        });
+    };
+    
     const rows = data.map(order => {
         // Calcular subtotal con descuento por ítem
         const subtotal = order.items.reduce((acc, item) => 
             acc + (item.quantity * item.listPrice * (1 - (item.discount || 0) / 100)), 0
         );
         // Aplicar descuento general de la orden
-        const total = subtotal * (1 - (order.discount || 0) / 100);
+        const totalBase = subtotal * (1 - (order.discount || 0) / 100);
+        // Aplicar IVA si corresponde
+        const total = applyTaxExport(totalBase);
         
         const row = [`#${String(order.orderNumber).padStart(5, '0')}`];
         if (isSuperadmin) row.push(order.companyId?.name || 'N/A');
@@ -79,10 +93,13 @@ const exportToCSV = (data, mode, isSuperadmin, canViewCommission) => {
             order.clientId?.businessName || 'N/A',
             new Date(order.date).toLocaleDateString(),
             `${order.salesRepId?.firstName || ''} ${order.salesRepId?.lastName || ''}`.trim(),
-            `$${total.toLocaleString()}`
+            `$${formatPriceExport(total)}`
         );
         if (canViewCommission) {
-            row.push(order.commissionAmount ? `$${order.commissionAmount.toLocaleString()}` : '-');
+            // Comisión se calcula sobre el total con IVA si showPricesWithTax es true
+            const commissionBase = order.commissionAmount || 0;
+            const commissionDisplay = showPricesWithTax ? applyTaxExport(commissionBase) : commissionBase;
+            row.push(order.commissionAmount ? `$${formatPriceExport(commissionDisplay)}` : '-');
         }
         row.push(order.status);
         
@@ -173,6 +190,23 @@ const OrdersPage = ({ mode = 'order' }) => {
     // Check if commission display is enabled for current user
     const hasCommissionFeature = features?.commissionCalculation === true;
     const canViewCommission = (isAdmin || isSuperadmin || user?.canViewCommission === true) && hasCommissionFeature;
+    
+    // IVA configuration
+    const showPricesWithTax = user?.company?.showPricesWithTax === true;
+    const taxRate = user?.company?.taxRate || 21;
+    
+    // Helper functions for price display
+    const applyTax = (price) => {
+        if (!showPricesWithTax) return price;
+        return price * (1 + (taxRate || 21) / 100);
+    };
+    
+    const formatPrice = (price) => {
+        return Number(price).toLocaleString('es-AR', { 
+            minimumFractionDigits: 2, 
+            maximumFractionDigits: 2 
+        });
+    };
     
     // Refrescar datos del usuario al montar y cuando vuelve al foco
     // Esto asegura que los permisos (como canViewCommission) estén actualizados
@@ -344,7 +378,7 @@ const OrdersPage = ({ mode = 'order' }) => {
                 search: debouncedSearchTerm
             });
             const ordersToExport = data.orders || data || [];
-            exportToCSV(ordersToExport, mode, isSuperadmin, canViewCommission);
+            exportToCSV(ordersToExport, mode, isSuperadmin, canViewCommission, showPricesWithTax, taxRate);
         } catch (error) {
             console.error('Error exporting orders:', error);
             addToast('Error al exportar: ' + error.message, 'error');
@@ -901,18 +935,20 @@ const OrdersPage = ({ mode = 'order' }) => {
                                         <td className="px-6 py-4 text-right font-bold text-(--text-primary) text-[13px]">
                                             ${(() => {
                                                 // Usar total calculado del backend o recalcular para pedidos antiguos
-                                                const total = order.total !== undefined ? parseFloat(order.total) : (() => {
+                                                const totalBase = order.total !== undefined ? parseFloat(order.total) : (() => {
                                                     const subtotal = order.items.reduce((acc, item) => acc + (item.quantity * item.listPrice * (1 - (item.discount || 0) / 100)), 0);
                                                     return subtotal * (1 - (order.discount || 0) / 100);
                                                 })();
-                                                return total.toLocaleString('es-AR');
+                                                // Aplicar IVA si corresponde
+                                                const total = applyTax(totalBase);
+                                                return formatPrice(total);
                                             })()}
                                         </td>
                                         {canViewCommission && (
                                             <td className="px-6 py-4 text-right text-[13px]">
                                                 {order.commissionAmount ? (
                                                     <span className="font-semibold text-success-600 dark:text-success-400">
-                                                        ${order.commissionAmount.toLocaleString()}
+                                                        ${formatPrice(applyTax(order.commissionAmount))}
                                                         {order.commissionRate && (
                                                             <span className="text-[10px] text-(--text-muted) ml-1">
                                                                 ({order.commissionRate}%)
@@ -1103,18 +1139,20 @@ const OrdersPage = ({ mode = 'order' }) => {
                                         <div className="col-span-2">
                                             <span className="text-(--text-muted)">Total:</span>
                                             <span className="ml-1 font-bold text-(--text-primary) text-[14px]">${(() => {
-                                                const total = order.total !== undefined ? parseFloat(order.total) : (() => {
+                                                const totalBase = order.total !== undefined ? parseFloat(order.total) : (() => {
                                                     const subtotal = order.items.reduce((acc, item) => acc + (item.quantity * item.listPrice * (1 - (item.discount || 0) / 100)), 0);
                                                     return subtotal * (1 - (order.discount || 0) / 100);
                                                 })();
-                                                return total.toLocaleString('es-AR');
+                                                // Aplicar IVA si corresponde
+                                                const total = applyTax(totalBase);
+                                                return formatPrice(total);
                                             })()}</span>
                                         </div>
                                         {canViewCommission && order.commissionAmount && (
                                             <div className="col-span-2">
                                                 <span className="text-(--text-muted)">Comisión:</span>
                                                 <span className="ml-1 font-bold text-success-600 text-[14px]">
-                                                    ${order.commissionAmount.toLocaleString()}
+                                                    ${formatPrice(applyTax(order.commissionAmount))}
                                                     {order.commissionRate && (
                                                         <span className="text-[10px] text-(--text-muted) ml-1">
                                                             ({order.commissionRate}%)
@@ -1308,6 +1346,8 @@ const OrdersPage = ({ mode = 'order' }) => {
                     setSelectedOrderForWhatsApp(null);
                 }}
                 order={selectedOrderForWhatsApp}
+                showPricesWithTax={showPricesWithTax}
+                taxRate={taxRate}
             />
 
             {/* Order Activity Drawer */}

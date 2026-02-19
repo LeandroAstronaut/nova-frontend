@@ -69,6 +69,16 @@ export const deleteProduct = async (id) => {
 };
 
 /**
+ * Activar/Desactivar producto
+ * @param {string} id - ID del producto
+ * @returns {Promise<Object>} Producto actualizado
+ */
+export const toggleProductActive = async (id) => {
+    const response = await api.patch(`/products/${id}/toggle-active`);
+    return response.data;
+};
+
+/**
  * Exportar productos a Excel
  * @returns {Promise<Blob>} Archivo Excel
  */
@@ -203,12 +213,47 @@ export const getProductStockMovements = async (productId, params = {}) => {
     return response.data;
 };
 
+/**
+ * Obtener stock por variante
+ * @param {string} productId - ID del producto
+ * @returns {Promise<Object>} { productId, productName, variantConfig, variants }
+ */
+export const getVariantStock = async (productId) => {
+    const response = await api.get(`/products/${productId}/variant-stock`);
+    return response.data;
+};
+
+/**
+ * Verificar si un SKU de variante ya existe
+ * @param {string} sku - SKU a verificar
+ * @param {string} excludeProductId - ID del producto a excluir (para edición)
+ * @returns {Promise<boolean>} true si existe
+ */
+export const checkVariantSkuExists = async (sku, excludeProductId = null) => {
+    if (!sku) return false;
+    const response = await api.get('/products/check-variant-sku', { params: { sku, excludeProductId } });
+    return response.data.exists;
+};
+
+/**
+ * Actualizar stock de una variante específica
+ * @param {string} productId - ID del producto
+ * @param {string} variantId - ID de la variante
+ * @param {number} stock - Nuevo stock
+ * @returns {Promise<Object>} Producto actualizado
+ */
+export const updateVariantStock = async (productId, variantId, stock) => {
+    const response = await api.patch(`/products/${productId}/stock`, { stock, variantId });
+    return response.data;
+};
+
 export default {
     getProducts,
     getProductById,
     createProduct,
     updateProduct,
     deleteProduct,
+    toggleProductActive,
     exportProducts,
     updateProductStock,
     checkCodeExists,
@@ -221,4 +266,7 @@ export default {
     setCoverImage,
     reorderProductImages,
     getProductStockMovements,
+    getVariantStock,
+    checkVariantSkuExists,
+    updateVariantStock,
 };

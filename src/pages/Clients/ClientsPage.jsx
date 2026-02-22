@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
     Plus, Search, Mail, Phone, User, Building2, MapPin, Percent, 
-    Eye, MoreHorizontal, Edit2, CheckCircle, XCircle, Truck, Tag, Activity, Download
+    Eye, MoreHorizontal, Edit2, CheckCircle, XCircle, Truck, Tag, Activity, Download,
+    ChevronUp, ChevronDown
 } from 'lucide-react';
 import { getClients, createClient, toggleClientStatus } from '../../services/clientService';
 import { useAuth } from '../../context/AuthContext';
@@ -137,11 +138,17 @@ const ClientsPage = () => {
     
     const [statusModal, setStatusModal] = useState({ isOpen: false, client: null, loading: false });
     const [openMenu, setOpenMenu] = useState({ id: null, position: null, openAbove: false });
+    
+    // Sorting State
+    const [sort, setSort] = useState({
+        sortBy: 'businessName',
+        order: 'asc'
+    });
     const [exportMenu, setExportMenu] = useState({ open: false, position: null });
 
     useEffect(() => {
         fetchData();
-    }, [pagination.page, debouncedSearchTerm, statusFilter]);
+    }, [pagination.page, debouncedSearchTerm, statusFilter, sort]);
 
     // Debounce para el término de búsqueda
     useEffect(() => {
@@ -159,7 +166,9 @@ const ClientsPage = () => {
             // Construir parámetros de query
             const params = {
                 page: pagination.page,
-                limit: pagination.limit
+                limit: pagination.limit,
+                sortBy: sort.sortBy,
+                order: sort.order
             };
             
             if (debouncedSearchTerm) {
@@ -244,14 +253,49 @@ const ClientsPage = () => {
     const handleOpenMenu = (e, clientId) => {
         e.stopPropagation();
         const rect = e.currentTarget.getBoundingClientRect();
-        const spaceBelow = window.innerHeight - rect.bottom;
-        const openAbove = spaceBelow < 200;
+        const windowHeight = window.innerHeight;
+        const windowWidth = window.innerWidth;
+        const menuHeight = 220; // Altura estimada del menú
+        const menuWidth = 192; // Ancho del menú
+        
+        // Detectar si está cerca del borde inferior
+        const openAbove = (rect.bottom + menuHeight) > windowHeight;
+        
+        // Calcular posición horizontal (alineado a la derecha del botón)
+        let leftPosition = rect.left - menuWidth + rect.width;
+        
+        // Asegurar que no se salga por la derecha
+        if (leftPosition + menuWidth > windowWidth) {
+            leftPosition = windowWidth - menuWidth - 16;
+        }
+        
+        // Asegurar que no sea negativo
+        if (leftPosition < 8) {
+            leftPosition = 8;
+        }
         
         setOpenMenu({
             id: clientId,
-            position: { top: rect.bottom, left: rect.left - 160 + rect.width },
+            position: { 
+                top: openAbove ? rect.top - menuHeight : rect.bottom + 8,
+                left: leftPosition 
+            },
             openAbove
         });
+    };
+
+    const handleSort = (field) => {
+        setSort(prev => ({
+            sortBy: field,
+            order: prev.sortBy === field && prev.order === 'asc' ? 'desc' : 'asc'
+        }));
+    };
+
+    const SortIcon = ({ field }) => {
+        if (sort.sortBy !== field) return <ChevronUp size={10} className="ml-1 opacity-20" />;
+        return sort.order === 'asc' 
+            ? <ChevronUp size={12} className="ml-1 text-primary-600 dark:text-primary-400" /> 
+            : <ChevronDown size={12} className="ml-1 text-primary-600 dark:text-primary-400" />;
     };
 
     const handleOpenExportMenu = (e) => {
@@ -354,19 +398,25 @@ const ClientsPage = () => {
             <div className="card p-0! overflow-hidden border-none shadow-sm ring-1 ring-(--border-color)">
                 {/* Filters */}
                 <div className="bg-(--bg-card) p-4 border-b border-(--border-color)">
-                    <div className="flex justify-end gap-3">
-                        <select
-                            value={statusFilter}
-                            onChange={(e) => {
-                                setStatusFilter(e.target.value);
-                                setPagination(prev => ({ ...prev, page: 1 }));
-                            }}
-                            className="px-3 py-2 bg-(--bg-input) border border-(--border-color) rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
-                        >
-                            <option value="all">Todos</option>
-                            <option value="active">Activos</option>
-                            <option value="inactive">Inactivos</option>
-                        </select>
+                    <div className="flex flex-col sm:flex-row justify-between gap-3">
+                        {/* Filtro de Estado */}
+                        <div className="flex items-center gap-2">
+                            <span className="text-[11px] text-(--text-muted)">Estado:</span>
+                            <select
+                                value={statusFilter}
+                                onChange={(e) => {
+                                    setStatusFilter(e.target.value);
+                                    setPagination(prev => ({ ...prev, page: 1 }));
+                                }}
+                                className="px-3 py-2 bg-(--bg-input) border border-(--border-color) rounded-lg text-xs font-medium text-(--text-primary) focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900 focus:bg-(--bg-card) transition-all"
+                            >
+                                <option value="all">Todos</option>
+                                <option value="active">Activos</option>
+                                <option value="inactive">Inactivos</option>
+                            </select>
+                        </div>
+                        
+                        {/* Búsqueda */}
                         <div className="relative w-full max-w-xs">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-(--text-muted)" size={14} strokeWidth={2.5} />
                             <input
@@ -374,7 +424,7 @@ const ClientsPage = () => {
                                 placeholder="Buscar cliente..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-9 pr-3 py-2 bg-(--bg-input) border border-(--border-color) rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
+                                className="w-full pl-9 pr-3 py-2 bg-(--bg-input) border border-(--border-color) rounded-lg text-xs font-medium text-(--text-primary) placeholder:text-(--text-muted) focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900 focus:bg-(--bg-card) transition-all"
                             />
                         </div>
                     </div>
@@ -385,11 +435,19 @@ const ClientsPage = () => {
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-(--bg-hover) text-[10px] font-bold text-(--text-muted) uppercase tracking-widest border-y border-(--border-color)">
-                                <th className="px-6 py-3">Cliente</th>
-                                <th className="px-6 py-3">Vendedor</th>
+                                <th className="px-6 py-3 cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('businessName')}>
+                                    <div className="flex items-center">Cliente <SortIcon field="businessName" /></div>
+                                </th>
+                                <th className="px-6 py-3 cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('salesRepId')}>
+                                    <div className="flex items-center">Vendedor <SortIcon field="salesRepId" /></div>
+                                </th>
                                 <th className="px-6 py-3">Contacto</th>
-                                <th className="px-6 py-3 text-center">Descuento</th>
-                                <th className="px-6 py-3 text-center">Estado</th>
+                                <th className="px-6 py-3 text-center cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('discount')}>
+                                    <div className="flex items-center justify-center">Descuento <SortIcon field="discount" /></div>
+                                </th>
+                                <th className="px-6 py-3 text-center cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('active')}>
+                                    <div className="flex items-center justify-center">Estado <SortIcon field="active" /></div>
+                                </th>
                                 <th className="px-6 py-3 text-right">Acciones</th>
                             </tr>
                         </thead>

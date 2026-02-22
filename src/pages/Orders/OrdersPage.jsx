@@ -17,6 +17,7 @@ import {
     X,
     Package,
     CheckCircle,
+    XCircle,
     MessageCircle
 } from 'lucide-react';
 
@@ -25,14 +26,18 @@ const StatusBadge = ({ status }) => {
         espera: 'bg-warning-50 dark:bg-warning-900/30 text-warning-600 dark:text-warning-400 border-warning-100 dark:border-warning-800',
         confirmado: 'bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 border-primary-100 dark:border-primary-800',
         preparado: 'bg-info-50 dark:bg-info-900/30 text-info-600 dark:text-info-400 border-info-100 dark:border-info-800',
-        completo: 'bg-success-50 dark:bg-success-900/30 text-success-600 dark:text-success-400 border-success-100 dark:border-success-800'
+        completo: 'bg-success-50 dark:bg-success-900/30 text-success-600 dark:text-success-400 border-success-100 dark:border-success-800',
+        entregado: 'bg-success-50 dark:bg-success-900/30 text-success-700 dark:text-success-300 border-success-200 dark:border-success-700',
+        cancelado: 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700'
     };
 
     const labels = {
         espera: 'En Espera',
         confirmado: 'Confirmado',
         preparado: 'Preparando',
-        completo: 'Completado'
+        completo: 'Completado',
+        entregado: 'Entregado',
+        cancelado: 'Cancelado'
     };
 
     return (
@@ -41,7 +46,7 @@ const StatusBadge = ({ status }) => {
         </span>
     );
 };
-import { getOrders, getAllOrders, convertBudgetToOrder, deleteOrder, revertOrderToBudget, updateOrderStatus, sendOrderEmail } from '../../services/orderService';
+import { getOrders, getAllOrders, convertBudgetToOrder, deleteOrder, revertOrderToBudget, updateOrderStatus, sendOrderEmail, cancelOrder, recoverOrder } from '../../services/orderService';
 import Button from '../../components/common/Button';
 import ConfirmModal from '../../components/common/ConfirmModal';
 import BudgetDrawer from '../../components/orders/BudgetDrawer';
@@ -253,6 +258,9 @@ const OrdersPage = ({ mode = 'order' }) => {
         order: 'desc'
     });
 
+    // Status Filter State
+    const [statusFilter, setStatusFilter] = useState('all');
+
     // Data for filters
     const [clients, setClients] = useState([]);
     const [sellers, setSellers] = useState([]);
@@ -394,7 +402,7 @@ const OrdersPage = ({ mode = 'order' }) => {
 
     useEffect(() => {
         fetchOrders();
-    }, [mode, sort, debouncedSearchTerm, pagination.page, pagination.limit]);
+    }, [mode, sort, debouncedSearchTerm, pagination.page, pagination.limit, statusFilter]);
 
     // Debounce para el término de búsqueda (esperar 500ms después de dejar de tipear)
     useEffect(() => {
@@ -410,6 +418,16 @@ const OrdersPage = ({ mode = 'order' }) => {
 
         return () => clearTimeout(timer);
     }, [searchTerm]);
+
+    // Resetear a página 1 cuando cambia el filtro de estado
+    useEffect(() => {
+        setPagination(prev => ({ ...prev, page: 1 }));
+    }, [statusFilter]);
+
+    // Resetear filtro de estado cuando cambia el modo (pedidos/presupuestos)
+    useEffect(() => {
+        setStatusFilter('all');
+    }, [mode]);
 
     const fetchInitialData = async () => {
         try {
@@ -431,7 +449,8 @@ const OrdersPage = ({ mode = 'order' }) => {
                 ...sort,
                 search: debouncedSearchTerm,
                 page: pagination.page,
-                limit: pagination.limit
+                limit: pagination.limit,
+                status: statusFilter
             });
             setOrders(data.orders || []);
             setPagination(prev => ({
@@ -444,7 +463,7 @@ const OrdersPage = ({ mode = 'order' }) => {
         } finally {
             setLoading(false);
         }
-    }, [mode, sort, debouncedSearchTerm, pagination.page, pagination.limit]);
+    }, [mode, sort, debouncedSearchTerm, pagination.page, pagination.limit, statusFilter]);
 
     const handleSort = (field) => {
         setSort(prev => ({
@@ -453,9 +472,13 @@ const OrdersPage = ({ mode = 'order' }) => {
         }));
     };
 
+    // Helper para estilo de cancelado
+    const cancelledClass = (order) => order.status === 'cancelado' ? 'line-through opacity-70' : '';
+
     // PERMISOS: Determinar si puede editar
     const canEdit = (order) => {
         if (isSuperadmin) return false; // Superadmin no edita nada
+        if (order.status === 'cancelado') return false; // No se editan cancelados
         if (isAdmin) {
             // Admin no puede editar pedidos completados (sí puede editar los que están preparando)
             if (order.type === 'order' && order.status === 'completo') {
@@ -479,26 +502,20 @@ const OrdersPage = ({ mode = 'order' }) => {
         return false;
     };
 
-    // PERMISOS: Determinar si puede eliminar
+    // PERMISOS: Determinar si puede eliminar (solo presupuestos no cancelados)
     const canDelete = (order) => {
         if (isSuperadmin) return false; // Superadmin no elimina nada
+        if (order.type === 'order') return false; // No se eliminan pedidos, solo presupuestos
+        if (order.status === 'cancelado') return false; // No se eliminan cancelados
         if (isAdmin) {
-            // Admin no puede eliminar pedidos completados
-            if (order.type === 'order' && order.status === 'completo') {
-                return false;
-            }
             return true;
         }
         if (isVendedor) {
-            // Vendedor solo elimina sus propios presupuestos
-            if (order.type === 'order') return false; // No elimina pedidos
             const isOwn = isSameId(order.salesRepId, user?.id);
             const isPending = order.status === 'espera';
             return isOwn && isPending;
         }
         if (isClient) {
-            // Cliente solo elimina sus propios presupuestos en espera
-            if (order.type === 'order') return false; // No elimina pedidos
             const isOwn = isSameId(order.clientId, user?.client?.id);
             const isPending = order.status === 'espera';
             return isOwn && isPending;
@@ -606,6 +623,98 @@ const OrdersPage = ({ mode = 'order' }) => {
         }
     };
 
+    // Cancel Modal states
+    const [cancelModal, setCancelModal] = useState({ isOpen: false, order: null, loading: false, reason: '' });
+    
+    // Recover Modal states  
+    const [recoverModal, setRecoverModal] = useState({ isOpen: false, order: null, loading: false });
+
+    // PERMISOS: Determinar si puede cancelar
+    const canCancel = (order) => {
+        if (!order) return false;
+        if (order.status === 'cancelado') return false;
+        if (order.isDeleted) return false;
+        if (isSuperadmin) return false; // Superadmin no cancela
+        if (order.type === 'order') {
+            // Pedidos: solo admin puede cancelar, y solo si está confirmado o preparando
+            if (!isAdmin) return false;
+            return ['confirmado', 'preparado'].includes(order.status);
+        } else {
+            // Presupuestos: admin puede cancelar cualquiera, vendedor solo sus propios en espera
+            if (isAdmin) return true;
+            if (isVendedor) {
+                const isOwn = isSameId(order.salesRepId, user?.id);
+                const isPending = order.status === 'espera';
+                return isOwn && isPending;
+            }
+            if (isClient) {
+                const isOwn = isSameId(order.clientId, user?.client?.id);
+                const isPending = order.status === 'espera';
+                return isOwn && isPending;
+            }
+        }
+        return false;
+    };
+
+    // PERMISOS: Determinar si puede recuperar
+    const canRecover = (order) => {
+        if (!order) return false;
+        if (order.status !== 'cancelado') return false;
+        if (order.isDeleted) return false;
+        if (isSuperadmin) return false;
+        if (isAdmin) return true;
+        if (isVendedor) {
+            return isSameId(order.salesRepId, user?.id);
+        }
+        if (isClient) {
+            return isSameId(order.clientId, user?.client?.id);
+        }
+        return false;
+    };
+
+    const handleCancelClick = (order) => {
+        setCancelModal({ isOpen: true, order, loading: false, reason: '' });
+        setOpenMenu({ id: null, position: null, openAbove: false });
+    };
+
+    const handleCancelConfirm = async () => {
+        if (!cancelModal.order) return;
+        
+        try {
+            setCancelModal(prev => ({ ...prev, loading: true }));
+            const wasOrder = cancelModal.order.type === 'order';
+            await cancelOrder(cancelModal.order._id, cancelModal.reason);
+            setCancelModal({ isOpen: false, order: null, loading: false, reason: '' });
+            addToast(wasOrder ? 'Pedido cancelado y convertido a presupuesto' : 'Presupuesto cancelado', 'success');
+            fetchOrders();
+        } catch (error) {
+            console.error('Error cancelling order:', error);
+            addToast('Error al cancelar: ' + (error.response?.data?.message || error.message), 'error');
+            setCancelModal({ isOpen: false, order: null, loading: false, reason: '' });
+        }
+    };
+
+    const handleRecoverClick = (order) => {
+        setRecoverModal({ isOpen: true, order, loading: false });
+        setOpenMenu({ id: null, position: null, openAbove: false });
+    };
+
+    const handleRecoverConfirm = async () => {
+        if (!recoverModal.order) return;
+        
+        try {
+            setRecoverModal(prev => ({ ...prev, loading: true }));
+            await recoverOrder(recoverModal.order._id);
+            setRecoverModal({ isOpen: false, order: null, loading: false });
+            addToast('Presupuesto recuperado exitosamente', 'success');
+            fetchOrders();
+        } catch (error) {
+            console.error('Error recovering order:', error);
+            addToast('Error al recuperar: ' + (error.response?.data?.message || error.message), 'error');
+            setRecoverModal({ isOpen: false, order: null, loading: false });
+        }
+    };
+
     // Determinar si se puede revertir a estado anterior y a cuál
     const getRevertInfo = (order) => {
         if (!isAdmin || order?.type !== 'order') return null;
@@ -683,11 +792,11 @@ const OrdersPage = ({ mode = 'order' }) => {
         setIsActivityDrawerOpen(true);
     };
 
-    const handleSendEmailConfirm = async ({ orderId, notifications }) => {
+    const handleSendEmailConfirm = async ({ orderId, notifications, additionalEmails }) => {
         try {
             setSendingEmail(true);
             
-            const result = await sendOrderEmail(orderId, notifications);
+            const result = await sendOrderEmail(orderId, notifications, additionalEmails);
             
             setIsSendEmailModalOpen(false);
             setSelectedOrderForEmail(null);
@@ -851,7 +960,35 @@ const OrdersPage = ({ mode = 'order' }) => {
             <div className="card p-0! overflow-hidden border-none shadow-sm ring-1 ring-(--border-color)">
                 {/* Filters Header */}
                 <div className="bg-(--bg-card) p-4 border-b border-(--border-color)">
-                    <div className="flex justify-end">
+                    <div className="flex flex-col sm:flex-row justify-between gap-3">
+                        {/* Filtro de Estado */}
+                        <div className="flex items-center gap-2">
+                            <span className="text-[11px] text-(--text-muted)">Estado:</span>
+                            <select
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value)}
+                                className="px-3 py-2 bg-(--bg-input) border border-(--border-color) rounded-lg text-xs font-medium text-(--text-primary) focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900 focus:bg-(--bg-card) transition-all"
+                            >
+                                <option value="all">Todos</option>
+                                {mode === 'order' ? (
+                                    <>
+                                        <option value="confirmado">Confirmado</option>
+                                        <option value="preparado">Preparando</option>
+                                        <option value="completo">Completado</option>
+                                        <option value="entregado">Entregado</option>
+                                        <option value="cancelado">Cancelado</option>
+                                    </>
+                                ) : (
+                                    <>
+                                        <option value="espera">En Espera</option>
+                                        <option value="confirmado">Confirmado</option>
+                                        <option value="cancelado">Cancelado</option>
+                                    </>
+                                )}
+                            </select>
+                        </div>
+                        
+                        {/* Búsqueda */}
                         <div className="relative w-full max-w-xs">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-(--text-muted)" size={14} strokeWidth={2.5} />
                             <input
@@ -875,8 +1012,8 @@ const OrdersPage = ({ mode = 'order' }) => {
                                     <div className="flex items-center"># Número <SortIcon field="orderNumber" /></div>
                                 </th>
                                 {isSuperadmin && (
-                                    <th className="px-6 py-3">
-                                        <div className="flex items-center gap-1"><Building2 size={12} /> Compañía</div>
+                                    <th className="px-6 py-3 cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('companyId')}>
+                                        <div className="flex items-center gap-1"><Building2 size={12} /> Compañía <SortIcon field="companyId" /></div>
                                     </th>
                                 )}
                                 <th className="px-6 py-3 cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('clientId')}>
@@ -885,12 +1022,20 @@ const OrdersPage = ({ mode = 'order' }) => {
                                 <th className="px-6 py-3 cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('date')}>
                                     <div className="flex items-center">Fecha <SortIcon field="date" /></div>
                                 </th>
-                                <th className="px-6 py-3">Vendedor</th>
-                                <th className="px-6 py-3 text-right cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors">Total</th>
+                                <th className="px-6 py-3 cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('salesRepId')}>
+                                    <div className="flex items-center">Vendedor <SortIcon field="salesRepId" /></div>
+                                </th>
+                                <th className="px-6 py-3 text-right cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('total')}>
+                                    <div className="flex items-center justify-end">Total <SortIcon field="total" /></div>
+                                </th>
                                 {canViewCommission && (
-                                    <th className="px-6 py-3 text-right">Comisión</th>
+                                    <th className="px-6 py-3 text-right cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('commissionAmount')}>
+                                        <div className="flex items-center justify-end">Comisión <SortIcon field="commissionAmount" /></div>
+                                    </th>
                                 )}
-                                <th className="px-6 py-3 text-center">Estado</th>
+                                <th className="px-6 py-3 text-center cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('status')}>
+                                    <div className="flex items-center justify-center">Estado <SortIcon field="status" /></div>
+                                </th>
                                 <th className="px-6 py-3 text-right">Acciones</th>
                             </tr>
                         </thead>
@@ -911,28 +1056,28 @@ const OrdersPage = ({ mode = 'order' }) => {
                                         className="hover:bg-(--bg-hover) transition-colors even:bg-(--bg-hover)/50 group cursor-pointer"
                                         onClick={(e) => { e.stopPropagation(); handleViewOrder(order); }}
                                     >
-                                        <td className="px-6 py-4 font-bold text-(--text-primary) text-[13px]">
+                                        <td className={`px-6 py-4 font-bold text-(--text-primary) text-[13px] ${cancelledClass(order)}`}>
                                             #{String(order.orderNumber).padStart(5, '0')}
                                         </td>
                                         {isSuperadmin && (
-                                            <td className="px-6 py-4">
+                                            <td className={`px-6 py-4 ${cancelledClass(order)}`}>
                                                 <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 border border-primary-100 dark:border-primary-800">
                                                     <Building2 size={10} />
                                                     {order.companyId?.name || 'N/A'}
                                                 </span>
                                             </td>
                                         )}
-                                        <td className="px-6 py-4">
+                                        <td className={`px-6 py-4 ${cancelledClass(order)}`}>
                                             <div className="text-[13px] font-bold text-(--text-primary)">{order.clientId?.businessName}</div>
                                             <div className="text-[10px] text-(--text-muted) font-bold tracking-tight uppercase">ID: {order.clientId?._id.substring(18).toUpperCase()}</div>
                                         </td>
-                                        <td className="px-6 py-4 text-[12px] font-semibold text-(--text-secondary)">
+                                        <td className={`px-6 py-4 text-[12px] font-semibold text-(--text-secondary) ${cancelledClass(order)}`}>
                                             {new Date(order.date).toLocaleDateString()}
                                         </td>
-                                        <td className="px-6 py-4 text-[12px] font-semibold text-(--text-secondary)">
+                                        <td className={`px-6 py-4 text-[12px] font-semibold text-(--text-secondary) ${cancelledClass(order)}`}>
                                             {order.salesRepId?.firstName} {order.salesRepId?.lastName}
                                         </td>
-                                        <td className="px-6 py-4 text-right font-bold text-(--text-primary) text-[13px]">
+                                        <td className={`px-6 py-4 text-right font-bold text-(--text-primary) text-[13px] ${cancelledClass(order)}`}>
                                             ${(() => {
                                                 // Usar total calculado del backend o recalcular para pedidos antiguos
                                                 const totalBase = order.total !== undefined ? parseFloat(order.total) : (() => {
@@ -945,7 +1090,7 @@ const OrdersPage = ({ mode = 'order' }) => {
                                             })()}
                                         </td>
                                         {canViewCommission && (
-                                            <td className="px-6 py-4 text-right text-[13px]">
+                                            <td className={`px-6 py-4 text-right text-[13px] ${cancelledClass(order)}`}>
                                                 {order.commissionAmount ? (
                                                     <span className="font-semibold text-success-600 dark:text-success-400">
                                                         ${formatPrice(applyTax(order.commissionAmount))}
@@ -1052,11 +1197,23 @@ const OrdersPage = ({ mode = 'order' }) => {
                                                                     label: 'Ver Actividad',
                                                                     onClick: () => handleViewActivityClick(order)
                                                                 },
+                                                                ...(canRecover(order) ? [{
+                                                                    icon: <CheckCircle size={16} />,
+                                                                    label: 'Recuperar',
+                                                                    variant: 'success',
+                                                                    onClick: () => handleRecoverClick(order)
+                                                                }] : []),
                                                                 ...(getRevertInfo(order) ? [{
                                                                     icon: <ArrowLeft size={16} />,
                                                                     label: getRevertInfo(order).label,
                                                                     variant: 'warning',
                                                                     onClick: () => handleRevertClick(order)
+                                                                }] : []),
+                                                                ...(canCancel(order) ? [{
+                                                                    icon: <XCircle size={16} />,
+                                                                    label: order.type === 'order' ? 'Cancelar (volverá a presupuesto)' : 'Cancelar',
+                                                                    variant: 'danger',
+                                                                    onClick: () => handleCancelClick(order)
                                                                 }] : []),
                                                                 ...(canDelete(order) ? [{
                                                                     icon: <Trash2 size={16} />,
@@ -1107,11 +1264,11 @@ const OrdersPage = ({ mode = 'order' }) => {
                                     {/* Header: Numero y Estado */}
                                     <div className="flex items-center justify-between mb-3">
                                         <div className="flex items-center gap-2">
-                                            <span className="font-bold text-(--text-primary) text-[15px]">
+                                            <span className={`font-bold text-(--text-primary) text-[15px] ${cancelledClass(order)}`}>
                                                 #{String(order.orderNumber).padStart(5, '0')}
                                             </span>
                                             {isSuperadmin && (
-                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 border border-primary-100 dark:border-primary-800">
+                                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 border border-primary-100 dark:border-primary-800 ${cancelledClass(order)}`}>
                                                     <Building2 size={8} />
                                                     {order.companyId?.name || 'N/A'}
                                                 </span>
@@ -1121,13 +1278,13 @@ const OrdersPage = ({ mode = 'order' }) => {
                                     </div>
                                     
                                     {/* Cliente */}
-                                    <div className="mb-2">
+                                    <div className={`mb-2 ${cancelledClass(order)}`}>
                                         <div className="text-[14px] font-bold text-(--text-primary)">{order.clientId?.businessName}</div>
                                         <div className="text-[10px] text-(--text-muted) font-bold tracking-tight uppercase">ID: {order.clientId?._id.substring(18).toUpperCase()}</div>
                                     </div>
                                     
                                     {/* Info Grid */}
-                                    <div className="grid grid-cols-2 gap-2 mb-3 text-[12px]">
+                                    <div className={`grid grid-cols-2 gap-2 mb-3 text-[12px] ${cancelledClass(order)}`}>
                                         <div>
                                             <span className="text-(--text-muted)">Fecha:</span>
                                             <span className="ml-1 font-semibold text-(--text-secondary)">{new Date(order.date).toLocaleDateString()}</span>
@@ -1164,7 +1321,7 @@ const OrdersPage = ({ mode = 'order' }) => {
                                     </div>
                                     
                                     {/* Acciones */}
-                                    <div className="flex items-center gap-2 pt-2 border-t border-(--border-color)">
+                                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-(--border-color)">
                                         {canConvertToOrder(order) && (
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); handleConvertClick(order); }}
@@ -1218,7 +1375,9 @@ const OrdersPage = ({ mode = 'order' }) => {
                                                 ...(isClient ? [] : [{ icon: <MessageCircle size={16} />, label: 'Enviar WhatsApp', onClick: () => handleSendWhatsAppClick(order) }]),
                                                 { icon: <Printer size={16} />, label: 'Imprimir / PDF', onClick: () => { try { generateOrderPDF(order, order.companyId); } catch (error) { addToast('Error al generar PDF: ' + error.message, 'error'); } } },
                                                 { icon: <History size={16} />, label: 'Ver Actividad', onClick: () => handleViewActivityClick(order) },
+                                                ...(canRecover(order) ? [{ icon: <CheckCircle size={16} />, label: 'Recuperar', variant: 'success', onClick: () => handleRecoverClick(order) }] : []),
                                                 ...(getRevertInfo(order) ? [{ icon: <ArrowLeft size={16} />, label: getRevertInfo(order).label, variant: 'warning', onClick: () => handleRevertClick(order) }] : []),
+                                                ...(canCancel(order) ? [{ icon: <XCircle size={16} />, label: order.type === 'order' ? 'Cancelar (volverá a presupuesto)' : 'Cancelar', variant: 'danger', onClick: () => handleCancelClick(order) }] : []),
                                                 ...(canDelete(order) ? [{ icon: <Trash2 size={16} />, label: 'Eliminar', variant: 'danger', onClick: () => handleDeleteClick(order) }] : [])
                                             ]}
                                             position={openMenu.position}
@@ -1311,6 +1470,48 @@ const OrdersPage = ({ mode = 'order' }) => {
                 confirmText={revertModal.loading ? 'Revirtiendo...' : 'Sí, revertir'}
                 cancelText="Cancelar"
                 type="warning"
+            />
+
+            {/* Cancel Order/Budget Modal */}
+            <ConfirmModal
+                isOpen={cancelModal.isOpen}
+                onClose={() => setCancelModal({ isOpen: false, order: null, loading: false, reason: '' })}
+                onConfirm={handleCancelConfirm}
+                title={cancelModal.order?.type === 'order' ? '¿Cancelar Pedido?' : '¿Cancelar Presupuesto?'}
+                description={
+                    <div className="space-y-3">
+                        <p>
+                            {cancelModal.order?.type === 'order' 
+                                ? `Está a punto de cancelar el pedido #${String(cancelModal.order?.orderNumber || '').padStart(5, '0')}. El pedido volverá a ser un presupuesto cancelado.` 
+                                : `Está a punto de cancelar el presupuesto #${String(cancelModal.order?.orderNumber || '').padStart(5, '0')}.`}
+                        </p>
+                        <div>
+                            <label className="block text-xs font-medium text-(--text-muted) mb-1">Motivo (opcional)</label>
+                            <textarea
+                                value={cancelModal.reason}
+                                onChange={(e) => setCancelModal(prev => ({ ...prev, reason: e.target.value }))}
+                                className="w-full p-2 bg-(--bg-input) border border-(--border-color) rounded-lg text-sm"
+                                rows={2}
+                                placeholder="Ingrese el motivo de la cancelación..."
+                            />
+                        </div>
+                    </div>
+                }
+                confirmText={cancelModal.loading ? 'Cancelando...' : 'Sí, cancelar'}
+                cancelText="No, mantener"
+                type="danger"
+            />
+
+            {/* Recover Cancelled Budget Modal */}
+            <ConfirmModal
+                isOpen={recoverModal.isOpen}
+                onClose={() => setRecoverModal({ isOpen: false, order: null, loading: false })}
+                onConfirm={handleRecoverConfirm}
+                title="¿Recuperar Presupuesto?"
+                description={`Está a punto de recuperar el presupuesto cancelado #${String(recoverModal.order?.orderNumber || '').padStart(5, '0')}. El presupuesto volverá a estado "En Espera" y se reservará el stock nuevamente.`}
+                confirmText={recoverModal.loading ? 'Recuperando...' : 'Sí, recuperar'}
+                cancelText="Cancelar"
+                type="success"
             />
 
             {/* Update Order Status Modal (Preparar/Completar) */}

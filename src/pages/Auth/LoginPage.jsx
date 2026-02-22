@@ -127,7 +127,7 @@ const LoginPage = () => {
                 transition={{ duration: 0.5 }}
                 className="w-full max-w-112.5 z-10"
             >
-                <div className="bg-(--bg-card)/80 backdrop-blur-xl border border-(--border-color) rounded-3xl shadow-soft dark:shadow-soft-dark p-10 md:p-12">
+                <div className="bg-(--bg-card)/80 backdrop-blur-xl border border-(--border-color) rounded-2xl shadow-soft dark:shadow-soft-dark p-6 md:p-8">
                     
                     <AnimatePresence mode="wait">
                         {!showCompanySelector ? (
@@ -139,18 +139,18 @@ const LoginPage = () => {
                                 exit={{ opacity: 0, x: -20 }}
                                 transition={{ duration: 0.3 }}
                             >
-                                <div className="text-center mb-8">
+                                <div className="text-center mb-6">
                                     <motion.div
                                         whileHover={{ scale: 1.05 }}
-                                        className="inline-flex items-center justify-center w-14 h-14 bg-primary-600 rounded-xl shadow-lg shadow-primary-200 dark:shadow-primary-900/30 mb-6"
+                                        className="inline-flex items-center justify-center w-12 h-12 bg-primary-600 rounded-xl shadow-lg shadow-primary-200 dark:shadow-primary-900/30 mb-4"
                                     >
-                                        <LogIn className="text-white" size={28} />
+                                        <LogIn className="text-white" size={22} />
                                     </motion.div>
-                                    <h1 className="text-2xl font-bold text-(--text-primary) mb-1.5">¡Bienvenido!</h1>
-                                    <p className="text-(--text-secondary) text-sm font-medium">Inicia sesión en NOVA Orden</p>
+                                    <h1 className="text-lg font-bold text-(--text-primary) mb-1">¡Bienvenido!</h1>
+                                    <p className="text-(--text-secondary) text-[13px] font-medium">Inicia sesión en NOVA Orden</p>
                                 </div>
 
-                                <form onSubmit={handleSubmit} className="space-y-6">
+                                <form onSubmit={handleSubmit} className="space-y-4">
                                     <Input
                                         label="Correo Electrónico"
                                         name="email"
@@ -168,7 +168,7 @@ const LoginPage = () => {
                                             labelRight={
                                                 <Link
                                                     to="/forgot-password"
-                                                    className="text-xs font-semibold text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors"
+                                                    className="text-[11px] font-semibold text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors"
                                                 >
                                                     ¿Olvidaste tu contraseña?
                                                 </Link>
@@ -184,16 +184,16 @@ const LoginPage = () => {
                                         <button
                                             type="button"
                                             onClick={() => setShowPassword(!showPassword)}
-                                            className="absolute right-3 top-8.5 text-(--text-muted) hover:text-(--text-primary) transition-colors"
+                                            className="absolute right-3 top-[34px] text-(--text-muted) hover:text-(--text-primary) transition-colors"
                                             tabIndex={-1}
                                         >
-                                            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                                         </button>
                                     </div>
 
                                     <Button
                                         type="submit"
-                                        className="w-full py-4 text-base rounded-xl"
+                                        className="w-full py-2.5 text-sm rounded-lg"
                                         isLoading={isLoading}
                                     >
                                         Continuar
@@ -209,20 +209,20 @@ const LoginPage = () => {
                                 exit={{ opacity: 0, x: 20 }}
                                 transition={{ duration: 0.3 }}
                             >
-                                <div className="text-center mb-8">
+                                <div className="text-center mb-6">
                                     <motion.div
                                         whileHover={{ scale: 1.05 }}
-                                        className="inline-flex items-center justify-center w-14 h-14 bg-primary-600 rounded-xl shadow-lg shadow-primary-200 dark:shadow-primary-900/30 mb-6"
+                                        className="inline-flex items-center justify-center w-12 h-12 bg-primary-600 rounded-xl shadow-lg shadow-primary-200 dark:shadow-primary-900/30 mb-4"
                                     >
-                                        <Building2 className="text-white" size={28} />
+                                        <Building2 className="text-white" size={22} />
                                     </motion.div>
-                                    <h1 className="text-2xl font-bold text-(--text-primary) mb-1.5">Selecciona tu empresa</h1>
-                                    <p className="text-(--text-secondary) text-sm font-medium">
+                                    <h1 className="text-lg font-bold text-(--text-primary) mb-1">Selecciona tu empresa</h1>
+                                    <p className="text-(--text-secondary) text-[13px] font-medium">
                                         Tu cuenta está asociada a {companyOptions.length} empresas
                                     </p>
                                 </div>
 
-                                <div className="space-y-3 mb-6">
+                                <div className="space-y-2 mb-4">
                                     {companyOptions.map((option, index) => {
                                         const RoleIcon = getRoleIcon(option.roleName);
                                         return (
@@ -235,28 +235,28 @@ const LoginPage = () => {
                                                 disabled={isLoading}
                                                 className="w-full p-4 bg-(--bg-body) hover:bg-(--bg-hover) border border-(--border-color) hover:border-primary-300 dark:hover:border-primary-700 rounded-xl transition-all group text-left"
                                             >
-                                                <div className="flex items-center gap-4">
+                                                <div className="flex items-center gap-3">
                                                     {option.companyLogo ? (
                                                         <img 
                                                             src={option.companyLogo} 
                                                             alt={option.companyName}
-                                                            className="w-12 h-12 rounded-xl object-contain bg-white p-1"
+                                                            className="w-10 h-10 rounded-lg object-contain bg-white p-1"
                                                         />
                                                     ) : (
-                                                        <div className="w-12 h-12 rounded-xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-primary-600 font-bold text-lg">
+                                                        <div className="w-10 h-10 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-primary-600 font-bold text-sm">
                                                             {option.initials}
                                                         </div>
                                                     )}
                                                     <div className="flex-1 min-w-0">
-                                                        <p className="text-(--text-primary) font-semibold truncate">
+                                                        <p className="text-(--text-primary) font-semibold text-sm truncate">
                                                             {option.companyName}
                                                         </p>
-                                                        <div className="flex items-center gap-1.5 text-xs text-(--text-muted)">
-                                                            <RoleIcon size={12} />
+                                                        <div className="flex items-center gap-1.5 text-[11px] text-(--text-muted)">
+                                                            <RoleIcon size={11} />
                                                             <span>{getRoleLabel(option.roleName)}</span>
                                                         </div>
                                                     </div>
-                                                    <ChevronRight size={20} className="text-(--text-muted) group-hover:text-primary-600 transition-colors" />
+                                                    <ChevronRight size={18} className="text-(--text-muted) group-hover:text-primary-600 transition-colors" />
                                                 </div>
                                             </motion.button>
                                         );
@@ -266,7 +266,7 @@ const LoginPage = () => {
                                 <button
                                     onClick={handleBackToLogin}
                                     disabled={isLoading}
-                                    className="w-full py-3 flex items-center justify-center gap-2 text-sm font-medium text-(--text-secondary) hover:text-(--text-primary) transition-colors"
+                                    className="w-full py-2.5 flex items-center justify-center gap-2 text-[13px] font-medium text-(--text-secondary) hover:text-(--text-primary) transition-colors"
                                 >
                                     <ArrowLeft size={16} />
                                     Volver al inicio de sesión
@@ -276,7 +276,7 @@ const LoginPage = () => {
                     </AnimatePresence>
 
                     {!showCompanySelector && (
-                        <div className="mt-12 pt-8 border-t border-(--border-color) text-center">
+                        <div className="mt-8 pt-6 border-t border-(--border-color) text-center">
                             <button
                                 onClick={() => setShowDocsDrawer(true)}
                                 className="inline-flex items-center gap-2 text-sm font-semibold text-(--text-secondary) hover:text-primary-600 dark:hover:text-primary-400 transition-colors group"

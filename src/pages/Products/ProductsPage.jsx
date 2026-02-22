@@ -15,7 +15,8 @@ import {
     History,
     Power,
     PowerOff,
-    AlertCircle
+    AlertCircle,
+    Activity
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -25,6 +26,7 @@ import ConfirmModal from '../../components/common/ConfirmModal';
 import ProductQuickViewAdmin from '../../components/products/ProductQuickViewAdmin';
 import ProductDrawer from '../../components/products/ProductDrawer';
 import StockMovementsDrawer from '../../components/products/StockMovementsDrawer';
+import ProductActivityDrawer from '../../components/products/ProductActivityDrawer';
 
 const ProductsPage = () => {
     const navigate = useNavigate();
@@ -68,11 +70,17 @@ const ProductsPage = () => {
         product: null
     });
     
+    // Activity drawer
+    const [activityDrawer, setActivityDrawer] = useState({
+        isOpen: false,
+        product: null
+    });
+    
     // Estado para el menú de exportación
     const [exportMenu, setExportMenu] = useState({ open: false, position: null });
     
     // Estado para el menú de acciones por producto
-    const [actionMenu, setActionMenu] = useState({ open: false, position: null, productId: null });
+    const [actionMenu, setActionMenu] = useState({ open: false, position: null, productId: null, openAbove: false });
     
     // Ahora sí, después de todos los hooks, hacemos los cálculos y el return condicional
     const isAdmin = user?.role?.name === 'admin';
@@ -204,25 +212,34 @@ const ProductsPage = () => {
     const handleOpenActionMenu = (e, productId) => {
         const rect = e.currentTarget.getBoundingClientRect();
         const windowWidth = window.innerWidth;
+        const windowHeight = window.innerHeight;
         const menuWidth = 192;
+        const menuHeight = 250; // Altura estimada del menú
         
+        // Calcular posición horizontal (alineado a la derecha del botón)
         let leftPosition = rect.left - menuWidth + rect.width;
         
+        // Asegurar que no se salga por la derecha
         if (leftPosition + menuWidth > windowWidth) {
             leftPosition = windowWidth - menuWidth - 16;
         }
         
+        // Asegurar que no sea negativo
         if (leftPosition < 8) {
             leftPosition = 8;
         }
+        
+        // Detectar si está cerca del borde inferior y necesita abrir hacia arriba
+        const openAbove = (rect.bottom + menuHeight) > windowHeight;
         
         setActionMenu({
             open: true,
             productId,
             position: {
-                top: rect.bottom + 8,
+                top: openAbove ? rect.top - menuHeight : rect.bottom + 8,
                 left: leftPosition
-            }
+            },
+            openAbove
         });
     };
 
@@ -256,6 +273,14 @@ const ProductsPage = () => {
     const handleViewStockMovements = (product, e) => {
         e?.stopPropagation();
         setStockMovementsDrawer({
+            isOpen: true,
+            product
+        });
+    };
+
+    const handleViewActivity = (product, e) => {
+        e?.stopPropagation();
+        setActivityDrawer({
             isOpen: true,
             product
         });
@@ -471,7 +496,7 @@ const ProductsPage = () => {
                                 </th>
                                 <th className="px-6 py-3 text-right cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('pricing.list1.price')}>
                                     <div className="flex items-center justify-end">
-                                        <span>Lista 1 {inputPricesWithTax ? <span className="text-[9px] normal-case">(con IVA)</span> : <span className="text-[9px] normal-case">(sin IVA)</span>}</span>
+                                        <span>{hasPriceListsFeature ? 'Lista 1' : 'Lista'} {inputPricesWithTax ? <span className="text-[9px] normal-case">(con IVA)</span> : <span className="text-[9px] normal-case">(sin IVA)</span>}</span>
                                         <SortIcon field="pricing.list1.price" />
                                     </div>
                                 </th>
@@ -764,9 +789,14 @@ const ProductsPage = () => {
                                                                 },
                                                                 ...(hasStockFeature ? [{
                                                                     icon: <History size={16} />,
-                                                                    label: 'Ver movimientos',
+                                                                    label: 'Movimientos de stock',
                                                                     onClick: () => handleViewStockMovements(product)
                                                                 }] : []),
+                                                                {
+                                                                    icon: <Activity size={16} />,
+                                                                    label: 'Ver actividad',
+                                                                    onClick: () => handleViewActivity(product)
+                                                                },
                                                                 {
                                                                     icon: product.active ? <PowerOff size={16} /> : <Power size={16} />,
                                                                     label: product.active ? 'Desactivar' : 'Activar',
@@ -781,7 +811,8 @@ const ProductsPage = () => {
                                                                 }
                                                             ]}
                                                             position={actionMenu.position}
-                                                            onClose={() => setActionMenu({ open: false, position: null, productId: null })}
+                                                            openAbove={actionMenu.openAbove}
+                                        onClose={() => setActionMenu({ open: false, position: null, productId: null, openAbove: false })}
                                                         />
                                                     )}
                                                 </div>
@@ -849,7 +880,11 @@ const ProductsPage = () => {
                         products.map((product) => (
                             <div
                                 key={product._id}
-                                className="p-4 hover:bg-(--bg-hover) transition-colors even:bg-(--bg-hover)/50"
+                                onClick={() => {
+                                    setEditingProduct(product);
+                                    setIsProductDrawerOpen(true);
+                                }}
+                                className="p-4 hover:bg-(--bg-hover) transition-colors even:bg-(--bg-hover)/50 cursor-pointer"
                             >
                                 {/* Header: Nombre y código */}
                                 <div className="flex items-start justify-between mb-2">
@@ -884,7 +919,7 @@ const ProductsPage = () => {
                                         {/* Lista 1 */}
                                         <div className="flex flex-col">
                                             <span className="text-[10px] text-(--text-muted) uppercase tracking-wider">
-                                                Lista 1 {inputPricesWithTax ? <span className="text-[8px]">(con IVA)</span> : <span className="text-[8px]">(sin IVA)</span>}
+                                                {hasPriceListsFeature ? 'Lista 1' : 'Lista'} {inputPricesWithTax ? <span className="text-[8px]">(con IVA)</span> : <span className="text-[8px]">(sin IVA)</span>}
                                             </span>
                                             {(() => {
                                                 const taxRate = product.pricing?.tax || 0;
@@ -1088,7 +1123,7 @@ const ProductsPage = () => {
                                             },
                                             ...(hasStockFeature ? [{
                                                 icon: <History size={16} />,
-                                                label: 'Ver movimientos',
+                                                label: 'Movimientos de stock',
                                                 onClick: () => handleViewStockMovements(product)
                                             }] : []),
                                             {
@@ -1105,7 +1140,8 @@ const ProductsPage = () => {
                                             }
                                         ]}
                                         position={actionMenu.position}
-                                        onClose={() => setActionMenu({ open: false, position: null, productId: null })}
+                                        openAbove={actionMenu.openAbove}
+                                        onClose={() => setActionMenu({ open: false, position: null, productId: null, openAbove: false })}
                                     />
                                 )}
                             </div>
@@ -1172,12 +1208,18 @@ const ProductsPage = () => {
                 onClose={() => setStockMovementsDrawer({ isOpen: false, product: null })}
                 product={stockMovementsDrawer.product}
             />
+            
+            <ProductActivityDrawer
+                isOpen={activityDrawer.isOpen}
+                onClose={() => setActivityDrawer({ isOpen: false, product: null })}
+                product={activityDrawer.product}
+            />
         </div>
     );
 };
 
 // ActionMenu Component
-const ActionMenu = ({ items, onClose, position }) => {
+const ActionMenu = ({ items, onClose, position, openAbove = false }) => {
     const menuRef = useRef(null);
     useEffect(() => {
         const handleClickOutside = (e) => {

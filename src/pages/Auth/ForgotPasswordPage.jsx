@@ -58,27 +58,27 @@ const ForgotPasswordPage = () => {
                 transition={{ duration: 0.5 }}
                 className="w-full max-w-md z-10"
             >
-                <div className="bg-(--bg-card)/80 backdrop-blur-xl border border-(--border-color) rounded-3xl shadow-soft dark:shadow-soft-dark p-10 md:p-12">
+                <div className="bg-(--bg-card)/80 backdrop-blur-xl border border-(--border-color) rounded-2xl shadow-soft dark:shadow-soft-dark p-6 md:p-8">
                     {/* Back Button */}
                     <Link
                         to="/login"
-                        className="inline-flex items-center gap-1 text-sm text-(--text-secondary) hover:text-primary-600 dark:hover:text-primary-400 transition-colors mb-6"
+                        className="inline-flex items-center gap-1 text-[13px] text-(--text-secondary) hover:text-primary-600 dark:hover:text-primary-400 transition-colors mb-5"
                     >
                         <ArrowLeft size={16} />
                         Volver al login
                     </Link>
 
-                    <div className="text-center mb-8">
+                    <div className="text-center mb-6">
                         <motion.div
                             whileHover={{ scale: 1.05 }}
-                            className="inline-flex items-center justify-center w-14 h-14 bg-primary-600 rounded-xl shadow-lg shadow-primary-200 dark:shadow-primary-900/30 mb-6"
+                            className="inline-flex items-center justify-center w-12 h-12 bg-primary-600 rounded-xl shadow-lg shadow-primary-200 dark:shadow-primary-900/30 mb-4"
                         >
-                            <KeyRound className="text-white" size={28} />
+                            <KeyRound className="text-white" size={22} />
                         </motion.div>
-                        <h1 className="text-2xl font-bold text-(--text-primary) mb-1.5">
+                        <h1 className="text-lg font-bold text-(--text-primary) mb-1">
                             ¿Olvidaste tu contraseña?
                         </h1>
-                        <p className="text-(--text-secondary) text-sm font-medium">
+                        <p className="text-(--text-secondary) text-[13px] font-medium">
                             {isSent 
                                 ? 'Revisa tu email para continuar' 
                                 : 'Te enviaremos instrucciones para recuperarla'}
@@ -86,7 +86,7 @@ const ForgotPasswordPage = () => {
                     </div>
 
                     {!isSent ? (
-                        <form onSubmit={handleSubmit} className="space-y-6">
+                        <form onSubmit={handleSubmit} className="space-y-4">
                             <Input
                                 label="Correo Electrónico"
                                 name="email"
@@ -100,16 +100,16 @@ const ForgotPasswordPage = () => {
 
                             <Button
                                 type="submit"
-                                className="w-full py-4 text-base rounded-xl"
+                                className="w-full py-2.5 text-sm rounded-lg"
                                 isLoading={isLoading}
                             >
                                 Enviar instrucciones
                             </Button>
                         </form>
                     ) : (
-                        <div className="text-center space-y-6">
-                            <div className="p-4 bg-success-50 dark:bg-success-900/20 rounded-xl border border-success-100 dark:border-success-800">
-                                <p className="text-success-700 dark:text-success-300 text-sm">
+                        <div className="text-center space-y-4">
+                            <div className="p-3 bg-success-50 dark:bg-success-900/20 rounded-lg border border-success-100 dark:border-success-800">
+                                <p className="text-success-700 dark:text-success-300 text-[13px]">
                                     Si el email existe en nuestro sistema, recibirás un enlace para restablecer tu contraseña.
                                 </p>
                             </div>

@@ -639,6 +639,9 @@ const ProductDrawer = ({ isOpen, onClose, onSave, product = null, features = {} 
         if (isOpen) {
             let newFormData;
             if (product) {
+                // Usar los nuevos campos de la API si inputPricesWithTax está activo
+                const usePricesWithTax = user?.company?.inputPricesWithTax === true;
+                
                 newFormData = {
                     code: product.code || '',
                     barcode: product.barcode || '',
@@ -651,21 +654,21 @@ const ProductDrawer = ({ isOpen, onClose, onSave, product = null, features = {} 
                     longDescription: product.longDescription || '',
                     pricing: {
                         list1: {
-                            price: user?.company?.inputPricesWithTax && product.pricing?.list1?.price 
-                                ? (product.pricing.list1.price * (1 + (product.pricing?.tax ?? 21)/100)).toFixed(2) 
+                            price: usePricesWithTax && product.priceWithTaxList1
+                                ? product.priceWithTaxList1.toFixed(2)
                                 : (product.pricing?.list1?.price || ''),
                             discount: product.pricing?.list1?.discount || '',
-                            offer: user?.company?.inputPricesWithTax && product.pricing?.list1?.offer 
-                                ? (product.pricing.list1.offer * (1 + (product.pricing?.tax ?? 21)/100)).toFixed(2) 
+                            offer: usePricesWithTax && product.offerWithTaxList1
+                                ? product.offerWithTaxList1.toFixed(2)
                                 : (product.pricing?.list1?.offer || '')
                         },
                         list2: {
-                            price: user?.company?.inputPricesWithTax && product.pricing?.list2?.price 
-                                ? (product.pricing.list2.price * (1 + (product.pricing?.tax ?? 21)/100)).toFixed(2) 
+                            price: usePricesWithTax && product.priceWithTaxList2
+                                ? product.priceWithTaxList2.toFixed(2)
                                 : (product.pricing?.list2?.price || ''),
                             discount: product.pricing?.list2?.discount || '',
-                            offer: user?.company?.inputPricesWithTax && product.pricing?.list2?.offer 
-                                ? (product.pricing.list2.offer * (1 + (product.pricing?.tax ?? 21)/100)).toFixed(2) 
+                            offer: usePricesWithTax && product.offerWithTaxList2
+                                ? product.offerWithTaxList2.toFixed(2)
                                 : (product.pricing?.list2?.offer || '')
                         },
                         tax: product.pricing?.tax ?? 21
@@ -684,32 +687,39 @@ const ProductDrawer = ({ isOpen, onClose, onSave, product = null, features = {} 
                 setHasVariants(product.hasVariants || false);
                 setHasUniformVariantPricing(product.hasUniformVariantPricing !== false); // default true
                 setVariantConfig(product.variantConfig || { label1: 'Variable 1', label2: 'Variable 2' });
-                // Limpiar variantes de campos obsoletos y convertir precios si es necesario
+                
+                // Función para convertir precios sin IVA a con IVA
+                const applyTax = (price, taxRate) => {
+                    if (!price || price <= 0) return price;
+                    const tax = parseFloat(taxRate) || 21;
+                    return (price * (1 + tax / 100)).toFixed(2);
+                };
+                
                 const taxRate = product.pricing?.tax ?? 21;
+                
+                // Limpiar variantes de campos obsoletos y aplicar conversión de precios si es necesario
                 const cleanVariants = (product.variants || []).map(v => {
                     const cleaned = { ...v };
                     if (cleaned.pricing && cleaned.pricing.adjustment !== undefined) {
                         delete cleaned.pricing.adjustment;
                     }
-                    // Convertir precios si inputPricesWithTax está activo
-                    if (user?.company?.inputPricesWithTax && cleaned.pricing) {
-                        if (cleaned.pricing.list1) {
-                            if (cleaned.pricing.list1.price > 0) {
-                                cleaned.pricing.list1.price = parseFloat((cleaned.pricing.list1.price * (1 + taxRate/100)).toFixed(2));
+                    
+                    // Si inputPricesWithTax está activo, convertir precios para mostrar con IVA
+                    if (usePricesWithTax && cleaned.pricing) {
+                        cleaned.pricing = {
+                            list1: {
+                                price: applyTax(cleaned.pricing.list1?.price, taxRate),
+                                discount: cleaned.pricing.list1?.discount || 0,
+                                offer: cleaned.pricing.list1?.offer ? applyTax(cleaned.pricing.list1.offer, taxRate) : null
+                            },
+                            list2: {
+                                price: applyTax(cleaned.pricing.list2?.price, taxRate),
+                                discount: cleaned.pricing.list2?.discount || 0,
+                                offer: cleaned.pricing.list2?.offer ? applyTax(cleaned.pricing.list2.offer, taxRate) : null
                             }
-                            if (cleaned.pricing.list1.offer > 0) {
-                                cleaned.pricing.list1.offer = parseFloat((cleaned.pricing.list1.offer * (1 + taxRate/100)).toFixed(2));
-                            }
-                        }
-                        if (cleaned.pricing.list2) {
-                            if (cleaned.pricing.list2.price > 0) {
-                                cleaned.pricing.list2.price = parseFloat((cleaned.pricing.list2.price * (1 + taxRate/100)).toFixed(2));
-                            }
-                            if (cleaned.pricing.list2.offer > 0) {
-                                cleaned.pricing.list2.offer = parseFloat((cleaned.pricing.list2.offer * (1 + taxRate/100)).toFixed(2));
-                            }
-                        }
+                        };
                     }
+                    
                     return cleaned;
                 });
                 setVariants(cleanVariants);

@@ -274,7 +274,7 @@ const UserDetailPage = () => {
                 onSave={handleEditUser}
                 user={user}
                 isSuperadmin={isSuperadmin}
-                features={user?.companyId?.features || {}}
+                features={user?.company?.features || {}}
                 clients={clients}
             />
 

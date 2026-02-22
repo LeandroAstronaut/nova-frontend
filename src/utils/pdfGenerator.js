@@ -16,12 +16,29 @@ export const generateOrderPDF = (order, company) => {
     const textColor = [51, 51, 51];
     const lightGray = [240, 240, 240];
     
+    // Configuración de IVA
+    const showPricesWithTax = company?.showPricesWithTax === true;
+    const taxRate = order.taxRate || company?.taxRate || 21;
+    
+    // Helper para aplicar IVA si corresponde
+    const applyTax = (price) => {
+        if (!showPricesWithTax || !price) return price;
+        return price * (1 + taxRate / 100);
+    };
+    
     // Usar totales del backend o calcular con lógica de ofertas
-    const subtotal = order.subtotal !== undefined ? order.subtotal : order.items.reduce((acc, item) => {
+    // Si showPricesWithTax, los totales del backend ya deberían incluir IVA
+    let subtotal = order.subtotal !== undefined ? order.subtotal : order.items.reduce((acc, item) => {
         return acc + (item.quantity * item.listPrice * (1 - (item.discount || 0) / 100));
     }, 0);
     
-    const total = order.total !== undefined ? order.total : subtotal * (1 - (order.discount || 0) / 100);
+    let total = order.total !== undefined ? order.total : subtotal * (1 - (order.discount || 0) / 100);
+    
+    // Aplicar IVA a los totales si no están ya incluidos
+    if (showPricesWithTax && !order.subtotalWithTax) {
+        subtotal = applyTax(subtotal);
+        total = applyTax(total);
+    }
     
     // Calcular descuentos para mostrar
     const itemsDiscountTotal = order.items.reduce((acc, item) => {
@@ -112,13 +129,15 @@ export const generateOrderPDF = (order, company) => {
     
     const tableData = order.items.map(item => {
         const itemTotal = item.quantity * item.listPrice * (1 - (item.discount || 0) / 100);
+        const itemTotalWithTax = applyTax(itemTotal);
+        const listPriceWithTax = applyTax(item.listPrice);
         const offerLabel = item.hasOffer ? ' (OFERTA)' : '';
         return {
             name: (item.productId?.name || item.name || 'Producto') + offerLabel,
             quantity: item.quantity,
-            price: `$${Number(item.listPrice).toLocaleString('es-AR')}`,
+            price: `$${Number(listPriceWithTax).toLocaleString('es-AR')}`,
             discount: `${item.discount || 0}%`,
-            total: `$${Number(itemTotal).toLocaleString('es-AR')}`
+            total: `$${Number(itemTotalWithTax).toLocaleString('es-AR')}`
         };
     });
     
@@ -163,7 +182,8 @@ export const generateOrderPDF = (order, company) => {
     doc.setFont('helvetica', 'normal');
     
     // Subtotal
-    doc.text('Subtotal:', totalsX, finalY);
+    const subtotalLabel = showPricesWithTax ? `Subtotal (c/IVA ${taxRate}%):` : 'Subtotal:';
+    doc.text(subtotalLabel, totalsX, finalY);
     doc.text(`$${Number(subtotal).toLocaleString('es-AR')}`, valueX, finalY, { align: 'right' });
     finalY += 5;
     
@@ -201,10 +221,20 @@ export const generateOrderPDF = (order, company) => {
     // TOTAL FINAL
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
-    doc.text('TOTAL:', totalsX, finalY);
+    const totalLabel = showPricesWithTax ? `TOTAL (c/IVA ${taxRate}%):` : 'TOTAL:';
+    doc.text(totalLabel, totalsX, finalY);
     doc.setTextColor(...primaryColor);
     doc.text(`$${Number(total).toLocaleString('es-AR')}`, valueX, finalY, { align: 'right' });
     doc.setTextColor(...textColor);
+    
+    // Nota sobre precios sin IVA si corresponde
+    if (!showPricesWithTax) {
+        finalY += 5;
+        doc.setFontSize(7);
+        doc.setTextColor(150, 150, 150);
+        doc.text(`Los precios no incluyen IVA (${taxRate}%)`, totalsX, finalY);
+        doc.setTextColor(...textColor);
+    }
     
     // NOTA SOBRE PRODUCTOS CON OFERTA
     if (excludeOfferFromGlobalDiscount && offerItems.length > 0) {

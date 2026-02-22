@@ -91,6 +91,31 @@ const typeColors = {
     logout: 'bg-gray-100 text-gray-600'
 };
 
+// Mapeo de estados a labels legibles
+const statusLabels = {
+    'espera': 'En Espera',
+    'confirmado': 'Confirmado',
+    'preparado': 'Preparando',
+    'preparando': 'Preparando',
+    'completo': 'Completado',
+    'completado': 'Completado',
+    'cancelado': 'Cancelado',
+    'budget': 'Presupuesto',
+    'order': 'Pedido'
+};
+
+// Estilos de badges de estado (igual que en la tabla)
+const statusBadgeStyles = {
+    espera: 'bg-warning-50 dark:bg-warning-900/30 text-warning-600 dark:text-warning-400 border-warning-100 dark:border-warning-800',
+    confirmado: 'bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 border-primary-100 dark:border-primary-800',
+    preparado: 'bg-info-50 dark:bg-info-900/30 text-info-600 dark:text-info-400 border-info-100 dark:border-info-800',
+    preparando: 'bg-info-50 dark:bg-info-900/30 text-info-600 dark:text-info-400 border-info-100 dark:border-info-800',
+    completo: 'bg-success-50 dark:bg-success-900/30 text-success-600 dark:text-success-400 border-success-100 dark:border-success-800',
+    completado: 'bg-success-50 dark:bg-success-900/30 text-success-600 dark:text-success-400 border-success-100 dark:border-success-800',
+    cancelado: 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700',
+    budget: 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-800'
+};
+
 const formatTime = (dateString) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -276,18 +301,21 @@ const OrderActivityDrawer = ({ isOpen, onClose, entityType, entityId, entityNumb
                                                 {/* Metadata adicional si existe */}
                                                 {activity.metadata && !showChanges && (
                                                     <div className="mt-2 pt-2 border-t border-[var(--border-color)]">
-                                                        {activity.metadata.previousStatus && activity.metadata.newStatus && (
+                                                        {/* Cambio de estado (status_updated y reverted) */}
+                                                        {(activity.metadata.previousStatus && activity.metadata.newStatus) || (activity.metadata.previousStatus && activity.metadata.targetStatus) ? (
                                                             <div className="flex items-center gap-2 text-[11px]">
-                                                                <span className="text-[var(--text-muted)]">Cambio de estado:</span>
-                                                                <span className="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-[var(--text-secondary)]">
-                                                                    {activity.metadata.previousStatus}
+                                                                <span className="text-[var(--text-muted)]">
+                                                                    {activity.type === 'order_reverted' ? 'Revertido:' : 'Cambio de estado:'}
+                                                                </span>
+                                                                <span className={`px-2 py-0.5 rounded border text-[10px] font-bold uppercase tracking-wide ${statusBadgeStyles[activity.metadata.previousStatus] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+                                                                    {statusLabels[activity.metadata.previousStatus] || activity.metadata.previousStatus}
                                                                 </span>
                                                                 <ArrowRight size={12} className="text-[var(--text-muted)]" />
-                                                                <span className="px-1.5 py-0.5 bg-primary-100 dark:bg-primary-900/30 rounded text-primary-700 dark:text-primary-300">
-                                                                    {activity.metadata.newStatus}
+                                                                <span className={`px-2 py-0.5 rounded border text-[10px] font-bold uppercase tracking-wide ${statusBadgeStyles[activity.metadata.newStatus || activity.metadata.targetStatus] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+                                                                    {statusLabels[activity.metadata.newStatus || activity.metadata.targetStatus] || activity.metadata.newStatus || activity.metadata.targetStatus}
                                                                 </span>
                                                             </div>
-                                                        )}
+                                                        ) : null}
                                                         {activity.metadata.recipients && (
                                                             <div className="text-[11px] text-[var(--text-muted)]">
                                                                 Destinatarios: {activity.metadata.recipients.join(', ')}

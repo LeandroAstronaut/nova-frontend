@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
     Plus, Search, Mail, Phone, User, Percent, Shield, Briefcase, Building2, 
-    Eye, MoreHorizontal, Edit2, Activity, CheckCircle, XCircle, Download
+    Eye, MoreHorizontal, Edit2, Activity, CheckCircle, XCircle, Download,
+    ChevronUp, ChevronDown
 } from 'lucide-react';
 import { getStaffUsers, createStaffUser, toggleStaffStatus, updateStaffUser } from '../../services/userService';
 import { getClients } from '../../services/clientService';
@@ -160,6 +161,15 @@ const UsersPage = () => {
     // Action Menu state
     const [openMenu, setOpenMenu] = useState({ id: null, position: null, openAbove: false });
     
+    // Role Filter State
+    const [roleFilter, setRoleFilter] = useState('all');
+    
+    // Sorting State
+    const [sort, setSort] = useState({
+        sortBy: 'firstName',
+        order: 'asc'
+    });
+    
     // Activity Drawer state
     const [isActivityDrawerOpen, setIsActivityDrawerOpen] = useState(false);
     const [activityUser, setActivityUser] = useState(null);
@@ -189,7 +199,7 @@ const UsersPage = () => {
 
     useEffect(() => {
         fetchData();
-    }, [pagination.page, debouncedSearchTerm]);
+    }, [pagination.page, debouncedSearchTerm, roleFilter, sort]);
 
     // Debounce para el término de búsqueda
     useEffect(() => {
@@ -207,7 +217,10 @@ const UsersPage = () => {
                 getStaffUsers({ 
                     page: pagination.page, 
                     limit: pagination.limit,
-                    search: debouncedSearchTerm || undefined
+                    search: debouncedSearchTerm || undefined,
+                    role: roleFilter !== 'all' ? roleFilter : undefined,
+                    sortBy: sort.sortBy,
+                    order: sort.order
                 }),
                 getClients()
             ];
@@ -286,18 +299,48 @@ const UsersPage = () => {
     const handleOpenMenu = (e, userId) => {
         const rect = e.currentTarget.getBoundingClientRect();
         const windowHeight = window.innerHeight;
-        const menuHeight = 180; // Altura estimada del menú
+        const windowWidth = window.innerWidth;
+        const menuHeight = 220; // Altura estimada del menú
+        const menuWidth = 192; // Ancho del menú
         
+        // Detectar si está cerca del borde inferior
         const openAbove = (rect.bottom + menuHeight) > windowHeight;
+        
+        // Calcular posición horizontal (alineado a la derecha del botón)
+        let leftPosition = rect.left - menuWidth + rect.width;
+        
+        // Asegurar que no se salga por la derecha
+        if (leftPosition + menuWidth > windowWidth) {
+            leftPosition = windowWidth - menuWidth - 16;
+        }
+        
+        // Asegurar que no sea negativo
+        if (leftPosition < 8) {
+            leftPosition = 8;
+        }
         
         setOpenMenu({
             id: userId,
             position: {
-                top: rect.bottom + 8,
-                left: rect.left - 160 + rect.width
+                top: openAbove ? rect.top - menuHeight : rect.bottom + 8,
+                left: leftPosition
             },
             openAbove
         });
+    };
+
+    const handleSort = (field) => {
+        setSort(prev => ({
+            sortBy: field,
+            order: prev.sortBy === field && prev.order === 'asc' ? 'desc' : 'asc'
+        }));
+    };
+
+    const SortIcon = ({ field }) => {
+        if (sort.sortBy !== field) return <ChevronUp size={10} className="ml-1 opacity-20" />;
+        return sort.order === 'asc' 
+            ? <ChevronUp size={12} className="ml-1 text-primary-600 dark:text-primary-400" /> 
+            : <ChevronDown size={12} className="ml-1 text-primary-600 dark:text-primary-400" />;
     };
 
     const handleViewActivity = (user) => {
@@ -433,7 +476,26 @@ const UsersPage = () => {
             <div className="card p-0! overflow-hidden border-none shadow-sm ring-1 ring-(--border-color)">
                 {/* Filters */}
                 <div className="bg-(--bg-card) p-4 border-b border-(--border-color)">
-                    <div className="flex justify-end">
+                    <div className="flex flex-col sm:flex-row justify-between gap-3">
+                        {/* Filtro de Rol */}
+                        <div className="flex items-center gap-2">
+                            <span className="text-[11px] text-(--text-muted)">Rol:</span>
+                            <select
+                                value={roleFilter}
+                                onChange={(e) => {
+                                    setRoleFilter(e.target.value);
+                                    setPagination(prev => ({ ...prev, page: 1 }));
+                                }}
+                                className="px-3 py-2 bg-(--bg-input) border border-(--border-color) rounded-lg text-xs font-medium text-(--text-primary) focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900 focus:bg-(--bg-card) transition-all"
+                            >
+                                <option value="all">Todos</option>
+                                <option value="admin">Administradores</option>
+                                <option value="vendedor">Vendedores</option>
+                                {clientUsersEnabled && <option value="cliente">Usuarios de Cliente</option>}
+                            </select>
+                        </div>
+                        
+                        {/* Búsqueda */}
                         <div className="relative w-full max-w-xs">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-(--text-muted)" size={14} strokeWidth={2.5} />
                             <input
@@ -452,12 +514,20 @@ const UsersPage = () => {
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-(--bg-hover) text-[10px] font-bold text-(--text-muted) uppercase tracking-widest border-y border-(--border-color)">
-                                <th className="px-6 py-3">Usuario</th>
-                                <th className="px-6 py-3">Rol</th>
+                                <th className="px-6 py-3 cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('firstName')}>
+                                    <div className="flex items-center">Usuario <SortIcon field="firstName" /></div>
+                                </th>
+                                <th className="px-6 py-3 cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('roleId')}>
+                                    <div className="flex items-center">Rol <SortIcon field="roleId" /></div>
+                                </th>
                                 <th className="px-6 py-3">Contacto</th>
                                 {isSuperadmin && <th className="px-6 py-3">Compañía</th>}
-                                <th className="px-6 py-3 text-center">Comisión</th>
-                                <th className="px-6 py-3 text-center">Estado</th>
+                                <th className="px-6 py-3 text-center cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('commission')}>
+                                    <div className="flex items-center justify-center">Comisión <SortIcon field="commission" /></div>
+                                </th>
+                                <th className="px-6 py-3 text-center cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('active')}>
+                                    <div className="flex items-center justify-center">Estado <SortIcon field="active" /></div>
+                                </th>
                                 <th className="px-6 py-3 text-right">Acciones</th>
                             </tr>
                         </thead>

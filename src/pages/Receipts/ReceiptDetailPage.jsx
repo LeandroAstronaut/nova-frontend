@@ -78,10 +78,10 @@ const ReceiptDetailPage = () => {
     const handleSendEmail = () => setIsEmailModalOpen(true);
     const handleSendWhatsApp = () => setIsWhatsAppModalOpen(true);
 
-    const handleConfirmSendEmail = async ({ notifications }) => {
+    const handleConfirmSendEmail = async ({ notifications, additionalEmails }) => {
         try {
             setEmailLoading(true);
-            const result = await sendReceiptEmail(receipt._id, notifications);
+            const result = await sendReceiptEmail(receipt._id, notifications, additionalEmails);
             addToast(`Email enviado exitosamente a ${result.sent} destinatario(s)`, 'success');
             setIsEmailModalOpen(false);
         } catch (error) {

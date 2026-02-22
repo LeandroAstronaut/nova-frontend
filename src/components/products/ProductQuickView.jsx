@@ -273,7 +273,7 @@ const ProductQuickView = ({
                         animate={{ x: 0 }}
                         exit={{ x: '100%' }}
                         transition={{ type: 'spring', damping: 28, stiffness: 220 }}
-                        className="fixed top-4 left-4 right-4 md:left-auto md:right-4 h-[calc(100vh-2rem)] w-auto md:w-full md:max-w-[800px] bg-[var(--bg-card)] shadow-2xl z-[210] flex flex-col border border-[var(--border-color)] rounded-2xl overflow-hidden"
+                        className="fixed top-4 left-4 right-4 md:left-auto md:right-4 h-[calc(100vh-2rem)] w-auto md:w-full md:max-w-[950px] bg-[var(--bg-card)] shadow-2xl z-[210] flex flex-col border border-[var(--border-color)] rounded-2xl overflow-hidden"
                     >
                         {/* Header */}
                         <div className="px-6 py-4 border-b border-[var(--border-color)] flex items-center justify-between shrink-0 bg-[var(--bg-card)]">
@@ -282,12 +282,11 @@ const ProductQuickView = ({
                                     <Package size={20} />
                                 </div>
                                 <div className="min-w-0">
-                                    <h2 className="text-sm font-bold text-[var(--text-primary)] truncate max-w-[350px] md:max-w-[500px]">
-                                        {product.name}
+                                    <h2 className="text-sm font-bold text-[var(--text-primary)]">
+                                        Detalle de Producto
                                     </h2>
-                                    <p className="text-[11px] text-[var(--text-muted)] font-medium">
-                                        {product.code}
-                                        {hasVariants && selectedVariant && ` • ${selectedVariant.sku || selectedVariant.value1}`}
+                                    <p className="text-[11px] text-[var(--text-muted)] font-medium truncate max-w-[300px] md:max-w-[450px]">
+                                        {product.name}
                                     </p>
                                 </div>
                             </div>
@@ -301,7 +300,7 @@ const ProductQuickView = ({
 
                         {/* Content - Scrollable */}
                         <div className="flex-1 overflow-y-auto">
-                            <div className="p-6 space-y-6">
+                            <div className="p-3 md:p-4 space-y-6">
                                 
                                 {/* ===== FILA 1: DOS COLUMNAS ===== */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

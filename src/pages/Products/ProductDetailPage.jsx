@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Edit2, Trash2, History } from 'lucide-react';
+import { ArrowLeft, Edit2, Trash2, History, Activity } from 'lucide-react';
 import { getProductById, deleteProduct } from '../../services/productService';
+import ProductActivityDrawer from '../../components/products/ProductActivityDrawer';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import Button from '../../components/common/Button';
@@ -20,6 +21,7 @@ const ProductDetailPage = () => {
     const [loading, setLoading] = useState(true);
     const [isEditDrawerOpen, setIsEditDrawerOpen] = useState(false);
     const [isStockMovementsOpen, setIsStockMovementsOpen] = useState(false);
+    const [isActivityOpen, setIsActivityOpen] = useState(false);
     const [deleteModal, setDeleteModal] = useState({ isOpen: false, loading: false });
 
     const isAdmin = user?.role?.name === 'admin';
@@ -124,7 +126,16 @@ const ProductDetailPage = () => {
                         className="px-3! text-[11px] font-bold uppercase tracking-wider"
                     >
                         <History size={14} strokeWidth={2.5} />
-                        Movimientos
+                        Movimientos de stock
+                    </Button>
+
+                    <Button 
+                        variant="secondary" 
+                        onClick={() => setIsActivityOpen(true)}
+                        className="px-3! text-[11px] font-bold uppercase tracking-wider"
+                    >
+                        <Activity size={14} strokeWidth={2.5} />
+                        Actividad
                     </Button>
 
                     <Button 
@@ -160,6 +171,13 @@ const ProductDetailPage = () => {
             <StockMovementsDrawer
                 isOpen={isStockMovementsOpen}
                 onClose={() => setIsStockMovementsOpen(false)}
+                product={product}
+            />
+
+            {/* Activity Drawer */}
+            <ProductActivityDrawer
+                isOpen={isActivityOpen}
+                onClose={() => setIsActivityOpen(false)}
                 product={product}
             />
 

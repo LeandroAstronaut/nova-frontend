@@ -6,6 +6,7 @@ import {
     Truck, Tag, Briefcase, Check
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { getSellers } from '../../services/orderService';
 import Button from '../common/Button';
 
 const ClientDrawer = ({ isOpen, onClose, onSave, client = null }) => {
@@ -47,9 +48,16 @@ const ClientDrawer = ({ isOpen, onClose, onSave, client = null }) => {
     // Cargar vendedores para el selector (solo admin)
     useEffect(() => {
         if ((isAdmin || isSuperadmin) && isOpen) {
-            // Aquí deberíamos cargar los vendedores de la empresa
-            // Por ahora usamos el usuario actual como default
-            setVendedores([]);
+            const loadSellers = async () => {
+                try {
+                    const sellers = await getSellers();
+                    setVendedores(sellers || []);
+                } catch (error) {
+                    console.error('Error loading sellers:', error);
+                    setVendedores([]);
+                }
+            };
+            loadSellers();
         }
     }, [isAdmin, isSuperadmin, isOpen]);
 
@@ -313,8 +321,12 @@ const ClientDrawer = ({ isOpen, onClose, onSave, client = null }) => {
                                             className="w-full px-3 py-2.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-sm"
                                         >
                                             <option value="">Seleccionar vendedor...</option>
-                                            <option value={user.id}>{user.firstName} {user.lastName} (Yo)</option>
-                                            {/* Aquí se cargarían los demás vendedores */}
+                                            {vendedores.map(seller => (
+                                                <option key={seller._id} value={seller._id}>
+                                                    {seller.firstName} {seller.lastName}
+                                                    {seller._id === user.id ? ' (Yo)' : ''}
+                                                </option>
+                                            ))}
                                         </select>
                                     </div>
                                 </div>

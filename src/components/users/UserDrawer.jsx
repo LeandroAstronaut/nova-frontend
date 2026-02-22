@@ -6,6 +6,9 @@ import Button from '../common/Button';
 
 const UserDrawer = ({ isOpen, onClose, onSave, user = null, clients = [], features = {}, companies = [], isSuperadmin = false }) => {
     const isEditing = !!user;
+    
+    // Normalizar clients para manejar tanto array como objeto con propiedad clients
+    const clientsList = Array.isArray(clients) ? clients : (clients?.clients || []);
 
     // Obtener información de cupo de la compañía seleccionada
     const getSelectedCompanyQuota = () => {
@@ -330,7 +333,7 @@ const UserDrawer = ({ isOpen, onClose, onSave, user = null, clients = [], featur
                                             }`}
                                         >
                                             <option value="">Seleccione un cliente...</option>
-                                            {clients.map((client) => (
+                                            {clientsList.map((client) => (
                                                 <option key={client._id} value={client._id}>
                                                     {client.businessName} {client.code ? `(${client.code})` : ''}
                                                 </option>
@@ -338,7 +341,7 @@ const UserDrawer = ({ isOpen, onClose, onSave, user = null, clients = [], featur
                                         </select>
                                     </div>
                                     {errors.clientId && <p className="text-danger-500 text-xs mt-1">{errors.clientId}</p>}
-                                    {clients.length === 0 && (
+                                    {clientsList.length === 0 && (
                                         <p className="text-amber-600 text-xs mt-1">
                                             No hay clientes disponibles. Cree clientes primero.
                                         </p>

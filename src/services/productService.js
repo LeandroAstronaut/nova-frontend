@@ -224,6 +224,17 @@ export const getVariantStock = async (productId) => {
 };
 
 /**
+ * Obtener actividad de un producto
+ * @param {string} productId - ID del producto
+ * @param {Object} params - { page, limit }
+ * @returns {Promise<Object>} { data, page, total }
+ */
+export const getProductActivity = async (productId, params = {}) => {
+    const response = await api.get(`/activity-logs/entity/product/${productId}`, { params });
+    return response.data;
+};
+
+/**
  * Verificar si un SKU de variante ya existe
  * @param {string} sku - SKU a verificar
  * @param {string} excludeProductId - ID del producto a excluir (para edición)
@@ -266,6 +277,7 @@ export default {
     setCoverImage,
     reorderProductImages,
     getProductStockMovements,
+    getProductActivity,
     getVariantStock,
     checkVariantSkuExists,
     updateVariantStock,

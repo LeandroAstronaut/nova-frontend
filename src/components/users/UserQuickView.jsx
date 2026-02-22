@@ -26,7 +26,7 @@ const UserQuickView = ({ isOpen, onClose, user, isSuperadmin = false }) => {
                         animate={{ x: 0 }}
                         exit={{ x: '100%' }}
                         transition={{ type: 'spring', damping: 28, stiffness: 220 }}
-                        className="fixed top-4 left-4 right-4 md:left-auto h-[calc(100vh-2rem)] w-auto md:w-full md:max-w-[750px] bg-[var(--bg-card)] shadow-2xl z-[210] flex flex-col border border-[var(--border-color)] rounded-2xl overflow-hidden"
+                        className="fixed top-4 left-4 right-4 md:left-auto h-[calc(100vh-2rem)] w-auto md:w-full md:max-w-[950px] bg-[var(--bg-card)] shadow-2xl z-[210] flex flex-col border border-[var(--border-color)] rounded-2xl overflow-hidden"
                     >
                         {/* Header */}
                         <div className="px-4 md:px-6 py-3 md:py-4 border-b border-[var(--border-color)] flex items-center justify-between shrink-0 bg-[var(--bg-card)]">
@@ -36,10 +36,10 @@ const UserQuickView = ({ isOpen, onClose, user, isSuperadmin = false }) => {
                                 </div>
                                 <div>
                                     <h2 className="text-sm md:text-base font-bold text-[var(--text-primary)]">
-                                        {user.firstName} {user.lastName}
+                                        Detalle de Usuario
                                     </h2>
-                                    <p className="text-[10px] md:text-[11px] text-[var(--text-muted)] font-medium">
-                                        {user.email}
+                                    <p className="text-[10px] md:text-[11px] text-[var(--text-muted)] font-medium truncate max-w-[200px] md:max-w-[400px]">
+                                        {user.firstName} {user.lastName}
                                     </p>
                                 </div>
                             </div>
@@ -52,7 +52,7 @@ const UserQuickView = ({ isOpen, onClose, user, isSuperadmin = false }) => {
                         </div>
 
                         {/* Content */}
-                        <div className="flex-1 overflow-y-auto p-4 md:p-6">
+                        <div className="flex-1 overflow-y-auto p-3 md:p-4">
                             <UserDetailContent user={user} isSuperadmin={isSuperadmin} />
                         </div>
                     </motion.div>

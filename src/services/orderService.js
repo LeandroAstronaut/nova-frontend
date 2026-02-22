@@ -97,9 +97,10 @@ export const revertOrderToBudget = async (orderId, targetStatus = 'budget') => {
     return response.data;
 };
 
-export const sendOrderEmail = async (orderId, notificationSettings) => {
+export const sendOrderEmail = async (orderId, notificationSettings, additionalEmails) => {
     const response = await api.post(`/orders/${orderId}/email`, {
-        notifications: notificationSettings
+        notifications: notificationSettings,
+        additionalEmails
     });
     return response.data;
 };
@@ -124,6 +125,21 @@ export const checkPriceChanges = async (orderId) => {
 
 export const updateOrderPrices = async (orderId) => {
     const response = await api.post(`/orders/${orderId}/update-prices`);
+    return response.data;
+};
+
+export const cancelOrder = async (orderId, reason) => {
+    const response = await api.post(`/orders/${orderId}/cancel`, { reason });
+    return response.data;
+};
+
+export const recoverOrder = async (orderId) => {
+    const response = await api.post(`/orders/${orderId}/recover`);
+    return response.data;
+};
+
+export const deleteBudget = async (orderId) => {
+    const response = await api.post(`/orders/${orderId}/delete`);
     return response.data;
 };
 

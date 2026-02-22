@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Plus,
@@ -13,7 +13,9 @@ import {
     Ban,
     Eye,
     Edit2,
-    History
+    History,
+    ChevronUp,
+    ChevronDown
 } from 'lucide-react';
 import { getReceipts, cancelReceipt, createReceipt, sendReceiptEmail } from '../../services/receiptService';
 import { getClients } from '../../services/orderService';
@@ -83,6 +85,15 @@ const ReceiptsPage = () => {
         totalPages: 0
     });
 
+    // Sorting State
+    const [sort, setSort] = useState({
+        sortBy: 'date',
+        order: 'desc'
+    });
+
+    // Status Filter State
+    const [statusFilter, setStatusFilter] = useState('all');
+
     // Modales
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
@@ -113,7 +124,17 @@ const ReceiptsPage = () => {
 
     useEffect(() => {
         fetchData();
-    }, [pagination.page, debouncedSearchTerm]);
+    }, [pagination.page, debouncedSearchTerm, sort, statusFilter]);
+
+    // Resetear a página 1 cuando cambia el filtro de estado
+    useEffect(() => {
+        setPagination(prev => ({ ...prev, page: 1 }));
+    }, [statusFilter]);
+
+    // Resetear a página 1 cuando cambia el ordenamiento
+    useEffect(() => {
+        setPagination(prev => ({ ...prev, page: 1 }));
+    }, [sort]);
 
     // Debounce para el término de búsqueda
     useEffect(() => {
@@ -131,7 +152,10 @@ const ReceiptsPage = () => {
                 getReceipts({ 
                     page: pagination.page, 
                     limit: pagination.limit,
-                    search: debouncedSearchTerm || undefined
+                    search: debouncedSearchTerm || undefined,
+                    sortBy: sort.sortBy,
+                    order: sort.order,
+                    status: statusFilter
                 }),
                 getClients()
             ]);
@@ -226,10 +250,10 @@ const ReceiptsPage = () => {
         setIsWhatsAppModalOpen(true);
     };
 
-    const handleConfirmSendEmail = async ({ receiptId, notifications }) => {
+    const handleConfirmSendEmail = async ({ receiptId, notifications, additionalEmails }) => {
         try {
             setEmailLoading(true);
-            const result = await sendReceiptEmail(receiptId, notifications);
+            const result = await sendReceiptEmail(receiptId, notifications, additionalEmails);
             addToast(`Email enviado exitosamente a ${result.sent} destinatario(s)`, 'success');
             setIsEmailModalOpen(false);
         } catch (error) {
@@ -267,15 +291,31 @@ const ReceiptsPage = () => {
     const handleOpenMenu = (e, receiptId) => {
         const rect = e.currentTarget.getBoundingClientRect();
         const windowHeight = window.innerHeight;
-        const menuHeight = 200;
+        const windowWidth = window.innerWidth;
+        const menuHeight = 250; // Altura estimada del menú
+        const menuWidth = 192; // Ancho del menú
         
+        // Detectar si está cerca del borde inferior
         const openAbove = (rect.bottom + menuHeight) > windowHeight;
+        
+        // Calcular posición horizontal (alineado a la derecha del botón)
+        let leftPosition = rect.left - menuWidth + rect.width;
+        
+        // Asegurar que no se salga por la derecha
+        if (leftPosition + menuWidth > windowWidth) {
+            leftPosition = windowWidth - menuWidth - 16;
+        }
+        
+        // Asegurar que no sea negativo
+        if (leftPosition < 8) {
+            leftPosition = 8;
+        }
         
         setOpenMenu({
             id: receiptId,
             position: {
-                top: rect.bottom + 8,
-                left: rect.left - 160 + rect.width
+                top: openAbove ? rect.top - 8 : rect.bottom + 8,
+                left: leftPosition
             },
             openAbove
         });
@@ -305,6 +345,20 @@ const ReceiptsPage = () => {
         link.click();
         
         setExportMenu({ open: false, position: null });
+    };
+
+    const handleSort = (field) => {
+        setSort(prev => ({
+            sortBy: field,
+            order: prev.sortBy === field && prev.order === 'desc' ? 'asc' : 'desc'
+        }));
+    };
+
+    const SortIcon = ({ field }) => {
+        if (sort.sortBy !== field) return <ChevronUp size={10} className="ml-1 opacity-20" />;
+        return sort.order === 'asc' 
+            ? <ChevronUp size={12} className="ml-1 text-primary-600 dark:text-primary-400" /> 
+            : <ChevronDown size={12} className="ml-1 text-primary-600 dark:text-primary-400" />;
     };
 
     // Nota: El filtrado ahora se hace en el backend
@@ -366,7 +420,22 @@ const ReceiptsPage = () => {
             <div className="card p-0! overflow-hidden border-none shadow-sm ring-1 ring-(--border-color)">
                 {/* Filters */}
                 <div className="bg-(--bg-card) p-4 border-b border-(--border-color)">
-                    <div className="flex justify-end">
+                    <div className="flex flex-col sm:flex-row justify-between gap-3">
+                        {/* Filtro de Estado */}
+                        <div className="flex items-center gap-2">
+                            <span className="text-[11px] text-(--text-muted)">Estado:</span>
+                            <select
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value)}
+                                className="px-3 py-2 bg-(--bg-input) border border-(--border-color) rounded-lg text-xs font-medium text-(--text-primary) focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900 focus:bg-(--bg-card) transition-all"
+                            >
+                                <option value="all">Todos</option>
+                                <option value="activo">Activos</option>
+                                <option value="anulado">Anulados</option>
+                            </select>
+                        </div>
+                        
+                        {/* Búsqueda */}
                         <div className="relative w-full max-w-xs">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-(--text-muted)" size={14} strokeWidth={2.5} />
                             <input
@@ -385,12 +454,24 @@ const ReceiptsPage = () => {
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-(--bg-hover) text-[10px] font-bold text-(--text-muted) uppercase tracking-widest border-y border-(--border-color)">
-                                <th className="px-6 py-3">Número</th>
-                                <th className="px-6 py-3">Fecha</th>
-                                <th className="px-6 py-3">Cliente</th>
-                                <th className="px-6 py-3">Tipo</th>
-                                <th className="px-6 py-3 text-right">Monto</th>
-                                <th className="px-6 py-3 text-center">Estado</th>
+                                <th className="px-6 py-3 cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('receiptNumber')}>
+                                    <div className="flex items-center">Número <SortIcon field="receiptNumber" /></div>
+                                </th>
+                                <th className="px-6 py-3 cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('date')}>
+                                    <div className="flex items-center">Fecha <SortIcon field="date" /></div>
+                                </th>
+                                <th className="px-6 py-3 cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('clientId')}>
+                                    <div className="flex items-center">Cliente <SortIcon field="clientId" /></div>
+                                </th>
+                                <th className="px-6 py-3 cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('type')}>
+                                    <div className="flex items-center">Tipo <SortIcon field="type" /></div>
+                                </th>
+                                <th className="px-6 py-3 text-right cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('amount')}>
+                                    <div className="flex items-center justify-end">Monto <SortIcon field="amount" /></div>
+                                </th>
+                                <th className="px-6 py-3 text-center cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors" onClick={() => handleSort('status')}>
+                                    <div className="flex items-center justify-center">Estado <SortIcon field="status" /></div>
+                                </th>
                                 <th className="px-6 py-3 text-right">Acciones</th>
                             </tr>
                         </thead>

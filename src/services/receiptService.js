@@ -37,8 +37,8 @@ export const cancelReceipt = async (id, reason) => {
     return response.data;
 };
 
-export const sendReceiptEmail = async (id, notifications) => {
-    const response = await api.post(`/receipts/${id}/email`, { notifications });
+export const sendReceiptEmail = async (id, notifications, additionalEmails) => {
+    const response = await api.post(`/receipts/${id}/email`, { notifications, additionalEmails });
     return response.data;
 };
 

@@ -578,9 +578,9 @@ const OrderDetailPage = () => {
             <SendEmailModal
                 isOpen={isSendEmailModalOpen}
                 onClose={() => setIsSendEmailModalOpen(false)}
-                onConfirm={async ({ orderId, notifications }) => {
+                onConfirm={async ({ orderId, notifications, additionalEmails }) => {
                     try {
-                        const result = await sendOrderEmail(orderId, notifications);
+                        const result = await sendOrderEmail(orderId, notifications, additionalEmails);
                         addToast(`${result.sent} email(s) enviado(s)`, 'success');
                     } catch (error) {
                         addToast('Error al enviar email: ' + error.message, 'error');

@@ -26,98 +26,108 @@ import {
 } from 'lucide-react';
 
 const InfoRow = ({ label, value, icon: Icon }) => (
-    <div className="flex items-start gap-3 py-2.5 border-b border-(--border-color) last:border-0">
+    <div className="flex items-center gap-3 py-2">
         {Icon && (
-            <div className="w-7 h-7 rounded-lg bg-(--bg-hover) flex items-center justify-center shrink-0">
-                <Icon size={14} className="text-(--text-muted)" />
+            <div className="w-8 h-8 rounded-lg bg-[var(--bg-hover)] flex items-center justify-center shrink-0">
+                <Icon size={16} className="text-[var(--text-muted)]" />
             </div>
         )}
-        <div className="flex-1">
-            <p className="text-[10px] font-medium text-(--text-muted) uppercase tracking-wider">{label}</p>
-            <p className="text-[12px] font-semibold text-(--text-primary) mt-0.5">{value || '-'}</p>
+        <div className="flex-1 min-w-0">
+            <p className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider">{label}</p>
+            <p className="text-[13px] font-semibold mt-0.5 truncate text-[var(--text-primary)]">{value || '-'}</p>
         </div>
     </div>
 );
 
 // Componente completo de precios como en el drawer
-const PricingDisplay = ({ pricing, label, inputPricesWithTax, taxRate, isList2 = false }) => {
+const PricingDisplay = ({ pricing, label, inputPricesWithTax, taxRate, isList2 = false, priceWithTax, offerWithTax, finalPriceWithTax }) => {
     const formatPrice = (price) => {
         if (!price && price !== 0) return '-';
         return `$${Number(price).toLocaleString('es-AR')}`;
     };
-
+    
     const applyTax = (price) => {
         if (!price || price <= 0) return 0;
         return price * (1 + taxRate / 100);
     };
 
-    const price = pricing?.price || 0;
+    // Usar los campos de la API si están disponibles, sino calcular manualmente
+    const basePrice = pricing?.price || 0;
     const offer = pricing?.offer || 0;
     const discount = pricing?.discount || 0;
     
-    const baseForDiscount = offer > 0 ? offer : price;
+    // Calcular precio final sin IVA
+    const baseForDiscount = offer > 0 ? offer : basePrice;
     const finalWithoutTax = baseForDiscount * (1 - discount / 100);
     
-    const displayPrice = inputPricesWithTax ? applyTax(price) : price;
-    const displayOffer = inputPricesWithTax && offer > 0 ? applyTax(offer) : offer;
-    const displayFinal = inputPricesWithTax ? applyTax(finalWithoutTax) : finalWithoutTax;
+    // Priorizar campos de API si existen
+    const displayPrice = inputPricesWithTax && priceWithTax ? priceWithTax : basePrice;
+    const displayOffer = inputPricesWithTax && offerWithTax ? offerWithTax : offer;
+    const displayFinal = inputPricesWithTax && finalPriceWithTax ? finalPriceWithTax : finalWithoutTax;
     
-    const hasOffer = offer > 0;
+    const hasOffer = offer > 0 || offerWithTax > 0;
     const hasDiscount = discount > 0;
 
-    if (!price && !isList2) return null;
-    if (isList2 && !price) return null;
+    if (!basePrice && !isList2) return null;
+    if (isList2 && !basePrice) return null;
 
     return (
-        <div className="mb-4">
-            <h4 className="text-[11px] font-bold text-primary-600 uppercase tracking-wider mb-2 flex items-center gap-2">
-                {label}
-                {inputPricesWithTax && <span className="text-[9px] normal-case text-amber-600">(con IVA)</span>}
-                {!inputPricesWithTax && taxRate > 0 && <span className="text-[9px] normal-case text-(--text-muted)">(sin IVA)</span>}
-            </h4>
+        <div>
+            {label && (
+                <h4 className="text-[11px] font-bold text-primary-600 uppercase tracking-wider mb-2 flex items-center gap-2">
+                    {label}
+                    {inputPricesWithTax && <span className="text-[9px] normal-case text-amber-600">(con IVA)</span>}
+                    {!inputPricesWithTax && taxRate > 0 && <span className="text-[9px] normal-case text-[var(--text-muted)]">(sin IVA)</span>}
+                </h4>
+            )}
             
-            <div className="bg-(--bg-card) rounded-xl border border-(--border-color) p-3 space-y-3">
+            <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] p-3 space-y-3">
                 {/* Precio Base */}
                 <div className="grid grid-cols-3 gap-3">
                     <div>
-                        <p className="text-[10px] text-(--text-muted) mb-1">Precio {inputPricesWithTax ? '(con IVA)' : '(sin IVA)'}</p>
-                        <p className="text-[14px] font-semibold text-(--text-primary)">{formatPrice(displayPrice)}</p>
+                        <p className="text-[10px] text-[var(--text-muted)] mb-1">Precio {inputPricesWithTax ? '(con IVA)' : '(sin IVA)'}</p>
+                        <p className="text-[14px] font-semibold text-[var(--text-primary)]">{formatPrice(displayPrice)}</p>
                         {inputPricesWithTax && taxRate > 0 && (
-                            <p className="text-[9px] text-(--text-muted)">Sin IVA: {formatPrice(price)}</p>
+                            <p className="text-[9px] text-[var(--text-muted)]">Sin IVA: {formatPrice(basePrice)}</p>
                         )}
                     </div>
                     
                     <div>
-                        <p className="text-[10px] text-(--text-muted) mb-1">Descuento</p>
-                        <p className="text-[14px] font-semibold text-(--text-primary)">{discount > 0 ? `${discount}%` : '-'}</p>
+                        <p className="text-[10px] text-[var(--text-muted)] mb-1">Descuento</p>
+                        <p className="text-[14px] font-semibold text-[var(--text-primary)]">{discount > 0 ? `${discount}%` : '-'}</p>
                     </div>
                     
                     <div>
-                        <p className="text-[10px] text-(--text-muted) mb-1">Oferta</p>
+                        <p className="text-[10px] text-[var(--text-muted)] mb-1">Oferta</p>
                         {hasOffer ? (
                             <p className="text-[14px] font-semibold text-warning-600">{formatPrice(displayOffer)}</p>
                         ) : (
-                            <p className="text-[14px] font-semibold text-(--text-muted)">-</p>
+                            <p className="text-[14px] font-semibold text-[var(--text-muted)]">-</p>
                         )}
                     </div>
                 </div>
                 
                 {/* Preview del precio final */}
-                {price > 0 && (
-                    <div className="bg-primary-50 dark:bg-primary-900/20 rounded-lg p-2 border border-primary-100 dark:border-primary-800">
-                        <div className="flex items-center justify-between text-[11px]">
-                            <span className="text-(--text-muted)">Precio final:</span>
-                            <span className="font-bold text-primary-700 dark:text-primary-400">{formatPrice(displayFinal)}</span>
-                            {hasOffer && (
-                                <span className="text-warning-600 ml-2">Oferta: {formatPrice(displayOffer)} {hasDiscount ? `(-${discount}%)` : ''}</span>
-                            )}
-                            {!hasOffer && hasDiscount && (
-                                <span className="text-success-600 ml-2">(-{discount}%)</span>
-                            )}
+                {basePrice > 0 && (
+                    <div className="bg-primary-50 dark:bg-primary-900/20 rounded-lg p-3 border border-primary-100 dark:border-primary-800">
+                        <div className="flex items-center justify-between">
+                            <span className="text-[12px] text-[var(--text-muted)]">Precio final:</span>
+                            <div className="flex items-center gap-2">
+                                <span className="text-[15px] font-bold text-primary-700 dark:text-primary-400">{formatPrice(displayFinal)}</span>
+                                {hasDiscount && (
+                                    <span className="text-[11px] text-success-600">(-{discount}%)</span>
+                                )}
+                            </div>
                         </div>
+                        {hasOffer && (
+                            <div className="flex items-center justify-between text-[11px] mt-1">
+                                <span className="text-warning-600">Oferta aplicada:</span>
+                                <span className="text-warning-600 font-semibold">{formatPrice(displayOffer)}</span>
+                            </div>
+                        )}
                         {!inputPricesWithTax && taxRate > 0 && (
-                            <div className="flex items-center justify-between text-[11px] mt-1 pt-1 border-t border-primary-100 dark:border-primary-800">
-                                <span className="text-(--text-muted)">Final + IVA ({taxRate}%):</span>
+                            <div className="flex items-center justify-between text-[11px] mt-2 pt-2 border-t border-primary-100 dark:border-primary-800">
+                                <span className="text-[var(--text-muted)]">Final + IVA ({taxRate}%):</span>
                                 <span className="font-bold text-primary-700 dark:text-primary-400">{formatPrice(applyTax(finalWithoutTax))}</span>
                             </div>
                         )}
@@ -133,22 +143,36 @@ const StockRow = ({ label, value, type = 'normal' }) => {
         if (type === 'reserved') return 'text-warning-600';
         if (type === 'quoted') return 'text-info-600';
         if (type === 'available') return 'text-success-600';
-        return 'text-(--text-primary)';
+        return 'text-[var(--text-primary)]';
     };
     
     return (
         <div className="flex justify-between items-center py-2">
-            <span className="text-[11px] text-(--text-muted)">{label}</span>
+            <span className="text-[11px] text-[var(--text-muted)]">{label}</span>
             <span className={`text-[13px] font-bold ${getColor()}`}>{value}</span>
         </div>
     );
 };
 
+const InfoRowNormal = ({ label, value, icon: Icon }) => (
+    <div className="flex items-center gap-3 py-2">
+        {Icon && (
+            <div className="w-8 h-8 rounded-lg bg-[var(--bg-hover)] flex items-center justify-center shrink-0">
+                <Icon size={16} className="text-[var(--text-muted)]" />
+            </div>
+        )}
+        <div className="flex-1 min-w-0">
+            <p className="text-[11px] font-normal text-[var(--text-muted)] uppercase tracking-wider">{label}</p>
+            <p className="text-[13px] font-semibold mt-0.5 truncate text-[var(--text-primary)]">{value || '-'}</p>
+        </div>
+    </div>
+);
+
 // Componente para mostrar precios de variantes individuales completos
 const VariantPricingCard = ({ variant, index, inputPricesWithTax, taxRate, hasPriceListsFeature, hasStockFeature }) => {
     const formatPrice = (price) => {
         if (!price && price !== 0) return '-';
-        return `$${Number(price).toLocaleString('es-AR')}`;
+        return `$${Number(price).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     };
 
     const applyTax = (price) => {
@@ -190,20 +214,22 @@ const VariantPricingCard = ({ variant, index, inputPricesWithTax, taxRate, hasPr
     const isVariantOutOfStock = variantAvailable === 0;
 
     return (
-        <div className={`p-4 rounded-xl border ${variant.active !== false ? 'bg-(--bg-card) border-(--border-color)' : 'bg-gray-50 dark:bg-gray-900/30 border-gray-200 dark:border-gray-800'}`}>
+        <div className={`p-4 rounded-xl border ${variant.active !== false ? 'bg-[var(--bg-hover)] border-[var(--border-color)]' : 'bg-gray-50 dark:bg-gray-900/30 border-gray-200 dark:border-gray-800'}`}>
             {/* Header */}
-            <div className="flex items-center gap-2 mb-3 pb-3 border-b border-(--border-color)">
-                <span className="w-6 h-6 bg-primary-100 dark:bg-primary-900/30 text-primary-600 rounded-full flex items-center justify-center text-xs font-bold">
-                    {index + 1}
-                </span>
-                <div className="flex-1">
-                    <span className="text-[13px] font-semibold text-(--text-primary)">
-                        {variant.value1}
-                        {variant.value2 && ` / ${variant.value2}`}
+            <div className="flex items-center justify-between mb-3 pb-3 border-b border-[var(--border-color)]">
+                <div className="flex items-center gap-3">
+                    <span className="w-8 h-8 bg-primary-100 dark:bg-primary-900/30 text-primary-600 rounded-lg flex items-center justify-center text-sm font-bold">
+                        {index + 1}
                     </span>
-                    {variant.sku && (
-                        <p className="text-[10px] text-(--text-muted) font-mono">SKU: {variant.sku}</p>
-                    )}
+                    <div>
+                        <span className="text-[14px] font-bold text-[var(--text-primary)]">
+                            {variant.value1}
+                            {variant.value2 && ` / ${variant.value2}`}
+                        </span>
+                        {variant.sku && (
+                            <p className="text-[11px] text-[var(--text-muted)] font-mono">SKU: {variant.sku}</p>
+                        )}
+                    </div>
                 </div>
                 {variant.active === false && (
                     <span className="px-2 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded text-[10px] font-medium">
@@ -214,78 +240,95 @@ const VariantPricingCard = ({ variant, index, inputPricesWithTax, taxRate, hasPr
             
             {/* Stock Info (si está habilitado) */}
             {hasStockFeature && (
-                <div className="mb-3 p-2 bg-(--bg-hover) rounded-lg">
+                <div className="mb-4 p-3 bg-[var(--bg-card)] rounded-lg border border-[var(--border-color)]">
                     <div className="grid grid-cols-5 gap-2 text-center">
                         <div>
-                            <p className="text-[8px] text-(--text-muted) uppercase">Disp.</p>
-                            <p className={`text-sm font-bold ${isVariantOutOfStock ? 'text-danger-600' : isVariantLowStock ? 'text-warning-600' : 'text-success-600'}`}>
+                            <p className="text-[10px] text-[var(--text-muted)] uppercase font-bold">Disp.</p>
+                            <p className={`text-base font-bold ${isVariantOutOfStock ? 'text-danger-600' : isVariantLowStock ? 'text-warning-600' : 'text-success-600'}`}>
                                 {variantAvailable}
                             </p>
                         </div>
                         <div>
-                            <p className="text-[8px] text-(--text-muted) uppercase">Físico</p>
-                            <p className="text-sm font-semibold text-(--text-primary)">{variantStock}</p>
+                            <p className="text-[10px] text-[var(--text-muted)] uppercase font-bold">Físico</p>
+                            <p className="text-[13px] font-semibold text-[var(--text-primary)]">{variantStock}</p>
                         </div>
                         <div>
-                            <p className="text-[8px] text-(--text-muted) uppercase">Res.</p>
-                            <p className="text-sm font-semibold text-warning-600">{variantReserved}</p>
+                            <p className="text-[10px] text-[var(--text-muted)] uppercase font-bold">Res.</p>
+                            <p className="text-[13px] font-semibold text-warning-600">{variantReserved}</p>
                         </div>
                         <div>
-                            <p className="text-[8px] text-(--text-muted) uppercase">Pres.</p>
-                            <p className="text-sm font-semibold text-info-600">{variantQuoted}</p>
+                            <p className="text-[10px] text-[var(--text-muted)] uppercase font-bold">Pres.</p>
+                            <p className="text-[13px] font-semibold text-info-600">{variantQuoted}</p>
                         </div>
                         <div>
-                            <p className="text-[8px] text-(--text-muted) uppercase">Mín.</p>
-                            <p className="text-sm font-medium text-(--text-muted)">{variantMinStock || '-'}</p>
+                            <p className="text-[10px] text-[var(--text-muted)] uppercase font-bold">Mín.</p>
+                            <p className="text-[13px] font-medium text-[var(--text-muted)]">{variantMinStock || '-'}</p>
                         </div>
                     </div>
                 </div>
             )}
             
-            {/* Lista 1 */}
-            <div className="mb-3">
-                <p className="text-[10px] font-bold text-(--text-muted) uppercase mb-2">Lista 1</p>
-                <div className="grid grid-cols-3 gap-2 text-[11px]">
-                    <div>
-                        <span className="text-(--text-muted)">Precio:</span>
-                        <p className="font-semibold">{formatPrice(l1DisplayPrice)}</p>
-                    </div>
-                    <div>
-                        <span className="text-(--text-muted)">Dto:</span>
-                        <p className="font-semibold">{l1Discount > 0 ? `${l1Discount}%` : '-'}</p>
-                    </div>
-                    <div>
-                        <span className="text-(--text-muted)">Oferta:</span>
-                        <p className={`font-semibold ${l1Offer > 0 ? 'text-warning-600' : ''}`}>{l1Offer > 0 ? formatPrice(l1DisplayOffer) : '-'}</p>
-                    </div>
-                </div>
-                <div className="mt-2 p-2 bg-primary-50 dark:bg-primary-900/20 rounded-lg">
-                    <div className="flex justify-between items-center">
-                        <span className="text-[10px] text-(--text-muted)">Precio final:</span>
-                        <span className="text-[13px] font-bold text-primary-700 dark:text-primary-400">{formatPrice(l1DisplayFinal)}</span>
-                    </div>
-                    {!inputPricesWithTax && taxRate > 0 && (
-                        <div className="flex justify-between items-center mt-1 pt-1 border-t border-primary-100 dark:border-primary-800">
-                            <span className="text-[10px] text-(--text-muted)">+ IVA ({taxRate}%):</span>
-                            <span className="text-[11px] font-semibold text-primary-700 dark:text-primary-400">{formatPrice(applyTax(l1FinalWithoutTax))}</span>
+            {/* Lista 1 - Precios claros */}
+            <div>
+                {hasPriceListsFeature && (
+                    <p className="text-[11px] font-bold text-primary-600 uppercase tracking-wider mb-2">Lista 1</p>
+                )}
+                
+                <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] p-3 space-y-3">
+                    {/* Grid de precios */}
+                    <div className="grid grid-cols-3 gap-3">
+                        <div>
+                            <p className="text-[10px] text-[var(--text-muted)] mb-1">Precio {inputPricesWithTax ? '(c/IVA)' : '(s/IVA)'}</p>
+                            <p className="text-[14px] font-semibold text-[var(--text-primary)]">{formatPrice(l1DisplayPrice)}</p>
+                            {inputPricesWithTax && taxRate > 0 && (
+                                <p className="text-[9px] text-[var(--text-muted)]">Sin IVA: {formatPrice(l1Price)}</p>
+                            )}
                         </div>
-                    )}
+                        
+                        <div>
+                            <p className="text-[10px] text-[var(--text-muted)] mb-1">Descuento</p>
+                            <p className="text-[14px] font-semibold text-[var(--text-primary)]">{l1Discount > 0 ? `${l1Discount}%` : '-'}</p>
+                        </div>
+                        
+                        <div>
+                            <p className="text-[10px] text-[var(--text-muted)] mb-1">Oferta</p>
+                            {l1Offer > 0 ? (
+                                <p className="text-[14px] font-semibold text-warning-600">{formatPrice(l1DisplayOffer)}</p>
+                            ) : (
+                                <p className="text-[14px] font-semibold text-[var(--text-muted)]">-</p>
+                            )}
+                        </div>
+                    </div>
+                    
+                    {/* Precio final destacado */}
+                    <div className="bg-primary-50 dark:bg-primary-900/20 rounded-lg p-2 border border-primary-100 dark:border-primary-800">
+                        <div className="flex items-center justify-between">
+                            <span className="text-[11px] text-[var(--text-muted)]">Precio final:</span>
+                            <span className="text-[15px] font-bold text-primary-700 dark:text-primary-400">{formatPrice(l1DisplayFinal)}</span>
+                        </div>
+                        {!inputPricesWithTax && taxRate > 0 && (
+                            <div className="flex items-center justify-between text-[11px] mt-1 pt-1 border-t border-primary-100 dark:border-primary-800">
+                                <span className="text-[var(--text-muted)]">Final + IVA ({taxRate}%):</span>
+                                <span className="font-bold text-primary-700 dark:text-primary-400">{formatPrice(applyTax(l1FinalWithoutTax))}</span>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
             
             {/* Lista 2 */}
             {hasL2 && (
-                <div className="pt-3 border-t border-(--border-color)">
-                    <p className="text-[10px] font-bold text-primary-600 uppercase mb-2">Lista 2</p>
-                    <div className="grid grid-cols-2 gap-2 text-[11px]">
-                        <div>
-                            <span className="text-(--text-muted)">Precio final:</span>
-                            <p className="font-semibold text-primary-600">{formatPrice(l2DisplayFinal)}</p>
+                <div className="mt-3 pt-3 border-t border-[var(--border-color)]">
+                    <p className="text-[11px] font-bold text-primary-600 uppercase tracking-wider mb-2">Lista 2</p>
+                    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] p-3">
+                        <div className="flex items-center justify-between">
+                            <span className="text-[12px] text-[var(--text-muted)]">Precio final:</span>
+                            <span className="text-[15px] font-bold text-primary-600">{formatPrice(l2DisplayFinal)}</span>
                         </div>
                         {!inputPricesWithTax && taxRate > 0 && (
-                            <div>
-                                <span className="text-(--text-muted)">+ IVA:</span>
-                                <p className="font-semibold text-primary-600">{formatPrice(applyTax(l2FinalWithoutTax))}</p>
+                            <div className="flex items-center justify-between text-[11px] mt-2 pt-2 border-t border-[var(--border-color)]">
+                                <span className="text-[var(--text-muted)]">+ IVA ({taxRate}%):</span>
+                                <span className="font-bold text-primary-600">{formatPrice(applyTax(l2FinalWithoutTax))}</span>
                             </div>
                         )}
                     </div>
@@ -475,7 +518,7 @@ const ProductDetailContent = ({ product, showPricesWithTax = false, features = {
     };
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-0">
             {/* Lightbox con swipe suave */}
             <ImageLightbox
                 images={orderedImages}
@@ -486,12 +529,12 @@ const ProductDetailContent = ({ product, showPricesWithTax = false, features = {
                 onPrev={prevLightboxImage}
             />
 
-            {/* Header con info básica */}
-            <div className="bg-(--bg-card) p-4 border-b border-(--border-color)">
+            {/* Header Principal - Estilo consistente */}
+            <div className="px-6 py-5 border-b border-[var(--border-color)] bg-[var(--bg-card)]">
                 <div className="flex items-start gap-4">
                     {/* Imagen miniatura */}
                     <div 
-                        className="relative w-20 h-20 rounded-xl bg-(--bg-hover) flex items-center justify-center shrink-0 overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary-500 transition-all"
+                        className="relative w-14 h-14 rounded-xl bg-[var(--bg-hover)] flex items-center justify-center shrink-0 overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary-500 transition-all border border-[var(--border-color)]"
                         onClick={() => {
                             if (hasImages) {
                                 setCurrentImageIndex(0);
@@ -500,45 +543,38 @@ const ProductDetailContent = ({ product, showPricesWithTax = false, features = {
                         }}
                     >
                         {coverImage ? (
-                            <>
-                                <img src={coverImage} alt={product.name} className="w-full h-full object-cover" />
-                                {hasImages && (
-                                    <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                                        <Eye size={20} className="text-white" />
-                                    </div>
-                                )}
-                            </>
+                            <img src={coverImage} alt={product.name} className="w-full h-full object-cover" />
                         ) : (
-                            <Package size={32} className="text-(--text-muted)" />
+                            <Package size={24} className="text-[var(--text-muted)]" />
                         )}
                     </div>
                     <div className="flex-1 min-w-0">
-                        <h2 className="text-[15px] font-bold text-(--text-primary) leading-tight">
+                        <h2 className="text-[15px] font-bold text-[var(--text-primary)] leading-tight truncate">
                             {product.name}
                         </h2>
-                        <p className="text-[11px] text-(--text-muted) mt-1">
-                            Código: {product.code || 'N/A'}
+                        <p className="text-[12px] text-[var(--text-secondary)] mt-0.5">
+                            Código: <span className="font-medium text-[var(--text-primary)]">{product.code || 'N/A'}</span>
                         </p>
                         <div className="flex items-center gap-2 mt-2 flex-wrap">
                             {product.active !== false ? (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border bg-success-50 dark:bg-success-900/30 text-success-600 border-success-100 dark:border-success-800">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border bg-success-100 dark:bg-success-900/30 text-success-700 border-success-200 dark:border-success-800">
                                     <CheckCircle size={10} />
                                     Activo
                                 </span>
                             ) : (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border bg-danger-50 dark:bg-danger-900/30 text-danger-600 border-danger-100 dark:border-danger-800">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border bg-danger-100 dark:bg-danger-900/30 text-danger-700 border-danger-200 dark:border-danger-800">
                                     <XCircle size={10} />
                                     Inactivo
                                 </span>
                             )}
                             {hasVariants && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border bg-primary-50 dark:bg-primary-900/30 text-primary-600 border-primary-100 dark:border-primary-800">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border bg-primary-100 dark:bg-primary-900/30 text-primary-700 border-primary-200 dark:border-primary-800">
                                     <Grid3X3 size={10} />
                                     {product.variants.filter(v => v.active !== false).length} variantes
                                 </span>
                             )}
                             {hasTax && (
-                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border bg-amber-50 dark:bg-amber-900/30 text-amber-600 border-amber-100 dark:border-amber-800">
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border bg-amber-100 dark:bg-amber-900/30 text-amber-700 border-amber-200 dark:border-amber-800">
                                     IVA {taxRate}%
                                 </span>
                             )}
@@ -548,56 +584,67 @@ const ProductDetailContent = ({ product, showPricesWithTax = false, features = {
             </div>
 
             {/* Contenido */}
-            <div className="p-4">
+            <div className="p-3 md:p-4">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* Columna izquierda */}
                     <div className="space-y-4">
                         {/* Precios - Solo cuando NO tiene variantes con precios individuales */}
                         {(!hasVariants || hasUniformVariantPricing) && (
                             <div>
-                                <h3 className="text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
+                                {/* Título fuera de la card */}
+                                <h3 className="text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-3">
                                     Precios
-                                    {inputPricesWithTax && <span className="text-[9px] normal-case ml-2 text-amber-600">(con IVA)</span>}
-                                    {!inputPricesWithTax && hasTax && <span className="text-[9px] normal-case ml-2 text-(--text-muted)">(sin IVA)</span>}
+                                    {inputPricesWithTax && <span className="text-[10px] normal-case text-amber-600"> (con IVA)</span>}
+                                    {!inputPricesWithTax && hasTax && <span className="text-[10px] normal-case text-[var(--text-muted)]"> (sin IVA)</span>}
                                 </h3>
                                 
-                                {/* Lista 1 */}
-                                <PricingDisplay 
-                                    pricing={product.pricing?.list1}
-                                    label="Lista 1 (Principal)"
-                                    inputPricesWithTax={inputPricesWithTax}
-                                    taxRate={taxRate}
-                                />
-
-                                {/* Lista 2 */}
-                                {hasPriceListsFeature && product.pricing?.list2?.price > 0 && (
+                                <div className="bg-[var(--bg-hover)] rounded-xl p-4 border border-[var(--border-color)]">
+                                    {/* Lista 1 - Sin título si no hay múltiples listas */}
                                     <PricingDisplay 
-                                        pricing={product.pricing?.list2}
-                                        label="Lista 2 (Alternativa)"
+                                        pricing={product.pricing?.list1}
+                                        label={hasPriceListsFeature ? "Lista 1 (Principal)" : null}
                                         inputPricesWithTax={inputPricesWithTax}
                                         taxRate={taxRate}
-                                        isList2={true}
+                                        priceWithTax={product.priceWithTaxList1}
+                                        offerWithTax={product.offerWithTaxList1}
+                                        finalPriceWithTax={product.finalPriceWithTaxList1}
                                     />
-                                )}
 
-                                {/* Mensaje de precio uniforme */}
-                                {hasVariants && hasUniformVariantPricing && (
-                                    <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl p-4 border border-amber-200 dark:border-amber-800">
-                                        <p className="text-[11px] text-amber-700 dark:text-amber-300">
-                                            <strong>Precio uniforme:</strong> Todas las variantes usan los mismos precios configurados arriba.
-                                        </p>
-                                    </div>
-                                )}
+                                    {/* Lista 2 */}
+                                    {hasPriceListsFeature && product.pricing?.list2?.price > 0 && (
+                                        <div className="mt-4 pt-4 border-t border-[var(--border-color)]">
+                                            <PricingDisplay 
+                                                pricing={product.pricing?.list2}
+                                                label="Lista 2 (Alternativa)"
+                                                inputPricesWithTax={inputPricesWithTax}
+                                                taxRate={taxRate}
+                                                isList2={true}
+                                                priceWithTax={product.priceWithTaxList2}
+                                                offerWithTax={product.offerWithTaxList2}
+                                                finalPriceWithTax={product.finalPriceWithTaxList2}
+                                            />
+                                        </div>
+                                    )}
+
+                                    {/* Mensaje de precio uniforme */}
+                                    {hasVariants && hasUniformVariantPricing && (
+                                        <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                                            <p className="text-[12px] text-amber-700 dark:text-amber-300">
+                                                <strong>Precio uniforme:</strong> Todas las variantes usan los mismos precios configurados arriba.
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         )}
 
                         {/* Variantes con precios individuales - Solo cuando NO es precio uniforme */}
                         {hasVariants && !hasUniformVariantPricing && (
                             <div>
-                                <h3 className="text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
-                                    Precios
-                                    {inputPricesWithTax && <span className="text-[9px] normal-case ml-2 text-amber-600">(con IVA)</span>}
-                                    {!inputPricesWithTax && hasTax && <span className="text-[9px] normal-case ml-2 text-(--text-muted)">(sin IVA)</span>}
+                                <h3 className="text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-3">
+                                    Precios por Variante
+                                    {inputPricesWithTax && <span className="text-[10px] normal-case text-amber-600"> (con IVA)</span>}
+                                    {!inputPricesWithTax && hasTax && <span className="text-[10px] normal-case text-[var(--text-muted)]"> (sin IVA)</span>}
                                 </h3>
                                 <div className="grid grid-cols-1 gap-3">
                                     {product.variants.map((variant, idx) => (
@@ -615,27 +662,27 @@ const ProductDetailContent = ({ product, showPricesWithTax = false, features = {
                             </div>
                         )}
 
-                        {/* Información General */}
-                        <div className="pt-4 border-t border-(--border-color)">
-                            <h3 className="text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
+                        {/* Información General - Labels font-normal */}
+                        <div className="pt-4 border-t border-[var(--border-color)]">
+                            <h3 className="text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-3">
                                 Información General
                             </h3>
                             <div className="space-y-1">
-                                <InfoRow label="Nombre" value={product.name} icon={Package} />
-                                <InfoRow label="Código" value={product.code} icon={Tag} />
-                                <InfoRow label="Barcode" value={product.barcode} icon={Barcode} />
-                                <InfoRow label="Marca" value={product.brand} icon={Building2} />
-                                <InfoRow label="Categoría" value={product.category} icon={Layers} />
-                                <InfoRow label="Subcategoría" value={product.subcategory} icon={Layers} />
-                                <InfoRow label="Unidad de Medida" value={product.unit} icon={Ruler} />
+                                <InfoRowNormal label="Nombre" value={product.name} icon={Package} />
+                                <InfoRowNormal label="Código" value={product.code} icon={Tag} />
+                                <InfoRowNormal label="Barcode" value={product.barcode} icon={Barcode} />
+                                <InfoRowNormal label="Marca" value={product.brand} icon={Building2} />
+                                <InfoRowNormal label="Categoría" value={product.category} icon={Layers} />
+                                <InfoRowNormal label="Subcategoría" value={product.subcategory} icon={Layers} />
+                                <InfoRowNormal label="Unidad de Medida" value={product.unit} icon={Ruler} />
                                 {hasVariants && (
-                                    <InfoRow 
+                                    <InfoRowNormal 
                                         label="Tipo de Variantes" 
                                         value={hasUniformVariantPricing ? 'Precio uniforme para todas' : 'Precios individuales por variante'} 
                                         icon={Grid3X3} 
                                     />
                                 )}
-                                <InfoRow 
+                                <InfoRowNormal 
                                     label="Fecha de Creación" 
                                     value={new Date(product.createdAt).toLocaleDateString('es-AR', { 
                                         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
@@ -645,25 +692,25 @@ const ProductDetailContent = ({ product, showPricesWithTax = false, features = {
                             </div>
                         </div>
 
-                        {/* Descripción */}
+                        {/* Descripción - Sin card */}
                         {product.description && (
-                            <div className="pt-4 border-t border-(--border-color)">
-                                <h3 className="text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
+                            <div className="pt-4 border-t border-[var(--border-color)]">
+                                <h3 className="text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-3">
                                     Descripción
                                 </h3>
-                                <p className="text-[12px] text-(--text-secondary) bg-(--bg-hover) p-3 rounded-xl">
+                                <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed">
                                     {product.description}
                                 </p>
                             </div>
                         )}
 
-                        {/* Descripción Larga */}
+                        {/* Descripción Larga - Sin card */}
                         {product.longDescription && (
-                            <div className="pt-4 border-t border-(--border-color)">
-                                <h3 className="text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
+                            <div className="pt-4 border-t border-[var(--border-color)]">
+                                <h3 className="text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-3">
                                     Descripción Detallada
                                 </h3>
-                                <p className="text-[12px] text-(--text-secondary) bg-(--bg-hover) p-3 rounded-xl whitespace-pre-wrap">
+                                <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap">
                                     {product.longDescription}
                                 </p>
                             </div>
@@ -671,14 +718,14 @@ const ProductDetailContent = ({ product, showPricesWithTax = false, features = {
 
                         {/* Tabla de variantes con precio uniforme */}
                         {hasVariants && hasUniformVariantPricing && (
-                            <div className="pt-4 border-t border-(--border-color)">
-                                <h3 className="text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
+                            <div className="pt-4 border-t border-[var(--border-color)]">
+                                <h3 className="text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-3">
                                     Variantes
                                 </h3>
-                                <div className="bg-(--bg-hover) rounded-xl overflow-hidden">
+                                <div className="bg-[var(--bg-hover)] rounded-xl overflow-hidden">
                                     <table className="w-full text-xs">
                                         <thead>
-                                            <tr className="text-[10px] text-(--text-muted) uppercase bg-(--bg-card)">
+                                            <tr className="text-[10px] text-[var(--text-muted)] uppercase bg-[var(--bg-card)]">
                                                 <th className="text-left py-2 px-3">{product.variantConfig?.label1 || 'Variable 1'}</th>
                                                 {product.variantConfig?.label2 && (
                                                     <th className="text-left py-2 px-3">{product.variantConfig.label2}</th>
@@ -687,7 +734,7 @@ const ProductDetailContent = ({ product, showPricesWithTax = false, features = {
                                                 <th className="text-center py-2 px-3">Estado</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-(--border-color)">
+                                        <tbody className="divide-y divide-[var(--border-color)]">
                                             {product.variants.map((variant) => (
                                                 <tr key={variant.id} className={variant.active === false ? 'opacity-50' : ''}>
                                                     <td className="py-2 px-3">{variant.value1}</td>
@@ -720,10 +767,10 @@ const ProductDetailContent = ({ product, showPricesWithTax = false, features = {
                         {/* Stock Total */}
                         {hasStockFeature && (
                             <div>
-                                <h3 className="text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
+                                <h3 className="text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-3">
                                     Stock Total {hasVariants && '(Suma de variantes activas)'}
                                 </h3>
-                                <div className={`bg-(--bg-hover) rounded-xl p-4 ${isLowStock ? 'border border-warning-200 dark:border-warning-800' : ''} ${isOutOfStock ? 'border border-danger-200 dark:border-danger-800' : ''}`}>
+                                <div className={`bg-[var(--bg-hover)] rounded-xl p-4 ${isLowStock ? 'border border-warning-200 dark:border-warning-800' : ''} ${isOutOfStock ? 'border border-danger-200 dark:border-danger-800' : ''}`}>
                                     {isLowStock && (
                                         <div className="flex items-center gap-1 mb-2 text-warning-600">
                                             <AlertCircle size={12} />
@@ -739,29 +786,29 @@ const ProductDetailContent = ({ product, showPricesWithTax = false, features = {
                                     
                                     {/* Grid de stock */}
                                     <div className="grid grid-cols-4 gap-3 mb-3">
-                                        <div className="text-center p-2 bg-(--bg-card) rounded-lg">
-                                            <p className="text-[9px] text-(--text-muted) mb-1">Disponible</p>
+                                        <div className="text-center p-2 bg-[var(--bg-card)] rounded-lg">
+                                            <p className="text-[9px] text-[var(--text-muted)] mb-1">Disponible</p>
                                             <p className={`text-lg font-bold ${isOutOfStock ? 'text-danger-600' : isLowStock ? 'text-warning-600' : 'text-success-600'}`}>
                                                 {stockInfo.available}
                                             </p>
                                         </div>
-                                        <div className="text-center p-2 bg-(--bg-card) rounded-lg">
-                                            <p className="text-[9px] text-(--text-muted) mb-1">Físico</p>
-                                            <p className="text-base font-semibold text-(--text-primary)">{stockInfo.stock}</p>
+                                        <div className="text-center p-2 bg-[var(--bg-card)] rounded-lg">
+                                            <p className="text-[9px] text-[var(--text-muted)] mb-1">Físico</p>
+                                            <p className="text-base font-semibold text-[var(--text-primary)]">{stockInfo.stock}</p>
                                         </div>
-                                        <div className="text-center p-2 bg-(--bg-card) rounded-lg">
-                                            <p className="text-[9px] text-(--text-muted) mb-1">Reservado</p>
+                                        <div className="text-center p-2 bg-[var(--bg-card)] rounded-lg">
+                                            <p className="text-[9px] text-[var(--text-muted)] mb-1">Reservado</p>
                                             <p className="text-base font-semibold text-warning-600">{stockInfo.stockReserved}</p>
                                         </div>
-                                        <div className="text-center p-2 bg-(--bg-card) rounded-lg">
-                                            <p className="text-[9px] text-(--text-muted) mb-1">Presup.</p>
+                                        <div className="text-center p-2 bg-[var(--bg-card)] rounded-lg">
+                                            <p className="text-[9px] text-[var(--text-muted)] mb-1">Presup.</p>
                                             <p className="text-base font-semibold text-info-600">{stockInfo.stockQuoted}</p>
                                         </div>
                                     </div>
                                     
-                                    <div className="border-t border-(--border-color) pt-2">
+                                    <div className="border-t border-[var(--border-color)] pt-2">
                                         <div className="flex justify-between items-center">
-                                            <span className="text-[10px] text-(--text-muted)">Stock Mínimo</span>
+                                            <span className="text-[10px] text-[var(--text-muted)]">Stock Mínimo</span>
                                             <span className="text-[11px] font-medium">{minStock || 'No definido'}</span>
                                         </div>
                                     </div>
@@ -771,14 +818,14 @@ const ProductDetailContent = ({ product, showPricesWithTax = false, features = {
 
                         {/* Stock por Variante */}
                         {hasStockFeature && hasVariants && (
-                            <div className="pt-4 border-t border-(--border-color)">
-                                <h3 className="text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
+                            <div className="pt-4 border-t border-[var(--border-color)]">
+                                <h3 className="text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-3">
                                     Stock por Variante
                                 </h3>
-                                <div className="bg-(--bg-hover) rounded-xl overflow-hidden">
+                                <div className="bg-[var(--bg-hover)] rounded-xl overflow-hidden">
                                     <table className="w-full text-xs">
                                         <thead>
-                                            <tr className="text-[10px] text-(--text-muted) uppercase bg-(--bg-card)">
+                                            <tr className="text-[10px] text-[var(--text-muted)] uppercase bg-[var(--bg-card)]">
                                                 <th className="text-left py-2 px-3">{product.variantConfig?.label1 || 'Variable'}</th>
                                                 {product.variantConfig?.label2 && (
                                                     <th className="text-left py-2 px-3">{product.variantConfig.label2}</th>
@@ -790,7 +837,7 @@ const ProductDetailContent = ({ product, showPricesWithTax = false, features = {
                                                 <th className="text-right py-2 px-2 text-[9px]">Mín.</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-(--border-color)">
+                                        <tbody className="divide-y divide-[var(--border-color)]">
                                             {product.variants.filter(v => v.active !== false).map((variant) => {
                                                 const variantAvailable = Math.max(0, (variant.stock || 0) - (variant.stockReserved || 0));
                                                 const isVariantLowStock = variant.minStock > 0 && variantAvailable <= variant.minStock && variantAvailable > 0;
@@ -813,7 +860,7 @@ const ProductDetailContent = ({ product, showPricesWithTax = false, features = {
                                                                 {variantAvailable}
                                                             </span>
                                                         </td>
-                                                        <td className="py-2 px-2 text-right text-(--text-muted)">
+                                                        <td className="py-2 px-2 text-right text-[var(--text-muted)]">
                                                             {variant.stock || 0}
                                                         </td>
                                                         <td className="py-2 px-2 text-right text-warning-600">
@@ -822,7 +869,7 @@ const ProductDetailContent = ({ product, showPricesWithTax = false, features = {
                                                         <td className="py-2 px-2 text-right text-info-600">
                                                             {variant.stockQuoted || 0}
                                                         </td>
-                                                        <td className="py-2 px-2 text-right text-(--text-muted)">
+                                                        <td className="py-2 px-2 text-right text-[var(--text-muted)]">
                                                             {variant.minStock || '-'}
                                                         </td>
                                                     </tr>
@@ -835,22 +882,22 @@ const ProductDetailContent = ({ product, showPricesWithTax = false, features = {
                         )}
 
                         {/* Configuración de Pedidos */}
-                        <div className={hasStockFeature ? 'pt-4 border-t border-(--border-color)' : ''}>
-                            <h3 className="text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
+                        <div className={hasStockFeature ? 'pt-4 border-t border-[var(--border-color)]' : ''}>
+                            <h3 className="text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-3">
                                 Configuración de Pedidos
                             </h3>
                             <div className="space-y-1">
-                                <InfoRow 
+                                <InfoRowNormal 
                                     label="Unidades por Bulto" 
                                     value={product.unitsPerPackage > 1 ? `${product.unitsPerPackage} unidades` : 'No especificado'} 
                                     icon={Box} 
                                 />
-                                <InfoRow 
+                                <InfoRowNormal 
                                     label="Cantidad Mínima de Pedido" 
                                     value={product.minOrderQuantity > 1 ? `${product.minOrderQuantity} unidades` : 'No especificado'} 
                                     icon={Box} 
                                 />
-                                <InfoRow 
+                                <InfoRowNormal 
                                     label="Venta por Bultos" 
                                     value={product.sellOnlyFullPackages ? 'Solo bultos completos' : 'Unidades sueltas permitidas'} 
                                     icon={Box} 
@@ -859,19 +906,25 @@ const ProductDetailContent = ({ product, showPricesWithTax = false, features = {
                         </div>
 
                         {/* Información del Sistema */}
-                        <div className="pt-4 border-t border-(--border-color)">
-                            <h3 className="text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
+                        <div className="pt-4 border-t border-[var(--border-color)]">
+                            <h3 className="text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-3">
                                 Información del Sistema
                             </h3>
                             <div className="space-y-1">
-                                <InfoRow 
-                                    label="Creado por" 
-                                    value={`${product.createdBy?.firstName} ${product.createdBy?.lastName}`} 
+                                <InfoRowNormal 
+                                    label="Creado Por" 
+                                    value={`${product.createdBy?.firstName || ''} ${product.createdBy?.lastName || ''}`.trim() || 'Sistema'} 
                                     icon={User} 
                                 />
-                                <InfoRow 
-                                    label="Última actualización" 
-                                    value={new Date(product.updatedAt).toLocaleString('es-AR')} 
+                                <InfoRowNormal 
+                                    label="Última Actualización" 
+                                    value={new Date(product.updatedAt).toLocaleString('es-AR', { 
+                                        day: '2-digit', 
+                                        month: '2-digit', 
+                                        year: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                    })} 
                                     icon={Clock} 
                                 />
                             </div>

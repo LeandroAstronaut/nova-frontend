@@ -49,7 +49,7 @@ const SettingsPage = () => {
         console.log('SettingsPage - MONTADO - user?.company?.logo:', user?.company?.logo);
     }, []);
 
-    // Actualizar localLogo cuando cambie user.company.logo
+    // Actualizar localLogo cuando cambie user.companyId.logo
     useEffect(() => {
         console.log('SettingsPage - user?.company?.logo cambió:', user?.company?.logo);
         setLocalLogo(user?.company?.logo || null);

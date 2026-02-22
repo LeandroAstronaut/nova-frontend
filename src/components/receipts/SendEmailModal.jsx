@@ -36,20 +36,23 @@ const SendReceiptEmailModal = ({ isOpen, onClose, onConfirm, receipt, loading })
         seller: false,
         client: false
     });
+    const [additionalEmails, setAdditionalEmails] = useState('');
 
     useEffect(() => {
         if (isOpen) {
             setNotifications({ company: false, seller: false, client: false });
+            setAdditionalEmails('');
         }
     }, [isOpen]);
 
     const handleConfirm = () => {
-        onConfirm({ receiptId: receipt?._id, notifications });
+        onConfirm({ receiptId: receipt?._id, notifications, additionalEmails: additionalEmails.trim() });
     };
 
     const handleClose = () => { if (!loading) onClose(); };
 
-    const hasSelectedRecipient = notifications.company || notifications.seller || notifications.client;
+    const hasAdditionalEmails = additionalEmails.trim().length > 0;
+    const hasSelectedRecipient = notifications.company || notifications.seller || notifications.client || hasAdditionalEmails;
     const receiptNumber = String(receipt?.receiptNumber || '').padStart(5, '0');
     const receiptTypeLabel = receipt?.type === 'ingreso' ? 'Recibo de Ingreso' : 'Recibo de Egreso';
 
@@ -78,9 +81,28 @@ const SendReceiptEmailModal = ({ isOpen, onClose, onConfirm, receipt, loading })
                                 <Toggle checked={notifications.seller} onChange={(c) => setNotifications(p => ({ ...p, seller: c }))} icon={User} label="Email vendedor" email={receipt?.salesRepId?.email} disabled={!receipt?.salesRepId?.email} />
                                 <Toggle checked={notifications.client} onChange={(c) => setNotifications(p => ({ ...p, client: c }))} icon={Mail} label="Email cliente" email={receipt?.clientId?.email} disabled={!receipt?.clientId?.email} />
                             </div>
-                            {!receipt?.companyId?.email && !receipt?.salesRepId?.email && !receipt?.clientId?.email && (
+
+                            {/* Additional Emails */}
+                            <div className="space-y-2">
+                                <label className="text-[12px] font-bold text-[var(--text-primary)] flex items-center gap-2">
+                                    <Mail size={14} />
+                                    Otras direcciones de email
+                                </label>
+                                <input
+                                    type="text"
+                                    value={additionalEmails}
+                                    onChange={(e) => setAdditionalEmails(e.target.value)}
+                                    placeholder="ej: correo1@ejemplo.com, correo2@ejemplo.com"
+                                    className="w-full px-3 py-2.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-all"
+                                />
+                                <p className="text-[10px] text-[var(--text-muted)]">
+                                    Separa múltiples emails con comas
+                                </p>
+                            </div>
+
+                            {!receipt?.companyId?.email && !receipt?.salesRepId?.email && !receipt?.clientId?.email && !hasAdditionalEmails && (
                                 <div className="p-4 bg-warning-50 dark:bg-warning-900/20 rounded-xl border border-warning-100 dark:border-warning-800">
-                                    <p className="text-[11px] text-warning-700 dark:text-warning-400 font-medium"><strong>Atencion:</strong> No hay emails configurados.</p>
+                                    <p className="text-[11px] text-warning-700 dark:text-warning-400 font-medium"><strong>Atención:</strong> No hay emails configurados. Puedes ingresar emails manualmente arriba.</p>
                                 </div>
                             )}
                         </div>

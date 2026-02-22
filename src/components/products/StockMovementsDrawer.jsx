@@ -12,8 +12,6 @@ import {
     User,
     FileText,
     History,
-    Minus,
-    Plus,
     ShoppingCart,
     RotateCcw,
     AlertCircle,
@@ -41,8 +39,8 @@ const typeLabels = {
     order_reserve: 'Reserva Pedido',
     order_release: 'Liberación Pedido',
     delivery_consume: 'Entrega',
-    quote_create: 'Presupuesto Creado',
-    quote_update: 'Presupuesto Editado',
+    quote_create: 'Nuevo Presupuesto',
+    quote_update: 'Presupuesto Modificado',
     quote_cancel: 'Presupuesto Cancelado',
     quote_convert: 'Presupuesto → Pedido'
 };
@@ -71,20 +69,63 @@ const formatTime = (dateString) => {
     return format(date, 'dd/MM/yyyy HH:mm', { locale: es });
 };
 
+// Componente para mostrar cambios expandibles - Estilos de NotificationBell
+const StockMovementChanges = ({ changes }) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+    
+    if (!changes || changes.length === 0) return null;
+    
+    return (
+        <div className="mt-2 pt-2 border-t border-[var(--border-color)]">
+            <button
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="flex items-center gap-1 text-[11px] text-primary-600 hover:text-primary-700 font-medium transition-colors"
+            >
+                <span>{changes.length} {changes.length === 1 ? 'cambio' : 'cambios'}</span>
+                <ChevronDown 
+                    size={12} 
+                    className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                />
+            </button>
+            
+            <AnimatePresence>
+                {isExpanded && (
+                    <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden"
+                    >
+                        <div className="mt-2 space-y-1">
+                            {changes.map((change, idx) => (
+                                <div key={idx} className="flex items-center gap-1.5 text-[11px]">
+                                    <span className="text-[var(--text-muted)]">{change.label}:</span>
+                                    <span className="line-through text-[var(--text-muted)] opacity-60">{change.from}</span>
+                                    <span className="text-[var(--text-muted)]">→</span>
+                                    <span className="font-medium text-[var(--text-primary)]">{change.to}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+    );
+};
+
 const getQuantityDisplay = (movement) => {
     const quantity = movement.quantity;
     
     if (quantity > 0) {
         return (
             <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-bold rounded-full">
-                <Plus size={12} />
                 +{quantity}
             </span>
         );
     } else if (quantity < 0) {
         return (
             <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-xs font-bold rounded-full">
-                <Minus size={12} />
                 {quantity}
             </span>
         );
@@ -96,29 +137,46 @@ const StockMovementsDrawer = ({ isOpen, onClose, product }) => {
     const { addToast } = useToast();
     const [movements, setMovements] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
     const [selectedVariantId, setSelectedVariantId] = useState(null);
     const [pagination, setPagination] = useState({
         page: 1,
-        limit: 50,
+        limit: 20,
         total: 0,
-        totalPages: 0
+        totalPages: 0,
+        hasMore: false
     });
 
-    // Reset selected variant when product changes
+    // Reset selected variant and movements when product changes
     useEffect(() => {
         setSelectedVariantId(null);
+        setMovements([]);
+        setPagination({
+            page: 1,
+            limit: 20,
+            total: 0,
+            totalPages: 0,
+            hasMore: false
+        });
     }, [product?._id]);
 
     useEffect(() => {
         if (isOpen && product?._id) {
-            fetchMovements();
+            // Reset and fetch first page when drawer opens or variant changes
+            setMovements([]);
+            fetchMovements(1, true);
         }
     }, [isOpen, product, selectedVariantId]);
 
-    const fetchMovements = async (page = 1) => {
+    const fetchMovements = async (page = 1, reset = false) => {
         if (!product?._id) return;
         
-        setLoading(true);
+        if (page === 1) {
+            setLoading(true);
+        } else {
+            setLoadingMore(true);
+        }
+        
         try {
             const params = {
                 page,
@@ -128,18 +186,29 @@ const StockMovementsDrawer = ({ isOpen, onClose, product }) => {
                 params.variantId = selectedVariantId;
             }
             const result = await getProductStockMovements(product._id, params);
-            setMovements(result.movements || []);
+            
+            // Acumular movimientos si no es reset
+            setMovements(prev => reset ? (result.movements || []) : [...prev, ...(result.movements || [])]);
+            
             setPagination({
                 page: result.page,
                 limit: pagination.limit,
                 total: result.total,
-                totalPages: result.totalPages
+                totalPages: result.totalPages,
+                hasMore: result.page < result.totalPages
             });
         } catch (error) {
             console.error('Error fetching stock movements:', error);
             addToast('Error al cargar movimientos de stock', 'error');
         } finally {
             setLoading(false);
+            setLoadingMore(false);
+        }
+    };
+    
+    const loadMore = () => {
+        if (!loadingMore && pagination.hasMore) {
+            fetchMovements(pagination.page + 1, false);
         }
     };
 
@@ -201,7 +270,7 @@ const StockMovementsDrawer = ({ isOpen, onClose, product }) => {
                         transition={{ type: 'spring', damping: 28, stiffness: 220, duration: 0.3 }}
                         className="fixed top-4 left-4 right-4 md:left-auto h-[calc(100vh-2rem)] w-auto md:w-full md:max-w-[600px] bg-[var(--bg-card)] shadow-2xl z-[210] flex flex-col border border-[var(--border-color)] rounded-2xl overflow-hidden"
                     >
-                        {/* Header */}
+                        {/* Header - Estilo similar a Notificaciones */}
                         <div className="px-6 py-4 border-b border-[var(--border-color)] flex items-center justify-between shrink-0 bg-[var(--bg-card)]">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-xl flex items-center justify-center text-primary-600 dark:text-primary-400">
@@ -216,23 +285,24 @@ const StockMovementsDrawer = ({ isOpen, onClose, product }) => {
                                     </p>
                                 </div>
                             </div>
-                            <button
-                                onClick={onClose}
-                                className="p-2 hover:bg-[var(--bg-hover)] rounded-lg text-[var(--text-muted)] transition-colors"
-                            >
-                                <X size={20} />
-                            </button>
+                            <div className="flex items-center gap-1">
+                                <button
+                                    onClick={onClose}
+                                    className="p-2 hover:bg-[var(--bg-hover)] rounded-lg text-[var(--text-muted)] transition-colors"
+                                >
+                                    <X size={20} />
+                                </button>
+                            </div>
                         </div>
 
-                        {/* Variant Selector */}
+                        {/* Variant Selector - Compacto */}
                         {hasVariants && (
-                            <div className="px-6 py-3 bg-[var(--bg-hover)] border-b border-[var(--border-color)]">
-                                <label className="text-[11px] text-[var(--text-muted)] mb-1.5 block">Variante</label>
-                                <div className="relative">
+                            <div className="px-6 py-2 bg-[var(--bg-hover)] border-b border-[var(--border-color)]">
+                                <div className="relative group">
                                     <select
                                         value={selectedVariantId || ''}
                                         onChange={(e) => setSelectedVariantId(e.target.value || null)}
-                                        className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900 appearance-none cursor-pointer"
+                                        className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg text-[11px] text-[var(--text-primary)] focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/30 appearance-none cursor-pointer transition-all hover:border-primary-300"
                                     >
                                         <option value="">Todas las variantes</option>
                                         {product.variants.map(variant => (
@@ -243,29 +313,29 @@ const StockMovementsDrawer = ({ isOpen, onClose, product }) => {
                                             </option>
                                         ))}
                                     </select>
-                                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none" size={16} />
+                                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-muted)] group-hover:text-primary-500 transition-colors pointer-events-none" size={14} />
                                 </div>
                             </div>
                         )}
 
-                        {/* Stock Summary */}
-                        <div className="px-6 py-4 bg-[var(--bg-hover)] border-b border-[var(--border-color)]">
-                            <div className="grid grid-cols-4 gap-3">
-                                <div className="text-center p-3 bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)]">
-                                    <p className="text-[9px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Físico</p>
-                                    <p className="text-xl font-bold text-[var(--text-primary)]">{displayStock.stock}</p>
+                        {/* Stock Summary - Compacto */}
+                        <div className="px-6 py-3 bg-[var(--bg-hover)] border-b border-[var(--border-color)]">
+                            <div className="flex items-center justify-between gap-4">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[10px] text-[var(--text-muted)]">Físico:</span>
+                                    <span className="text-sm font-bold text-[var(--text-primary)]">{displayStock.stock}</span>
                                 </div>
-                                <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-800">
-                                    <p className="text-[9px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1">Disponible</p>
-                                    <p className="text-xl font-bold text-blue-700 dark:text-blue-300">{Math.max(0, displayStock.stock - displayStock.stockReserved)}</p>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[10px] text-blue-600 dark:text-blue-400">Disponible:</span>
+                                    <span className="text-sm font-bold text-blue-700 dark:text-blue-300">{Math.max(0, displayStock.stock - displayStock.stockReserved)}</span>
                                 </div>
-                                <div className="text-center p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-100 dark:border-amber-800">
-                                    <p className="text-[9px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-1">Reservado</p>
-                                    <p className="text-xl font-bold text-amber-700 dark:text-amber-300">{displayStock.stockReserved}</p>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[10px] text-amber-600 dark:text-amber-400">Reservado:</span>
+                                    <span className="text-sm font-bold text-amber-700 dark:text-amber-300">{displayStock.stockReserved}</span>
                                 </div>
-                                <div className="text-center p-3 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-100 dark:border-purple-800">
-                                    <p className="text-[9px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider mb-1">Presup.</p>
-                                    <p className="text-xl font-bold text-purple-700 dark:text-purple-300">{displayStock.stockQuoted}</p>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[10px] text-purple-600 dark:text-purple-400">Presup.:</span>
+                                    <span className="text-sm font-bold text-purple-700 dark:text-purple-300">{displayStock.stockQuoted}</span>
                                 </div>
                             </div>
                         </div>
@@ -288,134 +358,95 @@ const StockMovementsDrawer = ({ isOpen, onClose, product }) => {
                                     </p>
                                 </div>
                             ) : (
-                                <div className="p-4">
-                                    {/* Timeline */}
-                                    <div className="relative">
-                                        {/* Timeline line */}
-                                        <div className="absolute left-5 top-2 bottom-2 w-px bg-[var(--border-color)]" />
+                                <div className="p-4 space-y-2">
+                                    {/* Lista de movimientos - Estilos copiados de NotificationBell */}
+                                    {movements.map((movement, index) => {
+                                        const Icon = typeIcons[movement.type] || History;
+                                        const colorClass = typeColors[movement.type] || 'bg-gray-100 text-gray-600';
+                                        const hasChanges = movement.changes && movement.changes.length > 0;
                                         
-                                        {movements.map((movement, index) => {
-                                            const Icon = typeIcons[movement.type] || History;
-                                            const colorClass = typeColors[movement.type] || 'bg-gray-100 text-gray-600';
-                                            const label = typeLabels[movement.type] || movement.type;
-                                            const isFirst = index === 0;
-                                            const hasOrderInfo = movement.sourceInfo;
-                                            
-                                            return (
-                                                <motion.div
-                                                    key={movement._id}
-                                                    initial={{ opacity: 0, x: -10 }}
-                                                    animate={{ opacity: 1, x: 0 }}
-                                                    transition={{ delay: index * 0.05 }}
-                                                    className="relative flex gap-4 pb-5 last:pb-0"
-                                                >
-                                                    {/* Timeline dot */}
-                                                    <div className="relative z-10">
-                                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${colorClass} ${isFirst ? 'ring-2 ring-offset-2 ring-offset-[var(--bg-card)] ring-primary-500' : ''}`}>
-                                                            <Icon size={18} />
-                                                        </div>
+                                        return (
+                                            <motion.div
+                                                key={movement._id}
+                                                initial={{ opacity: 0, y: 10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ delay: index * 0.05 }}
+                                                className="p-4 bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] hover:border-primary-200 dark:hover:border-primary-800 transition-all"
+                                            >
+                                                <div className="flex gap-3">
+                                                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${colorClass}`}>
+                                                        <Icon size={18} />
                                                     </div>
-                                                    
-                                                    {/* Content */}
-                                                    <div className="flex-1 min-w-0 pt-1">
-                                                        {/* Tipo y cantidad */}
-                                                        <div className="flex items-center justify-between gap-2 mb-1">
-                                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[var(--bg-hover)] text-[var(--text-muted)]">
-                                                                {label}
-                                                            </span>
-                                                            {getQuantityDisplay(movement)}
-                                                        </div>
-                                                        
-                                                        {/* Número de presupuesto/pedido si existe */}
-                                                        {hasOrderInfo && (
-                                                            <div className="flex items-center gap-2 mb-2">
-                                                                <Hash size={12} className="text-[var(--text-muted)]" />
-                                                                <span className="text-[12px] font-bold text-[var(--text-primary)]">
-                                                                    {movement.sourceInfo.type === 'budget' ? 'Presupuesto' : 'Pedido'} 
-                                                                    {' '}
-                                                                    #{String(movement.sourceInfo.orderNumber).padStart(5, '0')}
-                                                                </span>
-                                                            </div>
-                                                        )}
-                                                        
-                                                        {/* Descripción */}
-                                                        <p className="text-[13px] text-[var(--text-primary)] leading-snug mb-2">
-                                                            {movement.notes}
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-[13px] text-[var(--text-primary)] leading-snug">
+                                                            {movement.sourceId ? (
+                                                                <a 
+                                                                    href={`/pedidos/${movement.sourceId}`}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="hover:text-primary-600 transition-colors"
+                                                                >
+                                                                    {movement.notes}
+                                                                    {movement.sourceInfo?.orderNumber && (
+                                                                        <span className="ml-1 text-primary-600 font-medium">
+                                                                            #{movement.sourceInfo.orderNumber}
+                                                                        </span>
+                                                                    )}
+                                                                </a>
+                                                            ) : (
+                                                                movement.notes
+                                                            )}
                                                         </p>
-                                                        
                                                         {/* Stock resultante */}
-                                                        <div className="flex items-center gap-3 mb-2 p-2 bg-[var(--bg-hover)] rounded-lg text-[11px]">
-                                                            <span className="text-[var(--text-muted)] font-medium">Resultado:</span>
-                                                            <span className="font-bold text-[var(--text-primary)]">
-                                                                Físico: {movement.stockAfter?.physical}
-                                                            </span>
-                                                            <span className="text-[var(--border-color)]">|</span>
-                                                            <span className="font-bold text-amber-600 dark:text-amber-400">
-                                                                Reservado: {movement.stockAfter?.reserved}
-                                                            </span>
+                                                        <div className="flex items-center gap-3 mt-1.5 text-[11px] text-[var(--text-muted)]">
+                                                            <span>Físico: <span className="font-medium text-[var(--text-primary)]">{movement.stockAfter?.physical}</span></span>
+                                                            <span>Reservado: <span className="font-medium text-amber-600">{movement.stockAfter?.reserved}</span></span>
                                                             {movement.stockAfter?.quoted > 0 && (
-                                                                <>
-                                                                    <span className="text-[var(--border-color)]">|</span>
-                                                                    <span className="font-bold text-purple-600 dark:text-purple-400">
-                                                                        Presup.: {movement.stockAfter?.quoted}
-                                                                    </span>
-                                                                </>
+                                                                <span>Presup.: <span className="font-medium text-purple-600">{movement.stockAfter?.quoted}</span></span>
                                                             )}
                                                         </div>
-                                                        
-                                                        {/* Usuario y fecha */}
-                                                        <div className="flex items-center gap-2 text-[11px] text-[var(--text-muted)]">
-                                                            <span className="flex items-center gap-1">
-                                                                <Calendar size={11} />
+                                                        <div className="flex items-center gap-2 mt-1.5">
+                                                            <span className="text-[11px] text-[var(--text-muted)]">
                                                                 {formatTime(movement.createdAt)}
                                                             </span>
                                                             {movement.createdBy && (
-                                                                <>
-                                                                    <span>•</span>
-                                                                    <span className="flex items-center gap-1">
-                                                                        <User size={11} />
-                                                                        {movement.createdBy.firstName} {movement.createdBy.lastName}
-                                                                    </span>
-                                                                </>
+                                                                <span className="text-[10px] text-[var(--text-muted)]">
+                                                                    • {movement.createdBy.firstName} {movement.createdBy.lastName}
+                                                                </span>
                                                             )}
                                                         </div>
+                                                        {hasChanges && <StockMovementChanges changes={movement.changes} />}
                                                     </div>
-                                                </motion.div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            )}
-                            
-                            {/* Pagination */}
-                            {pagination.totalPages > 1 && (
-                                <div className="flex items-center justify-center gap-2 mt-6 pb-4">
-                                    <button
-                                        onClick={() => fetchMovements(pagination.page - 1)}
-                                        disabled={pagination.page === 1 || loading}
-                                        className="px-3 py-2 rounded-lg border border-[var(--border-color)] text-sm font-medium hover:bg-[var(--bg-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        Anterior
-                                    </button>
-                                    <span className="text-sm text-[var(--text-muted)]">
-                                        Página {pagination.page} de {pagination.totalPages}
-                                    </span>
-                                    <button
-                                        onClick={() => fetchMovements(pagination.page + 1)}
-                                        disabled={pagination.page === pagination.totalPages || loading}
-                                        className="px-3 py-2 rounded-lg border border-[var(--border-color)] text-sm font-medium hover:bg-[var(--bg-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        Siguiente
-                                    </button>
+                                                    <div className="shrink-0">
+                                                        {getQuantityDisplay(movement)}
+                                                    </div>
+                                                </div>
+                                            </motion.div>
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>
 
-                        {/* Footer */}
-                        <div className="px-6 py-3 border-t border-[var(--border-color)] bg-[var(--bg-hover)]">
-                            <p className="text-[11px] text-[var(--text-muted)] text-center">
-                                {pagination.total} {pagination.total === 1 ? 'movimiento' : 'movimientos'} registrados
-                            </p>
+                        {/* Footer - Igual a NotificationBell */}
+                        <div className="px-6 py-4 border-t border-[var(--border-color)] bg-[var(--bg-hover)]">
+                            {loadingMore ? (
+                                <div className="flex items-center justify-center gap-2">
+                                    <div className="w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+                                    <span className="text-[12px] text-[var(--text-muted)]">Cargando...</span>
+                                </div>
+                            ) : pagination.hasMore ? (
+                                <button
+                                    onClick={loadMore}
+                                    className="w-full text-center text-[12px] font-bold text-primary-600 hover:text-primary-700 transition-colors uppercase tracking-wider"
+                                >
+                                    Cargar más movimientos
+                                </button>
+                            ) : (
+                                <p className="text-center text-[12px] text-[var(--text-muted)]">
+                                    No hay más movimientos
+                                </p>
+                            )}
                         </div>
                     </motion.div>
                 </>

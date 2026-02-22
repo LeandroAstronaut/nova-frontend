@@ -55,6 +55,9 @@ const ProductCatalog = ({
         const hasVariants = product.hasVariants && product.variants?.length > 0;
         const hasUniformPricing = product.hasUniformVariantPricing !== false;
         
+        // Usar campos con IVA de la API si showPricesWithTax está activo
+        const usePriceWithTax = showPricesWithTax && hasTax;
+        
         let minPrice = 0;
         let maxPrice = 0;
         let minFinalPrice = 0;
@@ -89,32 +92,58 @@ const ProductCatalog = ({
             hasDiscount = variantPrices.some(p => p.hasDiscount);
             maxDiscountPercent = Math.max(...variantPrices.map(p => p.discount));
             priceSource = 'variants';
-        } else {
-            // Precio uniforme
-            const pricing = priceList === 2 
-                ? product.pricing?.list2 
-                : product.pricing?.list1;
             
-            minPrice = calculateBasePrice(pricing);
-            maxPrice = minPrice;
-            minFinalPrice = calculateFinalPrice(pricing);
-            maxFinalPrice = minFinalPrice;
-            hasOffer = (pricing?.offer || 0) > 0;
-            hasDiscount = (pricing?.discount || 0) > 0;
-            maxDiscountPercent = pricing?.discount || 0;
+            // Para variantes, aún necesitamos calcular manualmente porque no hay campos de API para cada variante
+            if (usePriceWithTax) {
+                minPrice = getPriceWithTax(minPrice, taxRate);
+                maxPrice = getPriceWithTax(maxPrice, taxRate);
+                minFinalPrice = getPriceWithTax(minFinalPrice, taxRate);
+                maxFinalPrice = getPriceWithTax(maxFinalPrice, taxRate);
+            }
+        } else {
+            // Precio uniforme - usar campos de API si están disponibles
+            if (priceList === 2) {
+                // Lista 2
+                if (usePriceWithTax && product.priceWithTaxList2) {
+                    minPrice = product.priceWithTaxList2;
+                    maxPrice = minPrice;
+                    minFinalPrice = product.finalPriceWithTaxList2 || minPrice;
+                    maxFinalPrice = minFinalPrice;
+                } else {
+                    const pricing = product.pricing?.list2;
+                    minPrice = calculateBasePrice(pricing);
+                    maxPrice = minPrice;
+                    minFinalPrice = calculateFinalPrice(pricing);
+                    maxFinalPrice = minFinalPrice;
+                }
+                hasOffer = (product.pricing?.list2?.offer || 0) > 0 || (usePriceWithTax && product.offerWithTaxList2 > 0);
+                hasDiscount = (product.pricing?.list2?.discount || 0) > 0;
+                maxDiscountPercent = product.pricing?.list2?.discount || 0;
+            } else {
+                // Lista 1 (default)
+                if (usePriceWithTax && product.priceWithTaxList1) {
+                    minPrice = product.priceWithTaxList1;
+                    maxPrice = minPrice;
+                    minFinalPrice = product.finalPriceWithTaxList1 || minPrice;
+                    maxFinalPrice = minFinalPrice;
+                } else {
+                    const pricing = product.pricing?.list1;
+                    minPrice = calculateBasePrice(pricing);
+                    maxPrice = minPrice;
+                    minFinalPrice = calculateFinalPrice(pricing);
+                    maxFinalPrice = minFinalPrice;
+                }
+                hasOffer = (product.pricing?.list1?.offer || 0) > 0 || (usePriceWithTax && product.offerWithTaxList1 > 0);
+                hasDiscount = (product.pricing?.list1?.discount || 0) > 0;
+                maxDiscountPercent = product.pricing?.list1?.discount || 0;
+            }
         }
 
-        // Aplicar IVA si corresponde
-        const displayMinPrice = showPricesWithTax && hasTax ? getPriceWithTax(minPrice, taxRate) : minPrice;
-        const displayMaxPrice = showPricesWithTax && hasTax ? getPriceWithTax(maxPrice, taxRate) : maxPrice;
-        const displayMinFinal = showPricesWithTax && hasTax ? getPriceWithTax(minFinalPrice, taxRate) : minFinalPrice;
-        const displayMaxFinal = showPricesWithTax && hasTax ? getPriceWithTax(maxFinalPrice, taxRate) : maxFinalPrice;
-
         return {
-            minPrice: displayMinPrice,
-            maxPrice: displayMaxPrice,
-            minFinalPrice: displayMinFinal,
-            maxFinalPrice: displayMaxFinal,
+            minPrice,
+            maxPrice,
+            minFinalPrice,
+            maxFinalPrice,
             hasOffer,
             hasDiscount,
             maxDiscountPercent,

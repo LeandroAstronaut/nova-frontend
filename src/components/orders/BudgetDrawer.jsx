@@ -70,7 +70,23 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
     const [clients, setClients] = useState([]);
     const [products, setProducts] = useState([]);
     const [sellers, setSellers] = useState([]);
+    
+    // Cargar comisión del vendedor seleccionado en modo creación
+    useEffect(() => {
+        if (mode === 'create' && header.salesRepId && sellers.length > 0) {
+            const selectedSeller = sellers.find(s => s._id === header.salesRepId);
+            if (selectedSeller && selectedSeller.commission) {
+                setCommissionRate(selectedSeller.commission);
+            }
+        }
+    }, [header.salesRepId, sellers, mode]);
+    
     const [searchQuery, setSearchQuery] = useState('');
+    
+    // Configuración congelada del pedido (para edición)
+    const orderConfig = order?.excludeOfferProductsFromGlobalDiscount !== undefined 
+        ? { excludeOfferProductsFromGlobalDiscount: order.excludeOfferProductsFromGlobalDiscount }
+        : user?.company;
     
     // Product Pagination
     const [productPage, setProductPage] = useState(1);
@@ -91,18 +107,22 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
             if (order && (mode === 'edit' || mode === 'view')) {
                 // Pre-fill for edit
                 setSelectedClient(order.clientId);
-                setItems(order.items.map(item => ({
-                    lineId: item.lineId || `${(item.productId._id || item.productId)}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-                    productId: item.productId._id || item.productId,
-                    name: item.productId.name || item.name || 'Producto',
-                    code: item.productId.code || item.code || '',
-                    quantity: item.quantity,
-                    listPrice: item.listPrice,
-                    discount: item.discount || 0,
-                    variantId: item.variantId || null,
-                    variantName: item.variantName || null
-                    // Nota: hasOffer se recalcula en el backend según estado actual del producto
-                })));
+                setItems(order.items.map(item => {
+                    const product = item.productId || {};
+                    
+                    return {
+                        lineId: item.lineId || `${(product._id || item.productId)}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                        productId: product._id || item.productId,
+                        name: product.name || item.name || 'Producto',
+                        code: product.code || item.code || '',
+                        quantity: item.quantity,
+                        listPrice: item.listPrice,
+                        discount: item.discount || 0,
+                        variantId: item.variantId || null,
+                        variantName: item.variantName || null,
+                        hasOffer: item.hasOffer || false
+                    };
+                }));
                 setHeader({
                     date: new Date(order.date).toISOString().split('T')[0],
                     salesRepId: order.salesRepId?._id || order.salesRepId || '',
@@ -649,14 +669,14 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                                             commissionRate={commissionRate}
                                             setCommissionRate={setCommissionRate}
                                             commissionAmount={calculateCommissionAmount()}
-                                            canEditCommission={(isAdmin || isSuperadmin) && mode === 'edit'}
+                                            canEditCommission={isAdmin || isSuperadmin}
                                             orderStatus={order?.status}
                                             // Discount permissions
                                             canEditProductDiscount={canEditProductDiscount}
                                             canEditBudgetDiscount={canEditBudgetDiscount}
                                             // Products y company para reglas de cantidad
                                             products={products}
-                                            company={user?.company}
+                                            company={orderConfig}
                                         />
                                     )}
                                 </AnimatePresence>

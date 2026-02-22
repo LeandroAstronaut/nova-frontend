@@ -276,16 +276,16 @@ const ProductQuickView = ({
                         className="fixed top-4 left-4 right-4 md:left-auto md:right-4 h-[calc(100vh-2rem)] w-auto md:w-full md:max-w-[950px] bg-[var(--bg-card)] shadow-2xl z-[210] flex flex-col border border-[var(--border-color)] rounded-2xl overflow-hidden"
                     >
                         {/* Header */}
-                        <div className="px-6 py-4 border-b border-[var(--border-color)] flex items-center justify-between shrink-0 bg-[var(--bg-card)]">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-xl flex items-center justify-center text-primary-600">
-                                    <Package size={20} />
+                        <div className="px-4 md:px-5 py-3 md:py-4 border-b border-[var(--border-color)] flex items-center justify-between shrink-0 bg-[var(--bg-card)]">
+                            <div className="flex items-center gap-2 md:gap-3">
+                                <div className="w-9 h-9 md:w-10 md:h-10 bg-primary-100 dark:bg-primary-900/30 rounded-xl flex items-center justify-center text-primary-600 dark:text-primary-400">
+                                    <Package size={18} className="md:w-5 md:h-5" />
                                 </div>
                                 <div className="min-w-0">
-                                    <h2 className="text-sm font-bold text-[var(--text-primary)]">
+                                    <h2 className="text-sm md:text-base font-semibold text-[var(--text-primary)]">
                                         Detalle de Producto
                                     </h2>
-                                    <p className="text-[11px] text-[var(--text-muted)] font-medium truncate max-w-[300px] md:max-w-[450px]">
+                                    <p className="text-[10px] md:text-[11px] text-[var(--text-muted)] font-medium truncate max-w-[200px] md:max-w-[350px]">
                                         {product.name}
                                     </p>
                                 </div>
@@ -377,148 +377,111 @@ const ProductQuickView = ({
                                             </div>
                                         )}
 
-                                        {/* Nombre y código */}
-                                        <div>
-                                            <h3 className="text-xl font-bold text-[var(--text-primary)] leading-tight mb-1">
-                                                {product.name}
-                                            </h3>
-                                            <p className="text-[13px] text-[var(--text-muted)] font-medium">
-                                                {product.code}
-                                            </p>
-                                        </div>
-
-                                        {/* Datos básicos en línea */}
-                                        <div className="flex flex-wrap gap-x-4 gap-y-2 text-[12px] text-[var(--text-muted)]">
-                                            {product.brand && (
-                                                <span className="flex items-center gap-1.5 bg-[var(--bg-hover)] px-2.5 py-1 rounded-lg">
-                                                    <Building2 size={14} /> {product.brand}
-                                                </span>
-                                            )}
-                                            {product.category && (
-                                                <span className="flex items-center gap-1.5 bg-[var(--bg-hover)] px-2.5 py-1 rounded-lg">
-                                                    <Layers size={14} /> {product.category}
-                                                </span>
-                                            )}
-                                            {product.unit && (
-                                                <span className="flex items-center gap-1.5 bg-[var(--bg-hover)] px-2.5 py-1 rounded-lg">
-                                                    <Ruler size={14} /> {product.unit}
-                                                </span>
-                                            )}
-                                            {product.barcode && (
-                                                <span className="flex items-center gap-1.5 bg-[var(--bg-hover)] px-2.5 py-1 rounded-lg">
-                                                    <Barcode size={14} /> {product.barcode}
-                                                </span>
-                                            )}
-                                        </div>
                                     </div>
 
-                                    {/* COLUMNA DERECHA: Precios, Variantes, Stock - Estilo Minimalista */}
+                                    {/* COLUMNA DERECHA: Info, Precios, Variantes, Stock */}
                                     <div className="space-y-5">
                                         
-                                        {/* Card de Precio Principal - Minimalista */}
-                                        <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-color)] p-5 shadow-sm">
-                                            <div className="flex items-center justify-between mb-4">
+                                        {/* Info del Producto - Nombre, Categoría, Código */}
+                                        <div>
+                                            <h3 className="text-[18px] font-bold text-[var(--text-primary)] leading-tight mb-1">
+                                                {product.name}
+                                            </h3>
+                                            {product.category && (
+                                                <p className="text-[11px] text-[var(--text-muted)] font-medium uppercase tracking-wide mb-1">
+                                                    {product.category}
+                                                    {product.subcategory && ` / ${product.subcategory}`}
+                                                </p>
+                                            )}
+                                            {/* Código y Stock sintético */}
+                                            <div className="flex items-center gap-2 text-[11px] text-[var(--text-muted)]">
+                                                {!hasVariants && (
+                                                    <span>Cod. {product.code}</span>
+                                                )}
+                                                {hasStockFeature && (
+                                                    <>
+                                                        {!hasVariants && <span className="text-[var(--border-color)]">|</span>}
+                                                        <span className={isOutOfStock ? 'text-danger-600' : isLowStock ? 'text-warning-600' : 'text-success-600'}>
+                                                            Stock: {stock.available} disp.
+                                                        </span>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Card de Precio */}
+                                        <div className="bg-[var(--bg-hover)] rounded-xl border border-[var(--border-color)] p-4">
+                                            <div className="flex items-center justify-between mb-2">
                                                 <span className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
                                                     Precio {priceList === 2 ? 'Lista 2' : 'Lista 1'}
+                                                    {showPricesWithTax && hasTax && (
+                                                        <span className="ml-1.5 text-[10px] text-success-600 font-normal">(c/IVA)</span>
+                                                    )}
                                                 </span>
-                                                {showPricesWithTax && hasTax && (
-                                                    <span className="text-[10px] text-success-600 font-medium bg-success-50 dark:bg-success-900/20 px-2 py-0.5 rounded-full">
-                                                        con IVA
+                                                {discount > 0 && (
+                                                    <span className="px-2 py-0.5 bg-success-100 dark:bg-success-900/30 text-success-600 text-[10px] font-bold rounded-lg">
+                                                        -{discount}%
                                                     </span>
                                                 )}
                                             </div>
 
-                                            <div className="space-y-3">
-                                                {/* Precio Final Grande (con descuento del INPUT) */}
-                                                <div className="flex items-end justify-between">
-                                                    <div>
-                                                        <span className="text-3xl font-bold text-[var(--text-primary)]">
-                                                            {formatPrice(displayFinalPrice)}
-                                                        </span>
-                                                        {/* Precio de lista tachado */}
-                                                        <span className="block text-sm text-[var(--text-muted)] line-through mt-0.5">
-                                                            {formatPrice(displayListPrice)}
-                                                        </span>
-                                                    </div>
-                                                    {/* Badge de descuento del INPUT */}
-                                                    {discount > 0 && (
-                                                        <span className="px-2.5 py-1 bg-success-100 dark:bg-success-900/30 text-success-600 text-[11px] font-bold rounded-lg">
-                                                            -{discount}%
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                
-                                                {/* Info de oferta si existe */}
-                                                {hasOffer && (
-                                                    <div className="flex items-center gap-2 p-2 bg-danger-50 dark:bg-danger-900/20 rounded-lg">
-                                                        <span className="px-2 py-0.5 bg-danger-500 text-white text-[9px] font-bold rounded">
-                                                            OFERTA
-                                                        </span>
-                                                        <span className="text-[11px] text-danger-600">
-                                                            Precio lista: {formatPrice(displayBasePrice)}
-                                                        </span>
-                                                    </div>
-                                                )}
-                                                
-                                                {/* IVA info */}
-                                                {hasTax ? (
-                                                    <p className="text-[12px] text-[var(--text-muted)] pt-2 border-t border-[var(--border-color)]">
-                                                        {showPricesWithTax 
-                                                            ? `Incluye IVA (${taxRate}%)` 
-                                                            : `IVA ${taxRate}% no incluido`}
-                                                    </p>
-                                                ) : (
-                                                    <p className="text-[12px] text-success-600 font-medium pt-2 border-t border-[var(--border-color)]">
-                                                        Producto sin IVA
-                                                    </p>
-                                                )}
-                                                
-                                                {/* Warning descuento global */}
-                                                {hasOffer && excludeOfferFromGlobalDiscount && (
-                                                    <div className="flex items-start gap-2 mt-2 p-2.5 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
-                                                        <AlertCircle size={14} className="text-amber-600 flex-shrink-0 mt-0.5" />
-                                                        <p className="text-[11px] text-amber-700 dark:text-amber-400">
-                                                            No aplica descuento global del pedido
-                                                        </p>
-                                                    </div>
+                                            <div className="flex items-end gap-2">
+                                                <span className="text-xl font-bold text-[var(--text-primary)]">
+                                                    {formatPrice(displayFinalPrice)}
+                                                </span>
+                                                {(displayListPrice > displayFinalPrice) && (
+                                                    <span className="text-[12px] text-[var(--text-muted)] line-through mb-0.5">
+                                                        {formatPrice(displayListPrice)}
+                                                    </span>
                                                 )}
                                             </div>
+                                            
+                                            {/* IVA info */}
+                                            <p className="text-[11px] text-[var(--text-muted)] mt-1">
+                                                {hasTax 
+                                                    ? (showPricesWithTax ? `Incluye IVA (${taxRate}%)` : `IVA ${taxRate}% no incluido`)
+                                                    : 'Sin IVA'
+                                                }
+                                            </p>
+                                            
+                                            {/* Warning descuento global */}
+                                            {hasOffer && excludeOfferFromGlobalDiscount && (
+                                                <div className="flex items-start gap-2 mt-2 p-2 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+                                                    <AlertCircle size={12} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                                                    <p className="text-[10px] text-amber-700 dark:text-amber-400">
+                                                        No aplica descuento global del pedido
+                                                    </p>
+                                                </div>
+                                            )}
                                         </div>
 
-                                        {/* Selector de Variantes - Minimalista */}
+                                        {/* Selector de Variantes */}
                                         {hasVariants && (
                                             <div>
                                                 <h4 className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3">
-                                                    Seleccionar variación
+                                                    {hasUniformPricing ? 'Opciones' : 'Seleccionar opción'}
                                                 </h4>
                                                 
-                                                <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
+                                                <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
                                                     {product.variants.filter(v => v.active !== false).map((variant) => {
                                                         const isSelected = selectedVariant?.id === variant.id;
                                                         
-                                                        // Si tiene precios individuales, mostrar precio de la variante
-                                                        // Si tiene precios uniformes, mostrar precio del producto padre
-                                                        let vPrice, vOffer, vDiscount, vFinal, vDisplayFinal;
-                                                        
-                                                        if (hasUniformPricing) {
-                                                            // Precios uniformes: usar precio del producto padre
-                                                            vPrice = basePrice;
-                                                            vOffer = offerPrice;
-                                                            vDiscount = productDiscount;
-                                                            vFinal = (vOffer > 0 ? vOffer : vPrice) * (1 - discount / 100);
-                                                            vDisplayFinal = showPricesWithTax && hasTax 
-                                                                ? vFinal * (1 + taxRate / 100) 
-                                                                : vFinal;
-                                                        } else {
-                                                            // Precios individuales: usar precio de la variante
+                                                        // Calcular precio para variantes con precios individuales
+                                                        let vPrice = 0, vFinal = 0, vDisplayFinal = 0, vDisplayList = 0, hasVOffer = false;
+                                                        if (!hasUniformPricing) {
                                                             const variantPricing = variant.pricing?.[priceList === 2 ? 'list2' : 'list1'] || {};
                                                             vPrice = variantPricing.price || 0;
-                                                            vOffer = variantPricing.offer || 0;
-                                                            vDiscount = variantPricing.discount || 0;
-                                                            vFinal = (vOffer > 0 ? vOffer : vPrice) * (1 - vDiscount / 100);
+                                                            const vOffer = variantPricing.offer || 0;
+                                                            const vDiscount = variantPricing.discount || 0;
+                                                            const vListPrice = vOffer > 0 ? vOffer : vPrice;
+                                                            vFinal = vListPrice * (1 - vDiscount / 100);
                                                             vDisplayFinal = showPricesWithTax && hasTax 
                                                                 ? vFinal * (1 + taxRate / 100) 
                                                                 : vFinal;
+                                                            vDisplayList = showPricesWithTax && hasTax
+                                                                ? vListPrice * (1 + taxRate / 100)
+                                                                : vListPrice;
+                                                            hasVOffer = vOffer > 0 || vDiscount > 0;
                                                         }
                                                         
                                                         return (
@@ -532,29 +495,29 @@ const ProductQuickView = ({
                                                                 }`}
                                                             >
                                                                 <div className="flex items-center gap-3">
-                                                                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${
+                                                                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
                                                                         isSelected ? 'border-primary-500 bg-primary-500' : 'border-[var(--border-color)]'
                                                                     }`}>
-                                                                        {isSelected && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                                                                        {isSelected && <div className="w-2 h-2 bg-white rounded-full" />}
                                                                     </div>
                                                                     <div>
-                                                                        <p className="text-[13px] font-medium text-[var(--text-primary)]">
+                                                                        <p className="text-[13px] font-semibold text-[var(--text-primary)]">
                                                                             {variant.value1}
                                                                             {variant.value2 && ` / ${variant.value2}`}
                                                                         </p>
                                                                         {variant.sku && (
-                                                                            <p className="text-[10px] text-[var(--text-muted)]">{variant.sku}</p>
+                                                                            <p className="text-[10px] text-[var(--text-muted)]">Cod. {variant.sku}</p>
                                                                         )}
                                                                     </div>
                                                                 </div>
                                                                 {!hasUniformPricing && (
                                                                     <div className="text-right">
-                                                                        <p className={`text-[14px] font-semibold ${vOffer > 0 ? 'text-danger-600' : 'text-[var(--text-primary)]'}`}>
+                                                                        <p className="text-[13px] font-bold text-[var(--text-primary)]">
                                                                             {formatPrice(vDisplayFinal)}
                                                                         </p>
-                                                                        {vOffer > 0 && (
+                                                                        {hasVOffer && (
                                                                             <p className="text-[10px] text-[var(--text-muted)] line-through">
-                                                                                {formatPrice(showPricesWithTax && hasTax ? vPrice * (1 + taxRate / 100) : vPrice)}
+                                                                                {formatPrice(vDisplayList)}
                                                                             </p>
                                                                         )}
                                                                     </div>
@@ -566,121 +529,155 @@ const ProductQuickView = ({
                                             </div>
                                         )}
 
-                                        {/* Stock - Minimalista */}
-                                        {hasStockFeature && (
-                                            <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-color)] p-4 shadow-sm">
-                                                <div className="flex items-center justify-between mb-3">
-                                                    <span className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">Stock</span>
-                                                    {isLowStock && (
-                                                        <span className="text-[10px] text-warning-600 font-medium">
-                                                            Stock bajo
-                                                        </span>
-                                                    )}
-                                                    {isOutOfStock && (
-                                                        <span className="text-[10px] text-danger-600 font-medium">
-                                                            Sin stock
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                
-                                                <div className="flex items-center gap-4">
-                                                    <div>
-                                                        <p className="text-[10px] text-[var(--text-muted)]">Disponible</p>
-                                                        <p className={`text-xl font-bold ${isOutOfStock ? 'text-danger-600' : isLowStock ? 'text-warning-600' : 'text-success-600'}`}>
-                                                            {stock.available}
-                                                        </p>
-                                                    </div>
-                                                    {isAdmin && (
-                                                        <>
-                                                            <div className="w-px h-8 bg-[var(--border-color)]" />
-                                                            <div className="flex gap-4">
-                                                                <div>
-                                                                    <p className="text-[10px] text-[var(--text-muted)]">Físico</p>
-                                                                    <p className="text-sm font-medium text-[var(--text-primary)]">{stock.stock}</p>
-                                                                </div>
-                                                                <div>
-                                                                    <p className="text-[10px] text-[var(--text-muted)]">Reserv.</p>
-                                                                    <p className="text-sm font-medium text-warning-600">{stock.reserved}</p>
-                                                                </div>
-                                                                <div>
-                                                                    <p className="text-[10px] text-[var(--text-muted)]">Mín</p>
-                                                                    <p className="text-sm font-medium text-[var(--text-muted)]">{stock.min || '-'}</p>
-                                                                </div>
-                                                            </div>
-                                                        </>
-                                                    )}
-                                                </div>
+                                        {/* Stock Info - Admin details (solo si es admin) */}
+                                        {hasStockFeature && isAdmin && (
+                                            <div className="flex items-center gap-2 p-2 bg-[var(--bg-hover)] rounded-lg text-[11px]">
+                                                <span className="text-[var(--text-muted)]">Stock:</span>
+                                                <span className="font-medium text-[var(--text-primary)]">{stock.stock} fis.</span>
+                                                <span className="text-[var(--border-color)]">|</span>
+                                                <span className="font-medium text-warning-600">{stock.reserved} res.</span>
+                                                <span className="text-[var(--border-color)]">|</span>
+                                                <span className="font-medium text-success-600">{stock.available} disp.</span>
+                                                {stock.min > 0 && (
+                                                    <>
+                                                        <span className="text-[var(--border-color)]">|</span>
+                                                        <span className="text-[var(--text-muted)]">Min: {stock.min}</span>
+                                                    </>
+                                                )}
                                             </div>
                                         )}
 
-                                        {/* Configuración de pedidos - Minimalista */}
-                                        {(unitsPerPackage > 1 || minOrderQuantity > 1 || sellOnlyFullPackages) && (
-                                            <div className="flex flex-wrap gap-2 pt-2">
-                                                {unitsPerPackage > 1 && (
-                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[var(--bg-hover)] text-[var(--text-secondary)] text-[11px] rounded-md">
-                                                        <Package size={12} />
-                                                        {unitsPerPackage} uds/bulto
-                                                    </span>
-                                                )}
-                                                {minOrderQuantity > 1 && (
-                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[var(--bg-hover)] text-[var(--text-secondary)] text-[11px] rounded-md">
-                                                        Mín: {minOrderQuantity} uds
-                                                    </span>
-                                                )}
-                                                {sellOnlyFullPackages && (
-                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-orange-50 dark:bg-orange-900/20 text-orange-600 text-[11px] rounded-md">
-                                                        Solo bultos
-                                                    </span>
-                                                )}
-                                            </div>
-                                        )}
                                     </div>
                                 </div>
 
-                                {/* ===== FILA 2: Descripción y detalles adicionales ===== */}
-                                {(product.description || product.longDescription) && (
-                                    <div className="pt-4 border-t border-[var(--border-color)]">
-                                        {product.description && (
-                                            <div className="mb-4">
-                                                <h4 className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2 flex items-center gap-2">
-                                                    <Info size={14} />
-                                                    Descripción
-                                                </h4>
-                                                <p className="text-[14px] text-[var(--text-secondary)] leading-relaxed">
-                                                    {product.description}
-                                                </p>
+                                {/* ===== FILA 2: DOS COLUMNAS - Configuración e Información ===== */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-[var(--border-color)]">
+                                    
+                                    {/* COLUMNA IZQUIERDA: Configuración de Pedidos */}
+                                    <div>
+                                        <h4 className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3">
+                                            Configuración de pedidos
+                                        </h4>
+                                        <div className="space-y-3">
+                                            {/* Unidades por bulto */}
+                                            <div className="flex items-start gap-3">
+                                                <div className="w-8 h-8 rounded-lg bg-[var(--bg-hover)] border border-[var(--border-color)] flex items-center justify-center flex-shrink-0">
+                                                    <Package size={14} className="text-[var(--text-muted)]" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">Unidades por bulto</p>
+                                                    <p className="text-[13px] text-[var(--text-primary)] font-medium">
+                                                        {unitsPerPackage > 1 ? `${unitsPerPackage} unidades` : 'No especificado'}
+                                                    </p>
+                                                </div>
                                             </div>
-                                        )}
-                                        
-                                        {product.longDescription && (
-                                            <div>
-                                                <h4 className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2 flex items-center gap-2">
-                                                    <Info size={14} />
-                                                    Detalles adicionales
-                                                </h4>
-                                                <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap">
-                                                    {product.longDescription}
-                                                </p>
+                                            
+                                            {/* Cantidad mínima */}
+                                            <div className="flex items-start gap-3">
+                                                <div className="w-8 h-8 rounded-lg bg-[var(--bg-hover)] border border-[var(--border-color)] flex items-center justify-center flex-shrink-0">
+                                                    <Layers size={14} className="text-[var(--text-muted)]" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">Cantidad mínima de pedido</p>
+                                                    <p className="text-[13px] text-[var(--text-primary)] font-medium">
+                                                        {minOrderQuantity > 1 ? `${minOrderQuantity} unidades` : 'No especificado'}
+                                                    </p>
+                                                </div>
                                             </div>
-                                        )}
+                                            
+                                            {/* Venta por bultos */}
+                                            <div className="flex items-start gap-3">
+                                                <div className="w-8 h-8 rounded-lg bg-[var(--bg-hover)] border border-[var(--border-color)] flex items-center justify-center flex-shrink-0">
+                                                    <Grid3X3 size={14} className="text-[var(--text-muted)]" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">Venta por bultos</p>
+                                                    <p className="text-[13px] text-[var(--text-primary)] font-medium">
+                                                        {sellOnlyFullPackages ? 'Solo bultos completos' : 'Unidades sueltas permitidas'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
-                                )}
+                                    
+                                    {/* COLUMNA DERECHA: Información del Producto */}
+                                    {(product.description || product.longDescription || product.brand || product.measurements?.length > 0) && (
+                                        <div>
+                                            <h4 className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3">
+                                                Información del producto
+                                            </h4>
+                                            <div className="space-y-3">
+                                                {/* Marca */}
+                                                {product.brand && (
+                                                    <div className="flex items-start gap-3">
+                                                        <div className="w-8 h-8 rounded-lg bg-[var(--bg-hover)] border border-[var(--border-color)] flex items-center justify-center flex-shrink-0">
+                                                            <Tag size={14} className="text-[var(--text-muted)]" />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">Marca</p>
+                                                            <p className="text-[13px] text-[var(--text-primary)] font-medium">{product.brand}</p>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                
+                                                {/* Medidas */}
+                                                {product.measurements?.length > 0 && (
+                                                    <div className="flex items-start gap-3">
+                                                        <div className="w-8 h-8 rounded-lg bg-[var(--bg-hover)] border border-[var(--border-color)] flex items-center justify-center flex-shrink-0">
+                                                            <Ruler size={14} className="text-[var(--text-muted)]" />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">Medidas</p>
+                                                            <p className="text-[13px] text-[var(--text-primary)]">{product.measurements.join(', ')}</p>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                
+                                                {/* Descripción */}
+                                                {product.description && (
+                                                    <div className="flex items-start gap-3">
+                                                        <div className="w-8 h-8 rounded-lg bg-[var(--bg-hover)] border border-[var(--border-color)] flex items-center justify-center flex-shrink-0">
+                                                            <Info size={14} className="text-[var(--text-muted)]" />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">Descripción</p>
+                                                            <p className="text-[13px] text-[var(--text-primary)] leading-relaxed">{product.description}</p>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                
+                                                {/* Descripción larga */}
+                                                {product.longDescription && (
+                                                    <div className="flex items-start gap-3">
+                                                        <div className="w-8 h-8 rounded-lg bg-[var(--bg-hover)] border border-[var(--border-color)] flex items-center justify-center flex-shrink-0">
+                                                            <Building2 size={14} className="text-[var(--text-muted)]" />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">Detalles adicionales</p>
+                                                            <p className="text-[13px] text-[var(--text-primary)] leading-relaxed whitespace-pre-wrap">{product.longDescription}</p>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
                         {/* ===== FOOTER: Cantidad y Agregar ===== */}
                         {!viewOnly && (
-                            <div className="px-6 py-4 border-t border-[var(--border-color)] bg-[var(--bg-hover)] shrink-0">
-                                <div className="flex items-start gap-3">
+                            <div className="px-4 md:px-6 py-3 md:py-4 border-t border-[var(--border-color)] bg-[var(--bg-hover)] shrink-0">
+                                <div className="flex items-start gap-2 md:gap-3">
                                     {/* Cantidad */}
                                     <div className="flex-shrink-0">
-                                        <label className="text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">
-                                            Cantidad
+                                        <label className="text-[9px] md:text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">
+                                            Cant.
                                             {sellOnlyFullPackages && unitsPerPackage > 1 && (
                                                 <span className="ml-1 text-[9px] normal-case text-primary-600">(x{unitsPerPackage})</span>
                                             )}
                                         </label>
-                                        <div className="flex items-center gap-1.5">
+                                        <div className="flex items-center gap-1 md:gap-1.5">
                                             <button
                                                 type="button"
                                                 onClick={() => {
@@ -689,9 +686,9 @@ const ProductQuickView = ({
                                                     setQuantityError(null);
                                                 }}
                                                 disabled={quantity <= getEffectiveMinQuantity()}
-                                                className="w-9 h-9 flex items-center justify-center rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-muted)] hover:text-primary-600 hover:border-primary-300 transition-colors disabled:opacity-40"
+                                                className="w-8 h-8 md:w-9 md:h-9 flex items-center justify-center rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-muted)] hover:text-primary-600 hover:border-primary-300 transition-colors disabled:opacity-40"
                                             >
-                                                <Minus size={16} />
+                                                <Minus size={14} className="md:w-4 md:h-4" />
                                             </button>
                                             <input
                                                 type="text"
@@ -710,7 +707,7 @@ const ProductQuickView = ({
                                                         setQuantityError(null);
                                                     }
                                                 }}
-                                                className="w-20 h-9 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg text-center font-semibold text-[15px] text-[var(--text-primary)] outline-none focus:border-primary-300"
+                                                className="w-16 md:w-20 h-8 md:h-9 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg text-center font-semibold text-[14px] md:text-[15px] text-[var(--text-primary)] outline-none focus:border-primary-300"
                                             />
                                             <button
                                                 type="button"
@@ -718,9 +715,9 @@ const ProductQuickView = ({
                                                     setQuantity(quantity + quantityStep);
                                                     setQuantityError(null);
                                                 }}
-                                                className="w-9 h-9 flex items-center justify-center rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-muted)] hover:text-primary-600 hover:border-primary-300 transition-colors"
+                                                className="w-8 h-8 md:w-9 md:h-9 flex items-center justify-center rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-muted)] hover:text-primary-600 hover:border-primary-300 transition-colors"
                                             >
-                                                <Plus size={16} />
+                                                <Plus size={14} className="md:w-4 md:h-4" />
                                             </button>
                                         </div>
                                         {(minOrderQuantity > 1 || (sellOnlyFullPackages && unitsPerPackage > 1)) ? (
@@ -737,17 +734,17 @@ const ProductQuickView = ({
                                     {/* Descuento manual */}
                                     {(!isClient || discount > 0) && (
                                         <div className="flex-shrink-0">
-                                            <label className="text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">
+                                            <label className="text-[9px] md:text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">
                                                 Dto. %
                                             </label>
-                                            <div className="flex items-center justify-center h-9 w-20 bg-success-50 dark:bg-success-900/30 border border-success-200 dark:border-success-800 rounded-lg px-2">
-                                                <Percent size={12} className="text-success-600 mr-1 flex-shrink-0" />
+                                            <div className="flex items-center justify-center h-8 md:h-9 w-16 md:w-20 bg-success-50 dark:bg-success-900/30 border border-success-200 dark:border-success-800 rounded-lg px-2">
+                                                <Percent size={12} className="text-success-600 mr-1 flex-shrink-0 hidden md:block" />
                                                 <input
                                                     type="number"
                                                     value={discount}
                                                     onChange={(e) => setDiscount(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
                                                     disabled={isClient}
-                                                    className="w-full bg-transparent text-center font-semibold text-[14px] text-success-700 dark:text-success-400 outline-none disabled:opacity-60"
+                                                    className="w-full bg-transparent text-center font-semibold text-[13px] md:text-[14px] text-success-700 dark:text-success-400 outline-none disabled:opacity-60"
                                                 />
                                             </div>
                                             <p className="h-3 mt-1" />
@@ -756,21 +753,21 @@ const ProductQuickView = ({
 
                                     {/* Botón Agregar */}
                                     <div className="flex-1 min-w-0">
-                                        <label className="text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block opacity-0">
+                                        <label className="text-[9px] md:text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block opacity-0">
                                             Acción
                                         </label>
                                         <Button
                                             variant="primary"
-                                            className="!w-full !py-2 !h-9 !text-sm font-semibold"
+                                            className="!w-full !py-2 !h-8 md:!h-9 !text-sm font-semibold"
                                             onClick={handleAdd}
                                             disabled={isOutOfStock}
                                         >
                                             {isOutOfStock ? (
-                                                'Sin stock'
+                                                <span className="text-[11px]">Sin stock</span>
                                             ) : (
                                                 <>
-                                                    <Plus size={16} className="mr-1.5" />
-                                                    Agregar
+                                                    <Plus size={18} className="md:mr-1.5" />
+                                                    <span className="hidden md:inline">Agregar</span>
                                                 </>
                                             )}
                                         </Button>

@@ -107,20 +107,38 @@ const CartDrawer = ({ isOpen, onClose, items, updateItem, removeItem, onCheckout
                                         className="group p-3 md:p-3.5 bg-[var(--bg-card)] rounded-2xl border border-[var(--border-color)] hover:border-primary-200 dark:hover:border-primary-800 transition-all"
                                     >
                                         <div className="flex gap-3">
-                                            <div className="w-10 h-10 md:w-14 md:h-14 bg-[var(--bg-hover)] rounded-xl flex items-center justify-center shrink-0">
-                                                <Package size={20} className="md:w-6 md:h-6 text-[var(--text-muted)] opacity-50" />
-                                            </div>
+                                            {(() => {
+                                                const product = getProductData(item.productId);
+                                                const images = product.images || [];
+                                                const coverIndex = product.coverImageIndex ?? 0;
+                                                const coverImage = images.length > 0 ? (images[coverIndex]?.url || images[0]?.url) : null;
+                                                
+                                                return coverImage ? (
+                                                    <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl overflow-hidden shrink-0 border border-[var(--border-color)]">
+                                                        <img src={coverImage} alt={item.name} className="w-full h-full object-cover" />
+                                                    </div>
+                                                ) : (
+                                                    <div className="w-12 h-12 md:w-14 md:h-14 bg-[var(--bg-hover)] rounded-xl flex items-center justify-center shrink-0">
+                                                        <Package size={20} className="md:w-6 md:h-6 text-[var(--text-muted)] opacity-50" />
+                                                    </div>
+                                                );
+                                            })()}
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex justify-between items-start gap-2">
                                                     <div className="min-w-0 flex-1">
                                                         <h4 className="text-sm font-medium text-[var(--text-primary)] truncate">{item.name}</h4>
-                                                        <p className="text-[11px] text-[var(--text-muted)]">{item.code}</p>
-                                                        {/* Mostrar variación si existe */}
-                                                        {item.variantName && (
-                                                            <p className="text-[10px] text-primary-600 font-medium mt-0.5">
-                                                                {item.variantName}
-                                                            </p>
-                                                        )}
+                                                        {(() => {
+                                                            // Buscar código de la variante si existe, sino usar el del producto
+                                                            const product = getProductData(item.productId);
+                                                            let code = item.code;
+                                                            if (item.variantId && product.variants) {
+                                                                const variant = product.variants.find(v => (v.id || v._id) === item.variantId);
+                                                                if (variant?.sku) {
+                                                                    code = variant.sku;
+                                                                }
+                                                            }
+                                                            return <p className="text-[11px] text-[var(--text-muted)]">Cod. {code}</p>;
+                                                        })()}
                                                     </div>
                                                     <button
                                                         onClick={() => removeItem(item.lineId)}
@@ -199,13 +217,13 @@ const CartDrawer = ({ isOpen, onClose, items, updateItem, removeItem, onCheckout
                                                     
                                                     {/* Precio Total */}
                                                     <div className="text-right">
-                                                        <p className="text-base font-bold text-[var(--text-primary)] whitespace-nowrap">
+                                                        <p className="text-sm font-bold text-[var(--text-primary)] whitespace-nowrap">
                                                             ${formatPrice(applyTax(Number(item.quantity || 0) * Number(item.listPrice || 0) * (1 - (Number(item.discount || 0) / 100))))}
                                                         </p>
                                                         {/* Precio unitario */}
                                                         <p className="text-[10px] text-[var(--text-muted)]">
                                                             ${formatPrice(applyTax(Number(item.listPrice || 0)))} c/u
-                                                            {showPricesWithTax && <span className="ml-1 text-success-600">(con IVA)</span>}
+                                                            {showPricesWithTax && <span className="ml-1 text-success-600">(c/IVA)</span>}
                                                         </p>
                                                     </div>
                                                 </div>
@@ -298,7 +316,7 @@ const CartDrawer = ({ isOpen, onClose, items, updateItem, removeItem, onCheckout
                                                         <p className="text-[9px] text-success-600">Precios con IVA incluido</p>
                                                     )}
                                                 </div>
-                                                <p className="text-xl md:text-2xl font-semibold text-[var(--text-primary)]">
+                                                <p className="text-base font-bold text-[var(--text-primary)]">
                                                     ${formatPrice(calculatedTotal)}
                                                 </p>
                                             </div>

@@ -46,7 +46,7 @@ const StatusBadge = ({ status }) => {
         </span>
     );
 };
-import { getOrders, getAllOrders, convertBudgetToOrder, deleteOrder, revertOrderToBudget, updateOrderStatus, sendOrderEmail, cancelOrder, recoverOrder } from '../../services/orderService';
+import { getOrders, getAllOrders, getOrder, convertBudgetToOrder, deleteOrder, revertOrderToBudget, updateOrderStatus, sendOrderEmail, cancelOrder, recoverOrder } from '../../services/orderService';
 import Button from '../../components/common/Button';
 import ConfirmModal from '../../components/common/ConfirmModal';
 import BudgetDrawer from '../../components/orders/BudgetDrawer';
@@ -591,10 +591,17 @@ const OrdersPage = ({ mode = 'order' }) => {
         }
     }, [isQuickViewOpen]);
 
-    const handleViewOrder = (order) => {
-        // Abrir drawer de quick view (click en fila)
+    const handleViewOrder = async (order) => {
+        // Abrir drawer con datos básicos inmediatamente
         setQuickViewOrder(order);
         setIsQuickViewOpen(true);
+        // Fetchear el order completo para obtener imágenes de productos
+        try {
+            const fullOrder = await getOrder(order._id);
+            setQuickViewOrder(fullOrder);
+        } catch (error) {
+            console.error('Error fetching full order for quick view:', error);
+        }
     };
 
     const handleNavigateToDetail = (order) => {

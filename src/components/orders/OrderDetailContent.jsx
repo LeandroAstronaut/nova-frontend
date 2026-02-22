@@ -194,15 +194,30 @@ const OrderDetailContent = ({ order, showPricesWithTax = false, canViewCommissio
                                     <div key={index} className="flex items-center gap-4 p-4 bg-[var(--bg-hover)] rounded-xl border border-[var(--border-color)]">
                                         {/* Imagen del producto */}
                                         <div className="w-14 h-14 bg-[var(--bg-card)] rounded-lg flex items-center justify-center shrink-0 overflow-hidden border border-[var(--border-color)]">
-                                            {item.image ? (
-                                                <img 
-                                                    src={item.image} 
-                                                    alt={item.name}
-                                                    className="w-full h-full object-cover"
-                                                />
-                                            ) : (
-                                                <Package size={24} className="text-[var(--text-muted)]" />
-                                            )}
+                                            {(() => {
+                                                // Obtener imagen del producto referenciado
+                                                const product = item.productId;
+                                                
+                                                // Si productId es un objeto poblado (tiene images)
+                                                if (product && typeof product === 'object' && product.images) {
+                                                    const images = product.images || [];
+                                                    const coverIndex = product.coverImageIndex ?? 0;
+                                                    const coverImage = images.length > 0 ? (images[coverIndex]?.url || images[0]?.url) : null;
+                                                    
+                                                    if (coverImage) {
+                                                        return (
+                                                            <img 
+                                                                src={coverImage} 
+                                                                alt={item.name}
+                                                                className="w-full h-full object-cover"
+                                                            />
+                                                        );
+                                                    }
+                                                }
+                                                
+                                                // Si productId es solo un ID (string) o no tiene imágenes
+                                                return <Package size={24} className="text-[var(--text-muted)]" />;
+                                            })()}
                                         </div>
                                         
                                         <div className="flex-1 min-w-0">
@@ -234,7 +249,7 @@ const OrderDetailContent = ({ order, showPricesWithTax = false, canViewCommissio
                                                     {item.quantity}
                                                 </span>
                                                 <span className="text-[var(--text-muted)] text-sm">×</span>
-                                                <span className="text-[13px] font-semibold text-[var(--text-primary)]">
+                                                <span className="text-[13px] font-semibold text-[var(--text-muted)]">
                                                     ${formatPrice(applyTax(Number(item.listPrice || 0)))}
                                                 </span>
                                             </div>
@@ -245,7 +260,7 @@ const OrderDetailContent = ({ order, showPricesWithTax = false, canViewCommissio
                                                 </p>
                                             )}
                                             
-                                            <p className="text-[15px] font-bold text-primary-600 leading-tight">
+                                            <p className="text-[15px] font-bold text-[var(--text-primary)] leading-tight">
                                                 ${formatPrice(applyTax(item.quantity * item.listPrice * (1 - (item.discount || 0) / 100)))}
                                             </p>
                                         </div>
@@ -254,17 +269,6 @@ const OrderDetailContent = ({ order, showPricesWithTax = false, canViewCommissio
                             </div>
                         </div>
 
-                        {/* Notas */}
-                        {order.notes && (
-                            <div className="pt-6 border-t border-[var(--border-color)]">
-                                <h3 className="text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-3">
-                                    Notas
-                                </h3>
-                                <p className="text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap bg-[var(--bg-hover)] p-4 rounded-xl border border-[var(--border-color)]">
-                                    {order.notes}
-                                </p>
-                            </div>
-                        )}
                     </div>
 
                     {/* Columna derecha - Totales e Info (2/5) */}
@@ -278,7 +282,7 @@ const OrderDetailContent = ({ order, showPricesWithTax = false, canViewCommissio
                         <div className="bg-[var(--bg-hover)] rounded-xl p-4 border border-[var(--border-color)]">
                             <div className="space-y-3">
                                 <div className="flex justify-between text-[13px]">
-                                    <span className="text-[var(--text-secondary)]">Subtotal</span>
+                                    <span className="font-semibold text-[var(--text-primary)]">Subtotal</span>
                                     <span className="font-semibold text-[var(--text-primary)]">${formatPrice(applyTax(subtotalBase))}</span>
                                 </div>
                                 
@@ -355,8 +359,24 @@ const OrderDetailContent = ({ order, showPricesWithTax = false, canViewCommissio
                             </div>
                         </div>
 
+                        {/* Notas - Siempre visible */}
+                        <div className="pt-4 border-t border-[var(--border-color)]">
+                            <h3 className="text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-3">
+                                Notas
+                            </h3>
+                            {order.notes ? (
+                                <p className="text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap bg-[var(--bg-hover)] p-4 rounded-xl border border-[var(--border-color)]">
+                                    {order.notes}
+                                </p>
+                            ) : (
+                                <p className="text-[13px] text-[var(--text-muted)] italic bg-[var(--bg-hover)] p-4 rounded-xl border border-[var(--border-color)]">
+                                    No se han cargado notas.
+                                </p>
+                            )}
+                        </div>
+
                         {/* Info general - Estilo con icono y label/valor */}
-                        <div>
+                        <div className="pt-4 border-t border-[var(--border-color)]">
                             <h3 className="text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-3">
                                 Información General
                             </h3>

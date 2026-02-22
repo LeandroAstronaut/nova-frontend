@@ -597,14 +597,12 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                         </div>
 
                         {/* Content - Scrolleable */}
-                        <div className="flex-1 overflow-y-auto bg-[var(--bg-body)] p-3 md:p-6">
+                        <div className="flex-1 overflow-y-auto bg-white dark:bg-[var(--bg-card)] pt-3 px-3 md:pt-4 md:px-6 pb-3 md:pb-6">
                             <div className="p-0 md:p-2">
                                 <AnimatePresence mode="wait">
                                     {step === 1 && (
                                         <ClientSelection
                                             clients={clients}
-                                            searchQuery={searchQuery}
-                                            onSearch={handleSearchClient}
                                             onSelect={selectClient}
                                             selectedClient={selectedClient}
                                         />
@@ -616,6 +614,13 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                                             currentPriceList={header.priceList}
                                             onSelect={handlePriceListSelect}
                                             hasItems={items.length > 0}
+                                            salesRep={
+                                                selectedClient?.salesRepId?.firstName 
+                                                    ? `${selectedClient.salesRepId.firstName} ${selectedClient.salesRepId.lastName || ''}`
+                                                    : sellers.find(s => s._id === (selectedClient?.salesRepId?._id || selectedClient?.salesRepId))?.firstName 
+                                                        ? `${sellers.find(s => s._id === (selectedClient?.salesRepId?._id || selectedClient?.salesRepId)).firstName} ${sellers.find(s => s._id === (selectedClient?.salesRepId?._id || selectedClient?.salesRepId)).lastName || ''}`
+                                                        : 'No asignado'
+                                            }
                                         />
                                     )}
 
@@ -655,6 +660,7 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                                             setNotes={(val) => setHeader(prev => ({ ...prev, notes: val }))}
                                             date={header.date}
                                             setDate={(val) => setHeader(prev => ({ ...prev, date: val }))}
+                                            onChangeStep={setStep}
                                             mode={mode}
                                             canChangeSeller={canChangeSeller}
                                             readOnly={effectiveReadOnly}
@@ -696,11 +702,12 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                                             <ShoppingBag size={20} />
                                             <span className="text-sm font-semibold">{items.length}</span>
                                         </button>
-                                        <div className="hidden sm:block text-[11px] text-[var(--text-muted)]">
-                                            Total: <span className="font-bold text-[var(--text-primary)]">
+                                        <div className="hidden sm:block">
+                                            <span className="text-[11px] text-[var(--text-muted)]">Total:</span>
+                                            <span className="text-base font-bold text-[var(--text-primary)] ml-1">
                                                 ${(showPricesWithTax ? calculateTotal() * (1 + (taxRate || 21) / 100) : calculateTotal()).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </span>
-                                            {showPricesWithTax && <span className="ml-1 text-success-600">(c/IVA)</span>}
+                                            {showPricesWithTax && <span className="ml-1 text-xs text-success-600">(c/IVA)</span>}
                                         </div>
                                     </>
                                 )}
@@ -717,7 +724,20 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                                     </Button>
                                 ) : (
                                     <>
-                                        {/* Botón Volver eliminado - ahora está en el header */}
+                                        {/* Botón Volver - en todos los pasos excepto el primero */}
+                                        {step > 1 && !(isClient && step <= 2) && (
+                                            <button
+                                                onClick={() => {
+                                                    if (step === 2) setStep(features.priceLists ? 1.5 : 1);
+                                                    else if (step === 1.5) setStep(1);
+                                                    else setStep(step - 1);
+                                                }}
+                                                className="p-2 hover:bg-[var(--bg-hover)] rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                                                title="Volver"
+                                            >
+                                                <ChevronLeft size={20} />
+                                            </button>
+                                        )}
                                         
                                         {step < 3 && (
                                             (step === 1 && selectedClient) ||
@@ -745,7 +765,7 @@ const BudgetDrawer = ({ isOpen, onClose, onSave, order = null, mode = 'create', 
                                                 disabled={loading || (!effectiveReadOnly && !header.salesRepId && !isClient)}
                                                 className="!px-4 !py-2 !text-sm !bg-success-600 hover:!bg-success-700"
                                             >
-                                                {loading ? 'Guardando...' : (effectiveReadOnly ? 'Cerrar' : (mode === 'edit' ? 'Actualizar' : 'Finalizar'))}
+                                                {loading ? 'Guardando...' : (effectiveReadOnly ? 'Cerrar' : (mode === 'edit' ? 'Actualizar' : 'Crear Presupuesto'))}
                                             </Button>
                                         )}
                                     </>

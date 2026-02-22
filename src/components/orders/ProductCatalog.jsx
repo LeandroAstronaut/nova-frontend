@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Loader2, Package, Plus, Check, Tag, Percent, Sparkles, Grid3X3 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 const ProductCatalog = ({
     products,
@@ -18,6 +18,27 @@ const ProductCatalog = ({
     pagination = { total: 0, totalPages: 1 },
     onPageChange
 }) => {
+    // Estado local para el input de búsqueda (sin sincronización automática con props)
+    const [searchInput, setSearchInput] = useState('');
+    
+    // Estado para trackear si ya se hizo la primera búsqueda
+    const [hasInitialized, setHasInitialized] = useState(false);
+    
+    // Solo ejecutar búsqueda después de que el usuario escribe (debounce)
+    useEffect(() => {
+        if (!hasInitialized) {
+            setHasInitialized(true);
+            return;
+        }
+        
+        const timer = setTimeout(() => {
+            if (searchInput !== searchQuery) {
+                setSearchQuery(searchInput);
+            }
+        }, 400);
+        
+        return () => clearTimeout(timer);
+    }, [searchInput]);
     // Helper para calcular precio con IVA
     const getPriceWithTax = (price, taxRate) => {
         if (!price) return 0;
@@ -163,41 +184,30 @@ const ProductCatalog = ({
 
     return (
         <div className="space-y-4">
-            {/* Nota general sobre configuración de pedidos o IVA */}
-            {company?.sellOnlyFullPackages ? (
-                <div className="p-2.5 md:p-3 rounded-xl text-xs font-medium flex items-center gap-2 bg-orange-50 dark:bg-orange-900/20 text-orange-600 border border-orange-100 dark:border-orange-800">
-                    <Package size={14} />
-                    Solo se permiten pedidos en bultos cerrados
-                </div>
-            ) : (
-                <div className={`p-2.5 md:p-3 rounded-xl text-xs font-medium flex items-center gap-2 ${
-                    showPricesWithTax 
-                        ? 'bg-success-50 dark:bg-success-900/20 text-success-600 border border-success-100 dark:border-success-800' 
-                        : 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 border border-amber-100 dark:border-amber-800'
-                }`}>
-                    {showPricesWithTax ? (
-                        <>
-                            <Tag size={14} />
-                            Los precios mostrados incluyen IVA
-                        </>
-                    ) : (
-                        <>
-                            <Tag size={14} />
-                            Los precios mostrados no incluyen IVA
-                        </>
-                    )}
-                </div>
-            )}
+            {/* Nota general sobre IVA, bultos y descuentos */}
+            <div className={`p-2.5 md:p-2 md:px-3  rounded-lg text-xs font-normal flex items-center gap-2 ${
+                showPricesWithTax 
+                    ? 'bg-success-50 dark:bg-success-900/20 text-success-600 border border-success-100 dark:border-success-800' 
+                    : 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 border border-amber-100 dark:border-amber-800'
+            }`}>
+                <Tag size={14} />
+                {showPricesWithTax 
+                    ? 'Los precios mostrados incluyen IVA'
+                    : 'Los precios mostrados no incluyen IVA'
+                }
+                {company?.sellOnlyFullPackages && ' · Solo bultos cerrados.'}
+                {company?.excludeOfferProductsFromGlobalDiscount && ' · Productos en oferta no aplican descuento global.'}
+            </div>
 
             {/* Header con Search */}
             <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-(--text-muted)" size={16} strokeWidth={2.5} />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={14} strokeWidth={2.5} />
                 <input
                     type="text"
                     placeholder="Buscar producto..."
-                    className="w-full pl-10 pr-4 py-2.5 bg-(--bg-card) border border-(--border-color) focus:border-primary-300 rounded-xl text-sm text-(--text-primary) transition-all outline-none"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-xs font-medium text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900 focus:bg-[var(--bg-card)] transition-all"
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
                     autoFocus
                 />
             </div>
@@ -209,8 +219,7 @@ const ProductCatalog = ({
                 </div>
             ) : products.length > 0 ? (
                 <div className="grid gap-3 grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5">
-                    <AnimatePresence mode="popLayout">
-                        {products.map((product) => {
+                    {products.map((product, index) => {
                             // Sumar todas las cantidades de este producto en el carrito (incluyendo variantes/descuentos diferentes)
                             const cartItemsForProduct = itemsInCart.filter(i => i.productId === product._id);
                             const totalQuantityInCart = cartItemsForProduct.reduce((sum, item) => sum + (item.quantity || 0), 0);
@@ -221,39 +230,34 @@ const ProductCatalog = ({
                             
                             return (
                                 <motion.div
-                                    layout
-                                    initial={{ opacity: 0, scale: 0.9 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    exit={{ opacity: 0, scale: 0.9 }}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: Math.min(index * 0.03, 0.5), duration: 0.2 }}
                                     key={product._id}
                                     onClick={() => onProductClick(product)}
-                                    className={`group bg-(--bg-card) rounded-xl md:rounded-2xl border transition-all cursor-pointer relative overflow-hidden ${inCart 
+                                    className={`group bg-(--bg-card) rounded-xl border transition-all cursor-pointer relative overflow-hidden ${inCart 
                                             ? 'border-primary-500 ring-2 ring-primary-100 dark:ring-primary-900/30 shadow-md' 
                                             : 'border-(--border-color) hover:border-primary-300 dark:hover:border-primary-700 hover:shadow-lg'
                                         }`}
                                 >
-                                    {/* ===== BADGES SUPERIORES (solo en imagen) ===== */}
-                                    
-                                    {/* Badge: SAVE X% / OFERTA */}
+                                    {/* Badge: En carrito - Esquina superior derecha */}
+                                    {inCart && (
+                                        <div className="absolute top-2 right-2 z-20 w-6 h-6 bg-primary-600 text-white rounded-full flex items-center justify-center shadow-md">
+                                            <Check size={14} strokeWidth={3} />
+                                        </div>
+                                    )}
+
+                                    {/* Badge: OFERTA / Descuento - Esquina superior izquierda */}
                                     {(priceInfo.hasOffer || priceInfo.hasDiscount) && (
                                         <div className="absolute top-2 left-2 z-10 px-2 py-1 bg-danger-500 text-white text-[9px] font-bold uppercase rounded-lg shadow-md">
                                             {priceInfo.hasOffer ? 'OFERTA' : `-${Math.round(priceInfo.maxDiscountPercent)}%`}
                                         </div>
                                     )}
 
-                                    {/* Badge: En carrito - SIEMPRE arriba derecha */}
-                                    {inCart && (
-                                        <div className="absolute top-2 right-2 z-10 px-2 py-1 bg-primary-600 text-white text-[9px] font-bold uppercase rounded-lg flex items-center gap-1 shadow-md">
-                                            <Check size={10} />
-                                            <span className="hidden md:inline">{inCart.quantity} en carrito</span>
-                                            <span className="md:hidden">{inCart.quantity}</span>
-                                        </div>
-                                    )}
-
                                     {/* ===== CONTENIDO ===== */}
-                                    <div className="p-3 md:p-4 flex flex-col h-full">
+                                    <div className="p-4 flex flex-col h-full">
                                         {/* Imagen */}
-                                        <div className={`relative aspect-square rounded-lg md:rounded-xl overflow-hidden flex items-center justify-center mb-3 ${inCart ? 'bg-primary-50 dark:bg-primary-900/20' : 'bg-gray-50 dark:bg-gray-900/50'}`}>
+                                        <div className={`relative aspect-square rounded-xl overflow-hidden flex items-center justify-center mb-3 ${inCart ? 'bg-primary-50 dark:bg-primary-900/20' : 'bg-[var(--bg-hover)]'}`}>
                                             {(() => {
                                                 const coverImage = getCoverImage(product);
                                                 return coverImage ? (
@@ -264,29 +268,27 @@ const ProductCatalog = ({
                                             })()}
                                         </div>
 
-                                        {/* Nombre */}
-                                        <h3 className="text-xs md:text-sm font-semibold text-(--text-primary) group-hover:text-primary-600 transition-colors line-clamp-2 min-h-8 md:min-h-10 leading-tight">
+                                        {/* Nombre y Código */}
+                                        <h3 className="text-[15px] font-bold text-(--text-primary) group-hover:text-primary-600 transition-colors line-clamp-2 leading-tight mb-1">
                                             {product.name}
                                         </h3>
+                                        <p className="text-[11px] text-(--text-muted) font-medium uppercase tracking-wide">Cod. {product.code}</p>
 
-                                        {/* Badge de Variaciones - Abajo del nombre */}
+                                        {/* Badge de Opciones - Abajo del código */}
                                         {priceInfo.hasVariants && (
-                                            <div className="mt-1 flex items-center gap-1 text-[9px] text-primary-600 font-medium">
+                                            <div className="mt-1 flex items-center gap-1 text-[11px] text-primary-600 font-medium">
                                                 <Grid3X3 size={10} />
-                                                <span>{product.variants.filter(v => v.active !== false).length} variaciones</span>
+                                                <span>{product.variants.filter(v => v.active !== false).length} Opciones</span>
                                             </div>
                                         )}
 
-                                        {/* Código */}
-                                        <p className="text-[10px] text-(--text-muted) mt-1">{product.code}</p>
-
                                         {/* ===== PRECIOS ===== */}
-                                        <div className="mt-auto pt-2">
+                                        <div className="mt-auto pt-3">
                                             <div className="flex items-end justify-between">
                                                 <div className="flex flex-col">
                                                     {/* Precio tachado (original) */}
                                                     {priceInfo.minFinalPrice < priceInfo.minPrice && (
-                                                        <span className="text-[10px] md:text-[11px] text-(--text-muted) line-through">
+                                                        <span className="text-[11px] text-(--text-muted) line-through">
                                                             {formatPrice(priceInfo.minPrice)}
                                                         </span>
                                                     )}
@@ -294,22 +296,22 @@ const ProductCatalog = ({
                                                     {/* Precio final */}
                                                     <div className="flex items-baseline gap-1">
                                                         {priceInfo.showFrom && (
-                                                            <span className="text-[10px] text-(--text-muted)">Desde</span>
+                                                            <span className="text-[11px] text-(--text-muted)">Desde</span>
                                                         )}
-                                                        <span className={`font-bold ${priceInfo.hasOffer ? 'text-danger-600' : 'text-(--text-primary)'} text-sm md:text-lg`}>
+                                                        <span className="font-bold text-(--text-primary) text-lg">
                                                             {formatPrice(priceInfo.minFinalPrice)}
                                                         </span>
                                                     </div>
                                                     
                                                     {/* Info IVA con % específico */}
                                                     {priceInfo.hasTax ? (
-                                                        <span className="text-[8px] text-(--text-muted)">
+                                                        <span className="text-[10px] text-(--text-muted)">
                                                             {showPricesWithTax 
                                                                 ? `Incluye IVA (${priceInfo.taxRate}%)` 
                                                                 : `+ IVA (${priceInfo.taxRate}%)`}
                                                         </span>
                                                     ) : (
-                                                        <span className="text-[8px] text-success-600">Sin IVA</span>
+                                                        <span className="text-[10px] text-success-600">Sin IVA</span>
                                                     )}
                                                 </div>
 
@@ -323,12 +325,7 @@ const ProductCatalog = ({
                                                     if (hasRestrictions) {
                                                         return (
                                                             <div className="text-[8px] md:text-[9px] text-right space-y-0.5">
-                                                                {priceInfo.hasVariants && (
-                                                                    <div className="px-1.5 py-0.5 bg-primary-50 dark:bg-primary-900/20 text-primary-600 rounded text-[8px]">
-                                                                        Elegir
-                                                                    </div>
-                                                                )}
-                                                                {unitsPerPackage > 1 && (
+                                                                {sellOnlyFullPackages && unitsPerPackage > 1 && (
                                                                     <div className="px-1.5 py-0.5 bg-amber-50 dark:bg-amber-900/20 text-amber-600 rounded">
                                                                         {unitsPerPackage}/bulto
                                                                     </div>
@@ -366,21 +363,12 @@ const ProductCatalog = ({
                                                 })()}
                                             </div>
 
-                                            {/* Warning: No aplica dto global - Abajo de todo, sutil */}
-                                            {excludeFromGlobalDiscount && (
-                                                <div className="mt-2 flex items-center justify-center gap-1 px-2 py-1 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 rounded-lg">
-                                                    <Tag size={9} className="text-amber-600" />
-                                                    <span className="text-[8px] text-amber-700 dark:text-amber-400 font-medium">
-                                                        No aplica descuento global
-                                                    </span>
-                                                </div>
-                                            )}
+
                                         </div>
                                     </div>
                                 </motion.div>
                             );
                         })}
-                    </AnimatePresence>
                 </div>
             ) : (
                 <div className="flex flex-col items-center justify-center py-20 text-center">

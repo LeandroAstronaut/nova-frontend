@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Send, Loader2 } from 'lucide-react';
+import { X, AlertCircle, Send, Building2, User, Mail, Loader2 } from 'lucide-react';
 import Button from '../common/Button';
 
 const Toggle = ({ checked, onChange, label, email, disabled }) => (
@@ -26,7 +26,8 @@ const Toggle = ({ checked, onChange, label, email, disabled }) => (
     </button>
 );
 
-const SendReceiptEmailModal = ({ isOpen, onClose, onConfirm, receipt, loading }) => {
+const CancelReceiptModal = ({ isOpen, onClose, onConfirm, receipt, loading, userRole }) => {
+    const [reason, setReason] = useState('');
     const [notifications, setNotifications] = useState({
         company: false,
         seller: false,
@@ -36,14 +37,20 @@ const SendReceiptEmailModal = ({ isOpen, onClose, onConfirm, receipt, loading })
 
     useEffect(() => {
         if (isOpen) {
-            // Todos desactivados por defecto
-            setNotifications({ company: false, seller: false, client: false });
+            setReason('');
+            // Por defecto todos tildados
+            setNotifications({ company: true, seller: true, client: true });
             setAdditionalEmails('');
         }
     }, [isOpen]);
 
     const handleConfirm = () => {
-        onConfirm({ receiptId: receipt?._id, notifications, additionalEmails: additionalEmails.trim() });
+        onConfirm({ 
+            receiptId: receipt?._id, 
+            reason: reason.trim(),
+            notifications, 
+            additionalEmails: additionalEmails.trim() 
+        });
     };
 
     const handleClose = () => { if (!loading) onClose(); };
@@ -51,31 +58,65 @@ const SendReceiptEmailModal = ({ isOpen, onClose, onConfirm, receipt, loading })
     const hasAdditionalEmails = additionalEmails.trim().length > 0;
     const hasSelectedRecipient = notifications.company || notifications.seller || notifications.client || hasAdditionalEmails;
     const receiptNumber = String(receipt?.receiptNumber || '').padStart(5, '0');
-    const receiptTypeLabel = receipt?.type === 'ingreso' ? 'Recibo de Ingreso' : 'Recibo de Egreso';
 
     return createPortal(
         <AnimatePresence>
             {isOpen && (
                 <>
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={handleClose} className="fixed inset-0 bg-secondary-900/50 dark:bg-black/60 backdrop-blur-sm z-[9999]" />
-                    <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} transition={{ type: 'spring', damping: 25, stiffness: 300 }} className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-[var(--bg-card)] rounded-2xl shadow-2xl z-[10000] overflow-hidden border border-[var(--border-color)]">
+                    <motion.div 
+                        initial={{ opacity: 0 }} 
+                        animate={{ opacity: 1 }} 
+                        exit={{ opacity: 0 }} 
+                        onClick={handleClose} 
+                        className="fixed inset-0 bg-secondary-900/50 dark:bg-black/60 backdrop-blur-sm z-[9999]" 
+                    />
+                    <motion.div 
+                        initial={{ opacity: 0, scale: 0.95, y: 20 }} 
+                        animate={{ opacity: 1, scale: 1, y: 0 }} 
+                        exit={{ opacity: 0, scale: 0.95, y: 20 }} 
+                        transition={{ type: 'spring', damping: 25, stiffness: 300 }} 
+                        className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-[var(--bg-card)] rounded-2xl shadow-2xl z-[10000] overflow-hidden border border-[var(--border-color)]"
+                    >
+                        {/* Header */}
                         <div className="px-6 py-4 border-b border-[var(--border-color)] flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-xl flex items-center justify-center text-primary-600 dark:text-primary-400">
-                                    <Send size={20} strokeWidth={2.5} />
+                                <div className="w-10 h-10 bg-danger-100 dark:bg-danger-900/30 rounded-xl flex items-center justify-center text-danger-600 dark:text-danger-400">
+                                    <AlertCircle size={20} strokeWidth={2.5} />
                                 </div>
                                 <div>
-                                    <h2 className="text-base font-bold text-[var(--text-primary)]">Enviar por Email</h2>
-                                    <p className="text-[11px] text-[var(--text-muted)] font-medium">{receiptTypeLabel} #{receiptNumber}</p>
+                                    <h2 className="text-base font-bold text-[var(--text-primary)]">¿Anular Recibo?</h2>
+                                    <p className="text-[11px] text-[var(--text-muted)] font-medium">Recibo #{receiptNumber}</p>
                                 </div>
                             </div>
-                            <button onClick={handleClose} disabled={loading} className="p-2 hover:bg-[var(--bg-hover)] rounded-lg text-[var(--text-muted)] transition-colors disabled:opacity-50"><X size={18} /></button>
+                            <button onClick={handleClose} disabled={loading} className="p-2 hover:bg-[var(--bg-hover)] rounded-lg text-[var(--text-muted)] transition-colors disabled:opacity-50">
+                                <X size={18} />
+                            </button>
                         </div>
+
                         <div className="p-6 space-y-4">
-                            {/* Destinatarios - Diseño Compacto */}
+                            {/* Mensaje de advertencia */}
+                            <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed">
+                                Está a punto de anular el recibo <strong>#{receiptNumber}</strong>. Esta acción no se puede deshacer.
+                            </p>
+
+                            {/* Motivo */}
                             <div className="space-y-2">
                                 <label className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
-                                    Seleccione los destinatarios
+                                    Motivo (opcional)
+                                </label>
+                                <textarea
+                                    value={reason}
+                                    onChange={(e) => setReason(e.target.value)}
+                                    placeholder="Ingrese el motivo de anulación..."
+                                    rows={2}
+                                    className="w-full px-3 py-2 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-all resize-none"
+                                />
+                            </div>
+
+                            {/* Email Destinatarios - Diseño Compacto */}
+                            <div className="space-y-2">
+                                <label className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+                                    Notificar por email
                                 </label>
                                 <div>
                                     <Toggle 
@@ -83,14 +124,14 @@ const SendReceiptEmailModal = ({ isOpen, onClose, onConfirm, receipt, loading })
                                         onChange={(c) => setNotifications(p => ({ ...p, company: c }))} 
                                         label="Empresa" 
                                         email={receipt?.companyId?.email} 
-                                        disabled={!receipt?.companyId?.email} 
+                                        disabled={!receipt?.companyId?.email || userRole === 'vendedor'} 
                                     />
                                     <Toggle 
                                         checked={notifications.seller} 
                                         onChange={(c) => setNotifications(p => ({ ...p, seller: c }))} 
                                         label="Vendedor" 
                                         email={receipt?.salesRepId?.email} 
-                                        disabled={!receipt?.salesRepId?.email} 
+                                        disabled={!receipt?.salesRepId?.email || userRole === 'admin'} 
                                     />
                                     <Toggle 
                                         checked={notifications.client} 
@@ -126,18 +167,24 @@ const SendReceiptEmailModal = ({ isOpen, onClose, onConfirm, receipt, loading })
                                     </p>
                                 </div>
                             )}
-
-                            {/* Nota informativa */}
-                            <div className="p-3 bg-primary-50 dark:bg-primary-900/20 rounded-xl border border-primary-100 dark:border-primary-800">
-                                <p className="text-[11px] text-primary-700 dark:text-primary-400 font-medium">
-                                    <strong>Nota:</strong> Se enviará un correo con el detalle completo del recibo.
-                                </p>
-                            </div>
                         </div>
+
+                        {/* Footer */}
                         <div className="px-6 py-4 border-t border-[var(--border-color)] bg-[var(--bg-hover)] flex gap-3">
-                            <Button variant="secondary" onClick={handleClose} disabled={loading} className="flex-1">Cancelar</Button>
-                            <Button variant="primary" onClick={handleConfirm} disabled={loading || !hasSelectedRecipient} className="flex-1">
-                                {loading ? (<><Loader2 size={16} className="animate-spin" />Enviando...</>) : (<><Send size={16} />Enviar Email</>)}
+                            <Button variant="secondary" onClick={handleClose} disabled={loading} className="flex-1">
+                                Cancelar
+                            </Button>
+                            <Button 
+                                variant="danger" 
+                                onClick={handleConfirm} 
+                                disabled={loading} 
+                                className="flex-1"
+                            >
+                                {loading ? (
+                                    <><Loader2 size={16} className="animate-spin" />Anulando...</>
+                                ) : (
+                                    <>Sí, anular</>
+                                )}
                             </Button>
                         </div>
                     </motion.div>
@@ -148,4 +195,4 @@ const SendReceiptEmailModal = ({ isOpen, onClose, onConfirm, receipt, loading })
     );
 };
 
-export default SendReceiptEmailModal;
+export default CancelReceiptModal;

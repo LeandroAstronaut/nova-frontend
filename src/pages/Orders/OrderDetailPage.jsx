@@ -34,6 +34,7 @@ import ConfirmModal from '../../components/common/ConfirmModal';
 import BudgetDrawer from '../../components/orders/BudgetDrawer';
 import ConvertToOrderModal from '../../components/orders/ConvertToOrderModal';
 import UpdateOrderStatusModal from '../../components/orders/UpdateOrderStatusModal';
+import RevertOrderModal from '../../components/orders/RevertOrderModal';
 import SendEmailModal from '../../components/orders/SendEmailModal';
 import SendWhatsAppModal from '../../components/orders/SendWhatsAppModal';
 import OrderActivityDrawer from '../../components/orders/OrderActivityDrawer';
@@ -259,11 +260,17 @@ const OrderDetailPage = () => {
         });
     };
 
-    const handleRevertConfirm = async () => {
+    const handleRevertConfirm = async ({ orderId, targetStatus, notifications, additionalEmails }) => {
         try {
             setRevertModal(prev => ({ ...prev, loading: true }));
-            await revertOrderToBudget(order._id, revertModal.targetStatus);
+            const result = await revertOrderToBudget(orderId, targetStatus, notifications, additionalEmails);
             addToast('Pedido revertido exitosamente', 'success');
+            
+            // Mostrar info de emails enviados
+            if (result.data?.emailNotifications?.sent > 0) {
+                addToast(`${result.data.emailNotifications.sent} correo(s) de notificación enviado(s)`, 'success');
+            }
+            
             fetchOrder();
         } catch (error) {
             console.error('Error reverting:', error);
@@ -544,9 +551,9 @@ const OrderDetailPage = () => {
             <ConvertToOrderModal
                 isOpen={isConvertModalOpen}
                 onClose={() => setIsConvertModalOpen(false)}
-                onConfirm={async ({ budgetId, notifications }) => {
+                onConfirm={async ({ budgetId, notifications, additionalEmails }) => {
                     try {
-                        await convertBudgetToOrder(budgetId, notifications);
+                        await convertBudgetToOrder(budgetId, notifications, additionalEmails);
                         setIsConvertModalOpen(false); // Cerrar modal inmediatamente
                         addToast('Presupuesto convertido a pedido exitosamente', 'success');
                         fetchOrder();
@@ -562,9 +569,9 @@ const OrderDetailPage = () => {
             <UpdateOrderStatusModal
                 isOpen={isUpdateStatusModalOpen}
                 onClose={() => setIsUpdateStatusModalOpen(false)}
-                onConfirm={async ({ orderId, status, notifications }) => {
+                onConfirm={async ({ orderId, status, notifications, additionalEmails }) => {
                     try {
-                        await updateOrderStatus(orderId, status, notifications);
+                        await updateOrderStatus(orderId, status, notifications, additionalEmails);
                         addToast('Estado actualizado exitosamente', 'success');
                         fetchOrder();
                     } catch (error) {
@@ -643,14 +650,15 @@ const OrderDetailPage = () => {
                 type="danger"
             />
 
-            <ConfirmModal
+            <RevertOrderModal
                 isOpen={revertModal.isOpen}
                 onClose={() => setRevertModal({ isOpen: false, loading: false, targetStatus: null, title: '', description: '' })}
                 onConfirm={handleRevertConfirm}
+                order={order}
+                loading={revertModal.loading}
+                targetStatus={revertModal.targetStatus}
                 title={revertModal.title}
                 description={revertModal.description}
-                confirmText={revertModal.loading ? 'Revirtiendo...' : 'Sí, revertir'}
-                type="warning"
             />
 
         </div>

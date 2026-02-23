@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { 
     Building2, Plus, Edit2, Trash2, Power, Check, X, 
     Package, FileText, Receipt, Users, Landmark, ShoppingCart, 
     Search, Download, MoreHorizontal, ChevronUp, ChevronDown,
-    Briefcase, Shield, Mail, Phone, Percent, Box
+    Briefcase, Shield, Mail, Phone, Percent, Box, Grid3X3, Eye, DollarSign,
+    Upload, Trash2 as TrashIcon, Image as ImageIcon, Tag
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { companyService } from '../../services/companyService';
+import { companyService, updateDisplayPreferences, updateOrderSettings, uploadCompanyLogo, deleteCompanyLogo } from '../../services/companyService';
 import { useToast } from '../../context/ToastContext';
 import ConfirmModal from '../../components/common/ConfirmModal';
 import Button from '../../components/common/Button';
@@ -36,7 +37,7 @@ const FeatureBadge = ({ active, icon: Icon, label }) => (
                 : 'bg-secondary-50 text-secondary-400 border-secondary-100'}
         `}
     >
-        <Icon size={9} />
+        {Icon && <Icon size={9} />}
         {label}
     </span>
 );
@@ -58,7 +59,7 @@ const PlanBadge = ({ plan }) => {
 
 // Función para exportar a CSV
 const exportToCSV = (data) => {
-    const headers = ['Nombre', 'Email', 'Slug', 'Plan', 'Estado', 'Usuarios Activos', 'Max Usuarios', 'Pedidos', 'Catálogo', 'Recibos', 'Ctas.Corrientes', 'Stock', 'Listas', 'Usr.Cliente'];
+    const headers = ['Nombre', 'Email', 'Slug', 'Plan', 'Estado', 'Usuarios Activos', 'Max Usuarios', 'Pedidos', 'Catálogo', 'Recibos', 'Ctas.Corrientes', 'Stock', 'Listas', 'Usr.Cliente', 'Prod.Variables'];
     const rows = data.map(company => [
         company.name,
         company.email,
@@ -73,7 +74,8 @@ const exportToCSV = (data) => {
         company.features.currentAccount ? 'Sí' : 'No',
         company.features.stock ? 'Sí' : 'No',
         company.features.priceLists ? 'Sí' : 'No',
-        company.features.clientUsers ? 'Sí' : 'No'
+        company.features.clientUsers ? 'Sí' : 'No',
+        company.features.productVariants ? 'Sí' : 'No'
     ]);
     
     const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
@@ -92,6 +94,11 @@ const CompaniesPage = () => {
     const [editingCompany, setEditingCompany] = useState(null);
     const [deleteModal, setDeleteModal] = useState({ open: false, company: null });
     const { addToast: showToast } = useToast();
+    
+    // Estado para manejo de logo
+    const [localLogo, setLocalLogo] = useState(null);
+    const [uploadingLogo, setUploadingLogo] = useState(false);
+    const fileInputRef = useRef(null);
 
     // Sorting State
     const [sort, setSort] = useState({
@@ -115,8 +122,12 @@ const CompaniesPage = () => {
             currentAccount: false,
             orders: true,
             clientUsers: false,
+            productVariants: false,
             maxUsers: 3
-        }
+        },
+        showPricesWithTax: false,
+        inputPricesWithTax: false,
+        excludeOfferProductsFromGlobalDiscount: false
     });
 
     const fetchCompanies = async () => {
@@ -183,6 +194,8 @@ const CompaniesPage = () => {
                 ...prev,
                 features: { ...prev.features, [featureName]: type === 'checkbox' ? checked : value }
             }));
+        } else if (name === 'showPricesWithTax' || name === 'inputPricesWithTax' || name === 'excludeOfferProductsFromGlobalDiscount') {
+            setFormData(prev => ({ ...prev, [name]: checked }));
         } else {
             setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
         }
@@ -193,6 +206,15 @@ const CompaniesPage = () => {
         try {
             if (editingCompany) {
                 await companyService.update(editingCompany._id, formData);
+                // También actualizar preferencias de visualización
+                await updateDisplayPreferences(editingCompany._id, {
+                    showPricesWithTax: formData.showPricesWithTax,
+                    inputPricesWithTax: formData.inputPricesWithTax
+                });
+                // Actualizar configuración de pedidos
+                await updateOrderSettings(editingCompany._id, {
+                    excludeOfferProductsFromGlobalDiscount: formData.excludeOfferProductsFromGlobalDiscount
+                });
                 showToast('Compañía actualizada exitosamente', 'success');
             } else {
                 await companyService.create(formData);
@@ -215,8 +237,12 @@ const CompaniesPage = () => {
             slug: company.slug,
             plan: company.plan,
             active: company.active,
-            features: { ...company.features }
+            features: { ...company.features },
+            showPricesWithTax: company.showPricesWithTax || false,
+            inputPricesWithTax: company.inputPricesWithTax || false,
+            excludeOfferProductsFromGlobalDiscount: company.excludeOfferProductsFromGlobalDiscount || false
         });
+        setLocalLogo(company.logo || null);
         setShowDrawer(true);
     };
 
@@ -260,15 +286,86 @@ const CompaniesPage = () => {
                 currentAccount: false,
                 orders: true,
                 clientUsers: false,
+                productVariants: false,
                 maxUsers: 3
-            }
+            },
+            showPricesWithTax: false,
+            inputPricesWithTax: false,
+            excludeOfferProductsFromGlobalDiscount: false
         });
     }
 
     const openCreateDrawer = () => {
         setEditingCompany(null);
         resetForm();
+        setLocalLogo(null);
         setShowDrawer(true);
+    };
+
+    const handleLogoUpload = async (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        
+        if (!editingCompany) return;
+        
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        // Resetear el input después de un pequeño delay
+        setTimeout(() => {
+            if (e.target) e.target.value = '';
+        }, 100);
+
+        // Validar tipo de archivo
+        if (!file.type.startsWith('image/')) {
+            showToast('Por favor selecciona un archivo de imagen válido', 'error');
+            return;
+        }
+
+        // Validar tamaño (1MB máximo)
+        if (file.size > 1 * 1024 * 1024) {
+            showToast('La imagen no debe superar los 1MB', 'error');
+            return;
+        }
+
+        setUploadingLogo(true);
+        try {
+            const result = await uploadCompanyLogo(editingCompany._id, file);
+            if (result.logo) {
+                setLocalLogo(result.logo);
+                // Actualizar la compañía en la lista
+                setCompanies(prev => prev.map(c => 
+                    c._id === editingCompany._id ? { ...c, logo: result.logo } : c
+                ));
+            }
+            showToast('Logo actualizado exitosamente', 'success');
+        } catch (error) {
+            console.error('Error uploading logo:', error);
+            showToast('Error al subir el logo: ' + (error.response?.data?.message || error.message), 'error');
+        } finally {
+            setUploadingLogo(false);
+        }
+    };
+
+    const handleDeleteLogo = async () => {
+        if (!editingCompany) return;
+        if (!window.confirm('¿Estás seguro de que deseas eliminar el logo?')) return;
+
+        setUploadingLogo(true);
+        try {
+            await deleteCompanyLogo(editingCompany._id);
+            setLocalLogo(null);
+            // Actualizar la compañía en la lista
+            setCompanies(prev => prev.map(c => 
+                c._id === editingCompany._id ? { ...c, logo: null } : c
+            ));
+            showToast('Logo eliminado exitosamente', 'success');
+        } catch (error) {
+            console.error('Error deleting logo:', error);
+            showToast('Error al eliminar el logo', 'error');
+        } finally {
+            setUploadingLogo(false);
+        }
     };
 
     return (
@@ -417,6 +514,9 @@ const CompaniesPage = () => {
                                                 {company.features.commissionCalculation && (
                                                     <FeatureBadge active={true} icon={Percent} label="Comisiones" />
                                                 )}
+                                                {company.features.productVariants && (
+                                                    <FeatureBadge active={true} icon={Grid3X3} label="Variables" />
+                                                )}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-center">
@@ -515,6 +615,9 @@ const CompaniesPage = () => {
                                         {company.features.commissionCalculation && (
                                             <FeatureBadge active={true} icon={Percent} label="Comisiones" />
                                         )}
+                                        {company.features.productVariants && (
+                                            <FeatureBadge active={true} icon={Grid3X3} label="Variables" />
+                                        )}
                                     </div>
                                     <div className="flex items-center justify-between text-[12px]">
                                         <span className="text-(--text-muted)">
@@ -573,6 +676,7 @@ const CompaniesPage = () => {
                             animate={{ x: 0 }}
                             exit={{ x: '100%' }}
                             transition={{ type: 'spring', damping: 28, stiffness: 220 }}
+                            onClick={(e) => e.stopPropagation()}
                             className="fixed top-4 left-4 right-4 md:left-auto h-[calc(100vh-2rem)] w-auto md:w-full md:max-w-[480px] bg-(--bg-card) shadow-2xl z-[10000] flex flex-col border border-(--border-color) rounded-2xl overflow-hidden"
                         >
                             {/* Header */}
@@ -725,6 +829,7 @@ const CompaniesPage = () => {
                                                 { key: 'priceLists', label: 'Listas de Precio', icon: FileText },
                                                 { key: 'clientUsers', label: 'Usuarios Cliente', icon: Users },
                                                 { key: 'commissionCalculation', label: 'Cálculo de Comisiones', icon: Percent },
+                                                { key: 'productVariants', label: 'Productos Variables', icon: Grid3X3 },
                                             ].map(({ key, label, icon: Icon }) => (
                                                 <label
                                                     key={key}
@@ -751,6 +856,95 @@ const CompaniesPage = () => {
                                             ))}
                                         </div>
                                     </div>
+
+                                    {/* Preferencias de Visualización - Solo en edición */}
+                                    {editingCompany && (
+                                        <div className="pt-4 border-t border-(--border-color)">
+                                            <label className="block text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
+                                                Preferencias de Visualización
+                                            </label>
+                                            <div className="space-y-3">
+                                                {/* Toggle: Mostrar precios con IVA */}
+                                                <label className="flex items-center justify-between p-3 bg-(--bg-hover) rounded-lg border border-(--border-color) cursor-pointer">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-lg bg-success-100 dark:bg-success-900/30 flex items-center justify-center text-success-600">
+                                                            <DollarSign size={16} />
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-sm font-semibold text-(--text-primary)">Mostrar precios con IVA incluido</p>
+                                                            <p className="text-[10px] text-(--text-muted)">En productos, presupuestos y pedidos</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className={`relative w-12 h-6 rounded-full transition-colors ${formData.showPricesWithTax ? 'bg-primary-500' : 'bg-(--border-color)'}`}>
+                                                        <input
+                                                            type="checkbox"
+                                                            name="showPricesWithTax"
+                                                            checked={formData.showPricesWithTax}
+                                                            onChange={handleInputChange}
+                                                            className="sr-only"
+                                                        />
+                                                        <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${formData.showPricesWithTax ? 'translate-x-7' : 'translate-x-1'}`} />
+                                                    </div>
+                                                </label>
+
+                                                {/* Toggle: Cargar precios con IVA */}
+                                                <label className="flex items-center justify-between p-3 bg-(--bg-hover) rounded-lg border border-(--border-color) cursor-pointer">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600">
+                                                            <DollarSign size={16} />
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-sm font-semibold text-(--text-primary)">En alta/edición cargo precios con IVA incluido</p>
+                                                            <p className="text-[10px] text-(--text-muted)">El sistema calculará el precio sin IVA automáticamente</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className={`relative w-12 h-6 rounded-full transition-colors ${formData.inputPricesWithTax ? 'bg-primary-500' : 'bg-(--border-color)'}`}>
+                                                        <input
+                                                            type="checkbox"
+                                                            name="inputPricesWithTax"
+                                                            checked={formData.inputPricesWithTax}
+                                                            onChange={handleInputChange}
+                                                            className="sr-only"
+                                                        />
+                                                        <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${formData.inputPricesWithTax ? 'translate-x-7' : 'translate-x-1'}`} />
+                                                    </div>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Configuración de Pedidos - Solo en edición */}
+                                    {editingCompany && (
+                                        <div className="pt-4 border-t border-(--border-color)">
+                                            <label className="block text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
+                                                Configuración de Pedidos
+                                            </label>
+                                            <div className="space-y-3">
+                                                {/* Toggle: Proteger precios de oferta */}
+                                                <label className="flex items-center justify-between p-3 bg-(--bg-hover) rounded-lg border border-(--border-color) cursor-pointer">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-lg bg-pink-100 dark:bg-pink-900/30 flex items-center justify-center text-pink-600">
+                                                            <Tag size={16} />
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-sm font-semibold text-(--text-primary)">Proteger precios de oferta</p>
+                                                            <p className="text-[10px] text-(--text-muted)">Los productos con precio de oferta no aplican descuento global del pedido</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className={`relative w-12 h-6 rounded-full transition-colors ${formData.excludeOfferProductsFromGlobalDiscount ? 'bg-primary-500' : 'bg-(--border-color)'}`}>
+                                                        <input
+                                                            type="checkbox"
+                                                            name="excludeOfferProductsFromGlobalDiscount"
+                                                            checked={formData.excludeOfferProductsFromGlobalDiscount}
+                                                            onChange={handleInputChange}
+                                                            className="sr-only"
+                                                        />
+                                                        <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${formData.excludeOfferProductsFromGlobalDiscount ? 'translate-x-7' : 'translate-x-1'}`} />
+                                                    </div>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {/* Estado Activo - Solo en edición */}
                                     {editingCompany && (
@@ -785,6 +979,79 @@ const CompaniesPage = () => {
                                                 >
                                                     {formData.active ? 'Desactivar' : 'Activar'}
                                                 </button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Logo de la Empresa - Solo en edición */}
+                                    {editingCompany && (
+                                        <div className="pt-4 border-t border-(--border-color)">
+                                            <div className="block text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
+                                                Logo de la Empresa
+                                            </div>
+                                            <div className="p-4 bg-(--bg-hover) rounded-lg">
+                                                <div className="flex flex-col items-center">
+                                                    {/* Vista previa del logo */}
+                                                    <div className="w-24 h-24 rounded-xl bg-(--bg-card) border-2 border-dashed border-(--border-color) flex items-center justify-center mb-3 overflow-hidden">
+                                                        {localLogo ? (
+                                                            <img 
+                                                                src={localLogo} 
+                                                                alt="Logo de la empresa" 
+                                                                className="w-full h-full object-contain p-2"
+                                                            />
+                                                        ) : (
+                                                            <Building2 size={40} className="text-(--text-muted)" />
+                                                        )}
+                                                    </div>
+
+                                                    {/* Botones de acción */}
+                                                    <div className="flex gap-2">
+                                                        <input
+                                                            ref={fileInputRef}
+                                                            type="file"
+                                                            accept="image/*"
+                                                            onChange={handleLogoUpload}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className="hidden"
+                                                            disabled={uploadingLogo}
+                                                        />
+                                                        <Button
+                                                            type="button"
+                                                            variant="secondary"
+                                                            className="!px-3 !py-1.5 !text-xs"
+                                                            isLoading={uploadingLogo}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                e.preventDefault();
+                                                                fileInputRef.current?.click();
+                                                            }}
+                                                        >
+                                                            <Upload size={14} className="mr-1.5" />
+                                                            {localLogo ? 'Cambiar Logo' : 'Subir Logo'}
+                                                        </Button>
+
+                                                        {localLogo && (
+                                                            <Button
+                                                                type="button"
+                                                                variant="secondary"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    e.preventDefault();
+                                                                    handleDeleteLogo();
+                                                                }}
+                                                                className="!px-3 !py-1.5 !text-xs text-danger-600 hover:text-danger-700"
+                                                                isLoading={uploadingLogo}
+                                                            >
+                                                                <TrashIcon size={14} className="mr-1.5" />
+                                                                Eliminar
+                                                            </Button>
+                                                        )}
+                                                    </div>
+
+                                                    <p className="text-[10px] text-(--text-muted) mt-2 text-center">
+                                                        Formatos: JPG, PNG, GIF, WEBP • Máximo 1MB
+                                                    </p>
+                                                </div>
                                             </div>
                                         </div>
                                     )}

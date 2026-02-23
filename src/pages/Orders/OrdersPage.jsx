@@ -52,6 +52,8 @@ import ConfirmModal from '../../components/common/ConfirmModal';
 import BudgetDrawer from '../../components/orders/BudgetDrawer';
 import ConvertToOrderModal from '../../components/orders/ConvertToOrderModal';
 import UpdateOrderStatusModal from '../../components/orders/UpdateOrderStatusModal';
+import RevertOrderModal from '../../components/orders/RevertOrderModal';
+import CancelOrderModal from '../../components/orders/CancelOrderModal';
 import SendEmailModal from '../../components/orders/SendEmailModal';
 import SendWhatsAppModal from '../../components/orders/SendWhatsAppModal';
 import OrderActivityDrawer from '../../components/orders/OrderActivityDrawer';
@@ -684,15 +686,21 @@ const OrdersPage = ({ mode = 'order' }) => {
         setOpenMenu({ id: null, position: null, openAbove: false });
     };
 
-    const handleCancelConfirm = async () => {
-        if (!cancelModal.order) return;
+    const handleCancelConfirm = async ({ orderId, reason, notifications, additionalEmails }) => {
+        if (!orderId) return;
         
         try {
             setCancelModal(prev => ({ ...prev, loading: true }));
-            const wasOrder = cancelModal.order.type === 'order';
-            await cancelOrder(cancelModal.order._id, cancelModal.reason);
+            const result = await cancelOrder(orderId, reason, notifications, additionalEmails);
+            const wasOrder = cancelModal.order?.type === 'order';
             setCancelModal({ isOpen: false, order: null, loading: false, reason: '' });
             addToast(wasOrder ? 'Pedido cancelado y convertido a presupuesto' : 'Presupuesto cancelado', 'success');
+            
+            // Mostrar info de emails enviados
+            if (result.data?.emailNotifications?.sent > 0) {
+                addToast(`${result.data.emailNotifications.sent} correo(s) de notificación enviado(s)`, 'success');
+            }
+            
             fetchOrders();
         } catch (error) {
             console.error('Error cancelling order:', error);
@@ -757,10 +765,10 @@ const OrdersPage = ({ mode = 'order' }) => {
         setIsUpdateStatusModalOpen(true);
     };
 
-    const handleUpdateStatusConfirm = async ({ orderId, status, notifications }) => {
+    const handleUpdateStatusConfirm = async ({ orderId, status, notifications, additionalEmails }) => {
         try {
             setUpdatingStatus(true);
-            const result = await updateOrderStatus(orderId, status, notifications);
+            const result = await updateOrderStatus(orderId, status, notifications, additionalEmails);
             setIsUpdateStatusModalOpen(false);
             setSelectedOrderForStatus(null);
             
@@ -837,12 +845,12 @@ const OrdersPage = ({ mode = 'order' }) => {
         setOpenMenu({ id: null, position: null, openAbove: false }); // Cerrar menú
     };
 
-    const handleRevertConfirm = async () => {
-        if (!revertModal.order) return;
+    const handleRevertConfirm = async ({ orderId, targetStatus, notifications, additionalEmails }) => {
+        if (!orderId) return;
         
         try {
             setRevertModal(prev => ({ ...prev, loading: true }));
-            await revertOrderToBudget(revertModal.order._id, revertModal.targetStatus);
+            const result = await revertOrderToBudget(orderId, targetStatus, notifications, additionalEmails);
             setRevertModal({ isOpen: false, order: null, loading: false, targetStatus: null, title: '', description: '' });
             
             const statusLabels = {
@@ -850,7 +858,13 @@ const OrdersPage = ({ mode = 'order' }) => {
                 'confirmado': 'Confirmado',
                 'preparado': 'Preparando'
             };
-            addToast(`Pedido revertido a ${statusLabels[revertModal.targetStatus] || revertModal.targetStatus} exitosamente`, 'success');
+            addToast(`Pedido revertido a ${statusLabels[targetStatus] || targetStatus} exitosamente`, 'success');
+            
+            // Mostrar info de emails enviados
+            if (result.data?.emailNotifications?.sent > 0) {
+                addToast(`${result.data.emailNotifications.sent} correo(s) de notificación enviado(s)`, 'success');
+            }
+            
             fetchOrders(); // Refrescar lista
         } catch (error) {
             console.error('Error reverting order:', error);
@@ -868,10 +882,10 @@ const OrdersPage = ({ mode = 'order' }) => {
         setIsConvertModalOpen(true);
     };
 
-    const handleConvertConfirm = async ({ budgetId, notifications }) => {
+    const handleConvertConfirm = async ({ budgetId, notifications, additionalEmails }) => {
         try {
             setConverting(true);
-            const result = await convertBudgetToOrder(budgetId, notifications);
+            const result = await convertBudgetToOrder(budgetId, notifications, additionalEmails);
             setIsConvertModalOpen(false);
             setSelectedBudget(null);
             
@@ -1183,7 +1197,7 @@ const OrdersPage = ({ mode = 'order' }) => {
                                                                     onClick: () => handleSendEmailClick(order)
                                                                 }]),
                                                                 ...(isClient ? [] : [{  // Clientes no pueden enviar emails/WhatsApp
-                                                                    icon: <MessageCircle size={16} />,
+                                                                    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>,
                                                                     label: 'Enviar WhatsApp',
                                                                     onClick: () => handleSendWhatsAppClick(order)
                                                                 }]),
@@ -1379,7 +1393,7 @@ const OrdersPage = ({ mode = 'order' }) => {
                                             items={[
                                                 ...(canEdit(order) ? [{ icon: <Edit2 size={16} />, label: 'Editar', onClick: () => handleEditOrder(order) }] : []),
                                                 ...(isClient ? [] : [{ icon: <Send size={16} />, label: 'Enviar por email', onClick: () => handleSendEmailClick(order) }]),
-                                                ...(isClient ? [] : [{ icon: <MessageCircle size={16} />, label: 'Enviar WhatsApp', onClick: () => handleSendWhatsAppClick(order) }]),
+                                                ...(isClient ? [] : [{ icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>, label: 'Enviar WhatsApp', onClick: () => handleSendWhatsAppClick(order) }]),
                                                 { icon: <Printer size={16} />, label: 'Imprimir / PDF', onClick: () => { try { generateOrderPDF(order, order.companyId); } catch (error) { addToast('Error al generar PDF: ' + error.message, 'error'); } } },
                                                 { icon: <History size={16} />, label: 'Ver Actividad', onClick: () => handleViewActivityClick(order) },
                                                 ...(canRecover(order) ? [{ icon: <CheckCircle size={16} />, label: 'Recuperar', variant: 'success', onClick: () => handleRecoverClick(order) }] : []),
@@ -1468,45 +1482,25 @@ const OrdersPage = ({ mode = 'order' }) => {
             />
 
             {/* Revert to Previous State Confirmation Modal */}
-            <ConfirmModal
+            {/* Revert Order Modal */}
+            <RevertOrderModal
                 isOpen={revertModal.isOpen}
                 onClose={() => setRevertModal({ isOpen: false, order: null, loading: false, targetStatus: null, title: '', description: '' })}
                 onConfirm={handleRevertConfirm}
-                title={revertModal.title || '¿Volver al estado anterior?'}
-                description={`Está a punto de revertir el pedido #${String(revertModal.order?.orderNumber || '').padStart(5, '0')}. ${revertModal.description || ''}`}
-                confirmText={revertModal.loading ? 'Revirtiendo...' : 'Sí, revertir'}
-                cancelText="Cancelar"
-                type="warning"
+                order={revertModal.order}
+                loading={revertModal.loading}
+                targetStatus={revertModal.targetStatus}
+                title={revertModal.title}
+                description={revertModal.description}
             />
 
             {/* Cancel Order/Budget Modal */}
-            <ConfirmModal
+            <CancelOrderModal
                 isOpen={cancelModal.isOpen}
                 onClose={() => setCancelModal({ isOpen: false, order: null, loading: false, reason: '' })}
                 onConfirm={handleCancelConfirm}
-                title={cancelModal.order?.type === 'order' ? '¿Cancelar Pedido?' : '¿Cancelar Presupuesto?'}
-                description={
-                    <div className="space-y-3">
-                        <p>
-                            {cancelModal.order?.type === 'order' 
-                                ? `Está a punto de cancelar el pedido #${String(cancelModal.order?.orderNumber || '').padStart(5, '0')}. El pedido volverá a ser un presupuesto cancelado.` 
-                                : `Está a punto de cancelar el presupuesto #${String(cancelModal.order?.orderNumber || '').padStart(5, '0')}.`}
-                        </p>
-                        <div>
-                            <label className="block text-xs font-medium text-(--text-muted) mb-1">Motivo (opcional)</label>
-                            <textarea
-                                value={cancelModal.reason}
-                                onChange={(e) => setCancelModal(prev => ({ ...prev, reason: e.target.value }))}
-                                className="w-full p-2 bg-(--bg-input) border border-(--border-color) rounded-lg text-sm"
-                                rows={2}
-                                placeholder="Ingrese el motivo de la cancelación..."
-                            />
-                        </div>
-                    </div>
-                }
-                confirmText={cancelModal.loading ? 'Cancelando...' : 'Sí, cancelar'}
-                cancelText="No, mantener"
-                type="danger"
+                order={cancelModal.order}
+                loading={cancelModal.loading}
             />
 
             {/* Recover Cancelled Budget Modal */}

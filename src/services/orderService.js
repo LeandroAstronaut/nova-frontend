@@ -75,9 +75,10 @@ export const getSellers = async () => {
     return response.data;
 };
 
-export const convertBudgetToOrder = async (budgetId, notificationSettings) => {
+export const convertBudgetToOrder = async (budgetId, notificationSettings, additionalEmails) => {
     const response = await api.post(`/orders/${budgetId}/convert`, {
-        notifications: notificationSettings
+        notifications: notificationSettings,
+        additionalEmails
     });
     return response.data;
 };
@@ -92,8 +93,12 @@ export const validateBudgetStock = async (budgetId) => {
     return response.data;
 };
 
-export const revertOrderToBudget = async (orderId, targetStatus = 'budget') => {
-    const response = await api.post(`/orders/${orderId}/revert`, { targetStatus });
+export const revertOrderToBudget = async (orderId, targetStatus = 'budget', notifications, additionalEmails) => {
+    const response = await api.post(`/orders/${orderId}/revert`, { 
+        targetStatus,
+        notifications,
+        additionalEmails
+    });
     return response.data;
 };
 
@@ -105,10 +110,11 @@ export const sendOrderEmail = async (orderId, notificationSettings, additionalEm
     return response.data;
 };
 
-export const updateOrderStatus = async (orderId, status, notificationSettings) => {
+export const updateOrderStatus = async (orderId, status, notificationSettings, additionalEmails) => {
     const response = await api.post(`/orders/${orderId}/status`, {
         status,
-        notifications: notificationSettings
+        notifications: notificationSettings,
+        additionalEmails
     });
     return response.data;
 };
@@ -128,8 +134,12 @@ export const updateOrderPrices = async (orderId) => {
     return response.data;
 };
 
-export const cancelOrder = async (orderId, reason) => {
-    const response = await api.post(`/orders/${orderId}/cancel`, { reason });
+export const cancelOrder = async (orderId, reason, notifications, additionalEmails) => {
+    const response = await api.post(`/orders/${orderId}/cancel`, { 
+        reason,
+        notifications,
+        additionalEmails
+    });
     return response.data;
 };
 

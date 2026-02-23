@@ -12,26 +12,18 @@ import {
     Shield,
     Bell,
     Database,
-    Upload,
-    Trash2,
-    Image as ImageIcon,
-    Eye,
-    DollarSign,
     Package,
     Globe,
     ShoppingCart,
-    Tag
+    Grid3X3
 } from 'lucide-react';
 import Button from '../../components/common/Button';
-import { updateContactInfo, updateDisplayPreferences, updateOrderSettings, uploadCompanyLogo, deleteCompanyLogo } from '../../services/companyService';
+import { updateContactInfo, updateOrderSettings } from '../../services/companyService';
 
 const SettingsPage = () => {
     const { user, updateUserContext } = useAuth();
     const { addToast } = useToast();
     const [loading, setLoading] = useState(false);
-    const [uploadingLogo, setUploadingLogo] = useState(false);
-    const [localLogo, setLocalLogo] = useState(user?.company?.logo || null);
-    const [logoRev, setLogoRev] = useState(0);
     const [formData, setFormData] = useState({
         companyName: '',
         businessName: '',
@@ -43,18 +35,6 @@ const SettingsPage = () => {
         notificationsEnabled: true,
         autoBackup: true
     });
-
-    // Log inicial
-    useEffect(() => {
-        console.log('SettingsPage - MONTADO - user?.company?.logo:', user?.company?.logo);
-    }, []);
-
-    // Actualizar localLogo cuando cambie user.companyId.logo
-    useEffect(() => {
-        console.log('SettingsPage - user?.company?.logo cambió:', user?.company?.logo);
-        setLocalLogo(user?.company?.logo || null);
-        setLogoRev(prev => prev + 1);
-    }, [user?.company?.logo]);
 
     const isAdmin = user?.role?.name === 'admin';
     const isSuperadmin = user?.role?.name === 'superadmin';
@@ -98,19 +78,14 @@ const SettingsPage = () => {
     };
     
     // Estado para preferencias de visualización
-    const [displayPrefs, setDisplayPrefs] = useState({
-        showPricesWithTax: user?.company?.showPricesWithTax === true,
-        inputPricesWithTax: user?.company?.inputPricesWithTax === true
-    });
-    const [savingPrefs, setSavingPrefs] = useState(false);
+
     
     // Estado para configuración de pedidos
     const [orderSettings, setOrderSettings] = useState({
         sellOnlyFullPackages: user?.company?.sellOnlyFullPackages === true,
         publicCatalog: user?.company?.publicCatalog === true,
         showPriceInPublicCatalog: user?.company?.showPriceInPublicCatalog === true,
-        allowAnonymousPurchases: user?.company?.allowAnonymousPurchases === true,
-        excludeOfferProductsFromGlobalDiscount: user?.company?.excludeOfferProductsFromGlobalDiscount === true
+        allowAnonymousPurchases: user?.company?.allowAnonymousPurchases === true
     });
     const [savingOrderSettings, setSavingOrderSettings] = useState(false);
     
@@ -121,38 +96,10 @@ const SettingsPage = () => {
                 sellOnlyFullPackages: user.company.sellOnlyFullPackages === true,
                 publicCatalog: user.company.publicCatalog === true,
                 showPriceInPublicCatalog: user.company.showPriceInPublicCatalog === true,
-                allowAnonymousPurchases: user.company.allowAnonymousPurchases === true,
-                excludeOfferProductsFromGlobalDiscount: user.company.excludeOfferProductsFromGlobalDiscount === true
+                allowAnonymousPurchases: user.company.allowAnonymousPurchases === true
             });
         }
     }, [user]);
-    
-    // Actualizar displayPrefs cuando cambie user
-    useEffect(() => {
-        if (user?.company) {
-            setDisplayPrefs({
-                showPricesWithTax: user.company.showPricesWithTax === true,
-                inputPricesWithTax: user.company.inputPricesWithTax === true
-            });
-        }
-    }, [user]);
-    
-    const handleSaveDisplayPreferences = async () => {
-        setSavingPrefs(true);
-        try {
-            await updateDisplayPreferences(user.company._id, displayPrefs);
-            
-            // Actualizar el contexto del usuario
-            await updateUserContext();
-            
-            addToast('Preferencias actualizadas exitosamente', 'success');
-        } catch (error) {
-            console.error('Error saving display preferences:', error);
-            addToast('Error al guardar preferencias: ' + (error.response?.data?.message || error.message), 'error');
-        } finally {
-            setSavingPrefs(false);
-        }
-    };
     
     const handleSaveOrderSettings = async () => {
         setSavingOrderSettings(true);
@@ -168,71 +115,6 @@ const SettingsPage = () => {
             addToast('Error al guardar configuración: ' + (error.response?.data?.message || error.message), 'error');
         } finally {
             setSavingOrderSettings(false);
-        }
-    };
-
-    const fileInputRef = React.useRef(null);
-
-    const handleLogoUpload = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        
-        // Resetear el input para permitir volver a seleccionar el mismo archivo
-        e.target.value = '';
-
-        // Validar tipo de archivo
-        if (!file.type.startsWith('image/')) {
-            addToast('Por favor selecciona un archivo de imagen válido', 'error');
-            return;
-        }
-
-        // Validar tamaño (1MB máximo)
-        if (file.size > 1 * 1024 * 1024) {
-            addToast('La imagen no debe superar los 1MB', 'error');
-            return;
-        }
-
-        setUploadingLogo(true);
-        try {
-            const result = await uploadCompanyLogo(user.company._id, file);
-            
-            // Actualizar estado local inmediatamente para ver el cambio sin esperar
-            if (result.logo) {
-                setLocalLogo(result.logo);
-                setLogoRev(prev => prev + 1);
-            }
-            
-            // Actualizar el contexto del usuario
-            await updateUserContext();
-            
-            addToast('Logo actualizado exitosamente', 'success');
-        } catch (error) {
-            console.error('Error uploading logo:', error);
-            addToast('Error al subir el logo: ' + (error.response?.data?.message || error.message), 'error');
-        } finally {
-            setUploadingLogo(false);
-        }
-    };
-
-    const handleDeleteLogo = async () => {
-        if (!window.confirm('¿Estás seguro de que deseas eliminar el logo?')) return;
-
-        setUploadingLogo(true);
-        try {
-            await deleteCompanyLogo(user.company._id);
-            
-            // Actualizar estado local inmediatamente
-            setLocalLogo(null);
-            
-            // Actualizar el contexto del usuario
-            await updateUserContext();
-            
-            addToast('Logo eliminado exitosamente', 'success');
-        } catch (error) {
-            console.error('Error deleting logo:', error);
-            addToast('Error al eliminar el logo: ' + (error.response?.data?.message || error.message), 'error');
-        } finally {
-            setUploadingLogo(false);
         }
     };
 
@@ -266,77 +148,6 @@ const SettingsPage = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Columna izquierda */}
                 <div className="space-y-6">
-                    {/* Logo de la Empresa */}
-                    <div className="card p-0! overflow-hidden border-none shadow-sm ring-1 ring-(--border-color)">
-                        <div className="px-6 py-4 border-b border-(--border-color) bg-(--bg-hover)">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-primary-600">
-                                    <ImageIcon size={20} />
-                                </div>
-                                <div>
-                                    <h2 className="text-base font-bold text-(--text-primary)">Logo de la Empresa</h2>
-                                    <p className="text-[11px] text-(--text-muted)">Imagen que se muestra en el sidebar</p>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div className="p-6">
-                            <div className="flex flex-col items-center">
-                                {/* Vista previa del logo */}
-                                <div className="w-32 h-32 rounded-2xl bg-(--bg-hover) border-2 border-dashed border-(--border-color) flex items-center justify-center mb-4 overflow-hidden">
-                                    {localLogo ? (
-                                        <img 
-                                            key={`${localLogo}-${logoRev}`}
-                                            src={localLogo} 
-                                            alt="Logo de la empresa" 
-                                            className="w-full h-full object-contain p-2"
-                                        />
-                                    ) : (
-                                        <Building2 size={48} className="text-(--text-muted)" />
-                                    )}
-                                </div>
-
-                                {/* Botones de acción */}
-                                <div className="flex gap-3">
-                                    <input
-                                        ref={fileInputRef}
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={handleLogoUpload}
-                                        className="hidden"
-                                        disabled={uploadingLogo}
-                                    />
-                                    <Button
-                                        variant="secondary"
-                                        className="text-sm"
-                                        isLoading={uploadingLogo}
-                                        onClick={() => fileInputRef.current?.click()}
-                                    >
-                                        <Upload size={16} className="mr-2" />
-                                        {user?.company?.logo ? 'Cambiar Logo' : 'Subir Logo'}
-                                    </Button>
-
-                                    {user?.company?.logo && (
-                                        <Button
-                                            variant="secondary"
-                                            onClick={handleDeleteLogo}
-                                            className="text-sm text-danger-600 hover:text-danger-700"
-                                            isLoading={uploadingLogo}
-                                        >
-                                            <Trash2 size={16} className="mr-2" />
-                                            Eliminar
-                                        </Button>
-                                    )}
-                                </div>
-
-                                <p className="text-[11px] text-(--text-muted) mt-3 text-center">
-                                    Formatos permitidos: JPG, PNG, GIF, WEBP<br/>
-                                    Tamaño máximo: 1MB
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
                     {/* Información de la Empresa (Solo lectura) */}
                     <div className="card p-0! overflow-hidden border-none shadow-sm ring-1 ring-(--border-color)">
                         <div className="px-6 py-4 border-b border-(--border-color) bg-(--bg-hover)">
@@ -517,6 +328,7 @@ const SettingsPage = () => {
                                     { key: 'priceLists', label: 'Listas de Precios', active: features.priceLists === true },
                                     { key: 'importador', label: 'Importador', active: features.importador === true },
                                     { key: 'clientUsers', label: 'Usuarios Cliente', active: features.clientUsers === true },
+                                    { key: 'productVariants', label: 'Productos Variables', active: features.productVariants === true },
                                 ].map((module) => (
                                     <div 
                                         key={module.key}
@@ -531,89 +343,6 @@ const SettingsPage = () => {
                                     </div>
                                 ))}
                             </div>
-                        </div>
-                    </div>
-
-                    {/* Preferencias de Visualización */}
-                    <div className="card p-0! overflow-hidden border-none shadow-sm ring-1 ring-(--border-color)">
-                        <div className="px-6 py-4 border-b border-(--border-color) bg-(--bg-hover)">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600">
-                                    <Eye size={20} />
-                                </div>
-                                <div>
-                                    <h2 className="text-base font-bold text-(--text-primary)">Preferencias de Visualización</h2>
-                                    <p className="text-[11px] text-(--text-muted)">Configuración de cómo se muestran los datos</p>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div className="p-6 space-y-4">
-                            {/* Toggle: Mostrar precios con IVA */}
-                            <div className="p-4 bg-(--bg-hover) rounded-xl border border-(--border-color)">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-lg bg-success-100 dark:bg-success-900/30 flex items-center justify-center text-success-600">
-                                            <DollarSign size={16} />
-                                        </div>
-                                        <div>
-                                            <p className="text-[13px] font-semibold text-(--text-primary)">Mostrar precios con IVA incluido</p>
-                                            <p className="text-[11px] text-(--text-muted)">En productos, presupuestos y pedidos</p>
-                                        </div>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => setDisplayPrefs(prev => ({ ...prev, showPricesWithTax: !prev.showPricesWithTax }))}
-                                        className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${
-                                            displayPrefs.showPricesWithTax ? 'bg-primary-500' : 'bg-(--border-color)'
-                                        }`}
-                                    >
-                                        <div
-                                            className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${
-                                                displayPrefs.showPricesWithTax ? 'translate-x-7' : 'translate-x-1'
-                                            }`}
-                                        />
-                                    </button>
-                                </div>
-                            </div>
-                            
-                            {/* Toggle: Cargar precios con IVA incluido */}
-                            <div className="p-4 bg-(--bg-hover) rounded-xl border border-(--border-color)">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600">
-                                            <DollarSign size={16} />
-                                        </div>
-                                        <div>
-                                            <p className="text-[13px] font-semibold text-(--text-primary)">En alta/edición cargo precios con IVA incluido</p>
-                                            <p className="text-[11px] text-(--text-muted)">El sistema calculará el precio sin IVA automáticamente</p>
-                                        </div>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => setDisplayPrefs(prev => ({ ...prev, inputPricesWithTax: !prev.inputPricesWithTax }))}
-                                        className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${
-                                            displayPrefs.inputPricesWithTax ? 'bg-primary-500' : 'bg-(--border-color)'
-                                        }`}
-                                    >
-                                        <div
-                                            className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${
-                                                displayPrefs.inputPricesWithTax ? 'translate-x-7' : 'translate-x-1'
-                                            }`}
-                                        />
-                                    </button>
-                                </div>
-                            </div>
-                            
-                            <Button
-                                variant="primary"
-                                onClick={handleSaveDisplayPreferences}
-                                isLoading={savingPrefs}
-                                className="w-full"
-                            >
-                                <Save size={18} className="mr-2" />
-                                Guardar Preferencias
-                            </Button>
                         </div>
                     </div>
 
@@ -654,34 +383,6 @@ const SettingsPage = () => {
                                         <div
                                             className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${
                                                 orderSettings.sellOnlyFullPackages ? 'translate-x-7' : 'translate-x-1'
-                                            }`}
-                                        />
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Toggle: Excluir productos en oferta del descuento global */}
-                            <div className="p-4 bg-(--bg-hover) rounded-xl border border-(--border-color)">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-lg bg-pink-100 dark:bg-pink-900/30 flex items-center justify-center text-pink-600">
-                                            <Tag size={16} />
-                                        </div>
-                                        <div>
-                                            <p className="text-[13px] font-semibold text-(--text-primary)">Proteger precios de oferta</p>
-                                            <p className="text-[11px] text-(--text-muted)">Los productos con precio de oferta no aplican descuento global del pedido</p>
-                                        </div>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => setOrderSettings(prev => ({ ...prev, excludeOfferProductsFromGlobalDiscount: !prev.excludeOfferProductsFromGlobalDiscount }))}
-                                        className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${
-                                            orderSettings.excludeOfferProductsFromGlobalDiscount ? 'bg-primary-500' : 'bg-(--border-color)'
-                                        }`}
-                                    >
-                                        <div
-                                            className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${
-                                                orderSettings.excludeOfferProductsFromGlobalDiscount ? 'translate-x-7' : 'translate-x-1'
                                             }`}
                                         />
                                     </button>

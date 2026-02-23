@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Package, CheckCircle, Loader2 } from 'lucide-react';
+import { X, XCircle, Loader2 } from 'lucide-react';
 import Button from '../common/Button';
 
 const Toggle = ({ checked, onChange, label, email }) => (
     <button
         type="button"
         onClick={() => onChange(!checked)}
-        className={`w-full flex items-center justify-between py-1 transition-colors ${checked ? '' : 'opacity-70'} cursor-pointer`}
+        className={`w-full flex items-center justify-between py-1 transition-colors cursor-pointer`}
     >
         <div className="flex flex-col items-start">
             <span className="text-[13px] font-bold text-[var(--text-primary)]">{label}</span>
@@ -25,15 +25,16 @@ const Toggle = ({ checked, onChange, label, email }) => (
     </button>
 );
 
-const UpdateOrderStatusModal = ({ isOpen, onClose, onConfirm, order, loading, targetStatus }) => {
+const CancelOrderModal = ({ isOpen, onClose, onConfirm, order, loading }) => {
     const [notifications, setNotifications] = useState({
         company: false,
         seller: false,
         client: false
     });
     const [additionalEmails, setAdditionalEmails] = useState('');
+    const [reason, setReason] = useState('');
 
-    // Resetear toggles cuando se abre el modal
+    // Resetear estado cuando se abre el modal
     useEffect(() => {
         if (isOpen) {
             setNotifications({
@@ -42,13 +43,14 @@ const UpdateOrderStatusModal = ({ isOpen, onClose, onConfirm, order, loading, ta
                 client: false
             });
             setAdditionalEmails('');
+            setReason('');
         }
     }, [isOpen]);
 
     const handleConfirm = () => {
         onConfirm({
             orderId: order?._id,
-            status: targetStatus,
+            reason: reason.trim(),
             notifications,
             additionalEmails: additionalEmails.trim()
         });
@@ -58,26 +60,7 @@ const UpdateOrderStatusModal = ({ isOpen, onClose, onConfirm, order, loading, ta
         if (!loading) onClose();
     };
 
-    // Configuración según el estado destino
-    const config = {
-        preparado: {
-            title: 'Poner en Preparación',
-            icon: Package,
-            color: 'bg-info-100 dark:bg-info-900/30 text-info-600 dark:text-info-400',
-            description: 'El pedido pasará a estado "Preparando"',
-            confirmText: 'Preparar Pedido'
-        },
-        completo: {
-            title: 'Completar Pedido',
-            icon: CheckCircle,
-            color: 'bg-success-100 dark:bg-success-900/30 text-success-600 dark:text-success-400',
-            description: 'El pedido pasará a estado "Completado"',
-            confirmText: 'Completar Pedido'
-        }
-    };
-
-    const currentConfig = config[targetStatus] || config.preparado;
-    const IconComponent = currentConfig.icon;
+    const isOrder = order?.type === 'order';
 
     return createPortal(
         <AnimatePresence>
@@ -87,19 +70,40 @@ const UpdateOrderStatusModal = ({ isOpen, onClose, onConfirm, order, loading, ta
                     <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} transition={{ type: 'spring', damping: 25, stiffness: 300 }} className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-[var(--bg-card)] rounded-2xl shadow-2xl z-[10000] overflow-hidden border border-[var(--border-color)]">
                         <div className="px-6 py-4 border-b border-[var(--border-color)] flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${currentConfig.color}`}>
-                                    <IconComponent size={20} strokeWidth={2.5} />
+                                <div className="w-10 h-10 bg-danger-100 dark:bg-danger-900/30 rounded-xl flex items-center justify-center text-danger-600 dark:text-danger-400">
+                                    <XCircle size={20} strokeWidth={2.5} />
                                 </div>
                                 <div>
-                                    <h2 className="text-base font-bold text-[var(--text-primary)]">{currentConfig.title}</h2>
-                                    <p className="text-[11px] text-[var(--text-muted)] font-medium">Pedido #{String(order?.orderNumber).padStart(5, '0')}</p>
+                                    <h2 className="text-base font-bold text-[var(--text-primary)]">{isOrder ? '¿Cancelar Pedido?' : '¿Cancelar Presupuesto?'}</h2>
+                                    <p className="text-[11px] text-[var(--text-muted)] font-medium">{isOrder ? 'Pedido' : 'Presupuesto'} #{String(order?.orderNumber).padStart(5, '0')}</p>
                                 </div>
                             </div>
                             <button onClick={handleClose} disabled={loading} className="p-2 hover:bg-[var(--bg-hover)] rounded-lg text-[var(--text-muted)] transition-colors disabled:opacity-50"><X size={18} /></button>
                         </div>
 
-                        <div className="p-6 space-y-4">
-                            {/* Destinatarios - Diseño Compacto */}
+                        <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+                            {/* Descripción */}
+                            <p className="text-[13px] text-[var(--text-secondary)]">
+                                {isOrder 
+                                    ? `Está a punto de cancelar el pedido #${String(order?.orderNumber || '').padStart(5, '0')}. El pedido volverá a ser un presupuesto cancelado.` 
+                                    : `Está a punto de cancelar el presupuesto #${String(order?.orderNumber || '').padStart(5, '0')}.`}
+                            </p>
+
+                            {/* Motivo */}
+                            <div className="space-y-2">
+                                <label className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+                                    Motivo (opcional)
+                                </label>
+                                <textarea
+                                    value={reason}
+                                    onChange={(e) => setReason(e.target.value)}
+                                    placeholder="Ingrese el motivo de la cancelación..."
+                                    className="w-full px-3 py-2.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-all resize-none"
+                                    rows={2}
+                                />
+                            </div>
+
+                            {/* Destinatarios */}
                             <div className="space-y-2">
                                 <label className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
                                     Notificar via email
@@ -152,9 +156,9 @@ const UpdateOrderStatusModal = ({ isOpen, onClose, onConfirm, order, loading, ta
                         </div>
 
                         <div className="px-6 py-4 border-t border-[var(--border-color)] bg-[var(--bg-hover)] flex gap-3">
-                            <Button variant="secondary" onClick={handleClose} disabled={loading} className="flex-1">Cancelar</Button>
-                            <Button variant="primary" onClick={handleConfirm} disabled={loading} className="flex-1">
-                                {loading ? (<><Loader2 size={16} className="animate-spin" />Procesando...</>) : (<><IconComponent size={16} />{currentConfig.confirmText}</>)}
+                            <Button variant="secondary" onClick={handleClose} disabled={loading} className="flex-1">No, mantener</Button>
+                            <Button variant="primary" onClick={handleConfirm} disabled={loading} className="flex-1 !bg-danger-600 hover:!bg-danger-700">
+                                {loading ? (<><Loader2 size={16} className="animate-spin" />Cancelando...</>) : (<><XCircle size={16} />Sí, cancelar</>)}
                             </Button>
                         </div>
                     </motion.div>
@@ -165,4 +169,4 @@ const UpdateOrderStatusModal = ({ isOpen, onClose, onConfirm, order, loading, ta
     );
 };
 
-export default UpdateOrderStatusModal;
+export default CancelOrderModal;

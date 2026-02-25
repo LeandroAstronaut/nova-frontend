@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -17,9 +17,13 @@ import {
     Star,
     Grid3X3,
     Layers,
-    Info
+    Info,
+    Share2,
+    Link,
+    MessageCircle
 } from 'lucide-react';
 import Button from '../common/Button';
+import { useToast } from '../../context/ToastContext';
 
 const ProductQuickView = ({ 
     isOpen, 
@@ -32,7 +36,8 @@ const ProductQuickView = ({
     features = {}, 
     company = {}, 
     priceList = 1, 
-    user = null 
+    user = null,
+    showPrices = true
 }) => {
     const [quantity, setQuantity] = useState(1);
     const [discount, setDiscount] = useState(0);
@@ -42,11 +47,60 @@ const ProductQuickView = ({
     const [lightboxIndex, setLightboxIndex] = useState(0);
     const [selectedVariant, setSelectedVariant] = useState(null);
     const [hasInitialized, setHasInitialized] = useState(false);
+    const [showShareMenu, setShowShareMenu] = useState(false);
+    
+    const { addToast } = useToast();
+    
+    // Funciones para compartir
+    const handleCopyLink = () => {
+        const url = window.location.href;
+        navigator.clipboard.writeText(url).then(() => {
+            addToast('Enlace copiado al portapapeles', 'success');
+            setShowShareMenu(false);
+        }).catch(() => {
+            addToast('Error al copiar el enlace', 'error');
+        });
+    };
+
+    const handleShareWhatsApp = () => {
+        const url = window.location.href;
+        const companyName = company?.name || 'la empresa';
+        const productName = product?.name || 'este producto';
+        const message = `Te comparto el producto ${productName} de la empresa ${companyName}: ${url}`;
+        const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+        window.open(whatsappUrl, '_blank');
+        setShowShareMenu(false);
+    };
+
+    // Ref y efecto para cerrar menú al hacer clic fuera
+    const shareMenuRef = useRef(null);
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (shareMenuRef.current && !shareMenuRef.current.contains(event.target)) {
+                setShowShareMenu(false);
+            }
+        };
+
+        if (showShareMenu) {
+            document.addEventListener('mousedown', handleClickOutside);
+            return () => document.removeEventListener('mousedown', handleClickOutside);
+        }
+    }, [showShareMenu]);
     
     // Feature flags
     const hasStockFeature = features?.stock === true;
     const hasPriceListsFeature = features?.priceLists === true;
     const isAdmin = user?.role?.name === 'admin' || user?.role?.name === 'superadmin';
+    const isPublicCatalog = viewOnly === true && !user; // Catálogo público (sin usuario)
+    
+    // Configuración de visualización de stock
+    // Admin siempre ve stock
+    // Catálogo interno: clientes solo si showStockToClients está activo
+    // Catálogo público: según publicCatalogSettings.showStock
+    const showStockToClients = isPublicCatalog 
+        ? company?.publicCatalogSettings?.showStock === true
+        : company?.catalogSettings?.showStockToClients === true;
+    const shouldShowStock = hasStockFeature && (isAdmin || showStockToClients);
 
     // Reset states when drawer opens
     useEffect(() => {
@@ -263,6 +317,7 @@ const ProductQuickView = ({
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
+                        transition={{ duration: 0.3, ease: 'easeInOut' }}
                         onClick={onClose}
                         className="fixed inset-0 bg-secondary-900/50 dark:bg-black/60 backdrop-blur-sm z-[200]"
                     />
@@ -272,7 +327,7 @@ const ProductQuickView = ({
                         initial={{ x: '100%' }}
                         animate={{ x: 0 }}
                         exit={{ x: '100%' }}
-                        transition={{ type: 'spring', damping: 28, stiffness: 220 }}
+                        transition={{ type: 'spring', damping: 25, stiffness: 200, duration: 0.4 }}
                         className="fixed top-4 left-4 right-4 md:left-auto md:right-4 h-[calc(100vh-2rem)] w-auto md:w-full md:max-w-[950px] bg-[var(--bg-card)] shadow-2xl z-[210] flex flex-col border border-[var(--border-color)] rounded-2xl overflow-hidden"
                     >
                         {/* Header */}
@@ -290,12 +345,52 @@ const ProductQuickView = ({
                                     </p>
                                 </div>
                             </div>
-                            <button
-                                onClick={onClose}
-                                className="p-2 hover:bg-[var(--bg-hover)] rounded-lg text-[var(--text-muted)] transition-colors"
-                            >
-                                <X size={20} />
-                            </button>
+                            <div className="flex items-center gap-2">
+                                {/* Botón Compartir - Solo en catálogo público */}
+                                {viewOnly && (
+                                    <div className="relative" ref={shareMenuRef}>
+                                        <button
+                                            onClick={() => setShowShareMenu(!showShareMenu)}
+                                            className="flex items-center gap-1.5 px-3 py-2 bg-[var(--bg-hover)] hover:bg-[var(--border-color)] rounded-lg text-xs font-medium text-[var(--text-primary)] transition-colors"
+                                        >
+                                            <Share2 size={14} />
+                                            Compartir
+                                        </button>
+                                        <AnimatePresence>
+                                            {showShareMenu && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                                                    transition={{ duration: 0.15 }}
+                                                    className="absolute right-0 top-full mt-2 w-44 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg shadow-lg z-50 py-1"
+                                                >
+                                                    <button
+                                                        onClick={handleCopyLink}
+                                                        className="w-full flex items-center gap-2 px-4 py-2 text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                                                    >
+                                                        <Link size={14} className="text-[var(--text-muted)]" />
+                                                        Copiar enlace
+                                                    </button>
+                                                    <button
+                                                        onClick={handleShareWhatsApp}
+                                                        className="w-full flex items-center gap-2 px-4 py-2 text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                                                    >
+                                                        <MessageCircle size={14} className="text-green-500" />
+                                                        WhatsApp
+                                                    </button>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </div>
+                                )}
+                                <button
+                                    onClick={onClose}
+                                    className="p-2 hover:bg-[var(--bg-hover)] rounded-lg text-[var(--text-muted)] transition-colors"
+                                >
+                                    <X size={20} />
+                                </button>
+                            </div>
                         </div>
 
                         {/* Content - Scrollable */}
@@ -393,14 +488,15 @@ const ProductQuickView = ({
                                                     {product.subcategory && ` / ${product.subcategory}`}
                                                 </p>
                                             )}
-                                            {/* Código y Stock sintético - Solo en modo compra, no en catálogo */}
+                                            {/* Código y Stock - Solo si corresponde según configuración */}
+                                            {/* Nota: Para productos con variantes, el stock se muestra en cada variante individual */}
                                             <div className="flex items-center gap-2 text-[11px] text-[var(--text-muted)]">
                                                 {!hasVariants && (
                                                     <span>Cod. {product.code}</span>
                                                 )}
-                                                {hasStockFeature && !viewOnly && (
+                                                {shouldShowStock && !hasVariants && (
                                                     <>
-                                                        {!hasVariants && <span className="text-[var(--border-color)]">|</span>}
+                                                        <span className="text-[var(--border-color)]">|</span>
                                                         <span className={isOutOfStock ? 'text-danger-600' : isLowStock ? 'text-warning-600' : 'text-success-600'}>
                                                             Stock: {stock.available} disp.
                                                         </span>
@@ -409,8 +505,8 @@ const ProductQuickView = ({
                                             </div>
                                         </div>
 
-                                        {/* Card de Precio - Oculta en modo catálogo cuando hay precios variables por variante */}
-                                        {!(viewOnly && hasVariants && !hasUniformPricing) && (
+                                        {/* Card de Precio - Oculta en modo catálogo cuando hay precios variables por variante o cuando showPrices es false */}
+                                        {showPrices && !(viewOnly && hasVariants && !hasUniformPricing) && (
                                             <div className="bg-[var(--bg-hover)] rounded-xl border border-[var(--border-color)] p-4">
                                                 <div className="flex items-center justify-between mb-2">
                                                     <span className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
@@ -486,9 +582,9 @@ const ProductQuickView = ({
                                                             hasVOffer = vOffer > 0 || vDiscount > 0;
                                                         }
                                                         
-                                                        // Calcular stock de la variante para modo catálogo
+                                                        // Calcular stock de la variante si corresponde mostrarlo
                                                         let vStock = null;
-                                                        if (viewOnly && hasStockFeature) {
+                                                        if (shouldShowStock) {
                                                             const vStockAvail = Math.max(0, (variant.stock || 0) - (variant.stockReserved || 0));
                                                             vStock = {
                                                                 available: vStockAvail,
@@ -526,17 +622,17 @@ const ProductQuickView = ({
                                                                         {variant.sku && (
                                                                             <p className="text-[10px] text-[var(--text-muted)]">Cod. {variant.sku}</p>
                                                                         )}
-                                                                        {/* Stock en modo catálogo - NO se muestra según requerimiento */}
-                                                                        {/* {viewOnly && hasStockFeature && vStock && (
+                                                                        {/* Stock de variante - Solo si la configuración lo permite */}
+                                                                        {shouldShowStock && vStock && (
                                                                             <p className={`text-[10px] font-medium mt-0.5 ${
                                                                                 vStock.isOut ? 'text-danger-600' : vStock.isLow ? 'text-warning-600' : 'text-success-600'
                                                                             }`}>
                                                                                 Stock: {vStock.available} disp.
                                                                             </p>
-                                                                        )} */}
+                                                                        )}
                                                                     </div>
                                                                 </div>
-                                                                {!hasUniformPricing && (
+                                                                {!hasUniformPricing && showPrices && (
                                                                     <div className="text-right">
                                                                         {/* Badge de descuento en modo catálogo */}
                                                                         {viewOnly && hasVOffer && (
@@ -571,8 +667,8 @@ const ProductQuickView = ({
                                             </div>
                                         )}
 
-                                        {/* Stock Info - Admin details (solo si es admin y no es modo catálogo) */}
-                                        {hasStockFeature && isAdmin && !viewOnly && (
+                                        {/* Stock Info - Solo admin ve detalles completos */}
+                                        {hasStockFeature && isAdmin && (
                                             <div className="flex items-center gap-2 p-2 bg-[var(--bg-hover)] rounded-lg text-[11px]">
                                                 <span className="text-[var(--text-muted)]">Stock:</span>
                                                 <span className="font-medium text-[var(--text-primary)]">{stock.stock} fis.</span>

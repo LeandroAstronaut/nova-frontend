@@ -17,11 +17,13 @@ import {
     MessageCircle,
     Hash,
     CreditCard,
-    Headphones
+    Headphones,
+    Eye,
+    EyeOff
 } from 'lucide-react';
 import Button from '../../components/common/Button';
 import SupportDrawer from '../../components/common/SupportDrawer';
-import { updateContactInfo, updateOrderSettings } from '../../services/companyService';
+import { updateContactInfo, updateOrderSettings, updateCatalogSettings } from '../../services/companyService';
 
 const SettingsPage = () => {
     const { user, updateUserContext } = useAuth();
@@ -75,38 +77,75 @@ const SettingsPage = () => {
         }
     };
     
-    const [orderSettings, setOrderSettings] = useState({
+    // Configuración unificada de Pedidos/Catálogo
+    const [configSettings, setConfigSettings] = useState({
+        // Pedidos
         sellOnlyFullPackages: user?.company?.sellOnlyFullPackages === true,
+        // Catálogo interno (solo si tiene stock)
+        showStockToClients: user?.company?.catalogSettings?.showStockToClients === true,
+        hideOutOfStockInCatalog: user?.company?.catalogSettings?.hideOutOfStockInCatalog === true,
+        // Catálogo público
         publicCatalog: user?.company?.publicCatalog === true,
-        showPriceInPublicCatalog: user?.company?.showPriceInPublicCatalog === true,
-        allowAnonymousPurchases: user?.company?.allowAnonymousPurchases === true
+        publicCatalogShowPrices: user?.company?.publicCatalogSettings?.showPrices === true || user?.company?.showPriceInPublicCatalog === true,
+        publicCatalogPriceListId: user?.company?.publicCatalogSettings?.priceListId || null,
+        publicCatalogShowStock: user?.company?.publicCatalogSettings?.showStock === true
     });
-    const [savingOrderSettings, setSavingOrderSettings] = useState(false);
-    
+    const [savingConfig, setSavingConfig] = useState(false);
+    const [hasChanges, setHasChanges] = useState(false);
+
+    // Cargar configuración inicial
     useEffect(() => {
         if (user?.company) {
-            setOrderSettings({
+            setConfigSettings({
                 sellOnlyFullPackages: user.company.sellOnlyFullPackages === true,
+                showStockToClients: user.company.catalogSettings?.showStockToClients === true,
+                hideOutOfStockInCatalog: user.company.catalogSettings?.hideOutOfStockInCatalog === true,
                 publicCatalog: user.company.publicCatalog === true,
-                showPriceInPublicCatalog: user.company.showPriceInPublicCatalog === true,
-                allowAnonymousPurchases: user.company.allowAnonymousPurchases === true
+                publicCatalogShowPrices: user.company.publicCatalogSettings?.showPrices === true || user.company.showPriceInPublicCatalog === true,
+                publicCatalogPriceListId: user.company.publicCatalogSettings?.priceListId || null,
+                publicCatalogShowStock: user.company.publicCatalogSettings?.showStock === true
             });
+            setHasChanges(false);
         }
     }, [user]);
-    
-    const handleSaveOrderSettings = async () => {
-        setSavingOrderSettings(true);
+
+    // Marcar cambios pendientes
+    const updateConfig = (key, value) => {
+        setConfigSettings(prev => ({ ...prev, [key]: value }));
+        setHasChanges(true);
+    };
+
+    // Guardar configuración unificada
+    const handleSaveConfig = async () => {
+        setSavingConfig(true);
         try {
-            await updateOrderSettings(user.company._id, orderSettings);
+            // Guardar configuración de pedidos
+            await updateOrderSettings(user.company._id, {
+                sellOnlyFullPackages: configSettings.sellOnlyFullPackages
+            });
+
+            // Guardar configuración de catálogo (si tiene el módulo)
+            if (features.catalog === true) {
+                await updateCatalogSettings(user.company._id, {
+                    showStockToClients: configSettings.showStockToClients,
+                    hideOutOfStockInCatalog: configSettings.hideOutOfStockInCatalog,
+                    publicCatalog: configSettings.publicCatalog,
+                    publicCatalogSettings: {
+                        showPrices: configSettings.publicCatalogShowPrices,
+                        priceListId: configSettings.publicCatalogPriceListId,
+                        showStock: configSettings.publicCatalogShowStock
+                    }
+                });
+            }
             
             await updateUserContext();
-            
-            addToast('Configuración de pedidos guardada exitosamente', 'success');
+            setHasChanges(false);
+            addToast('Configuración guardada exitosamente', 'success');
         } catch (error) {
-            console.error('Error saving order settings:', error);
+            console.error('Error saving config:', error);
             addToast('Error al guardar configuración: ' + (error.response?.data?.message || error.message), 'error');
         } finally {
-            setSavingOrderSettings(false);
+            setSavingConfig(false);
         }
     };
 
@@ -363,11 +402,18 @@ const SettingsPage = () => {
                         </div>
                     </div>
 
-                    {/* Configuración de Pedidos */}
+                    {/* Configuración de Pedidos/Catálogo */}
                     <div className="bg-gradient-to-br from-primary-50/50 to-transparent dark:from-primary-900/10 rounded-2xl border border-primary-100 dark:border-primary-800 p-5">
-                        <h3 className="text-[11px] font-semibold text-primary-700 dark:text-primary-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                            <Package size={14} /> Configuración de Pedidos
-                        </h3>
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-[11px] font-semibold text-primary-700 dark:text-primary-400 uppercase tracking-wider flex items-center gap-2">
+                                <Package size={14} /> Configuración de Pedidos/Catálogo
+                            </h3>
+                            {hasChanges && (
+                                <span className="text-[10px] font-medium text-amber-600 bg-amber-100 dark:bg-amber-900/30 px-2 py-1 rounded-full">
+                                    Cambios pendientes
+                                </span>
+                            )}
+                        </div>
                         
                         <div className="space-y-4">
                             {/* Toggle: Solo bultos cerrados */}
@@ -383,86 +429,208 @@ const SettingsPage = () => {
                                 </div>
                                 <button
                                     type="button"
-                                    onClick={() => setOrderSettings(prev => ({ ...prev, sellOnlyFullPackages: !prev.sellOnlyFullPackages }))}
+                                    onClick={() => updateConfig('sellOnlyFullPackages', !configSettings.sellOnlyFullPackages)}
                                     className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${
-                                        orderSettings.sellOnlyFullPackages ? 'bg-primary-500' : 'bg-[var(--border-color)]'
+                                        configSettings.sellOnlyFullPackages ? 'bg-primary-500' : 'bg-[var(--border-color)]'
                                     }`}
                                 >
                                     <motion.div
                                         initial={false}
-                                        animate={{ x: orderSettings.sellOnlyFullPackages ? 20 : 2 }}
+                                        animate={{ x: configSettings.sellOnlyFullPackages ? 20 : 2 }}
                                         transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                                         className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm"
                                     />
                                 </button>
                             </div>
 
-                            {/* Toggle: Catálogo público */}
-                            <div className="flex items-center justify-between p-3 bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)]">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
-                                        <Globe size={16} />
-                                    </div>
-                                    <div>
-                                        <p className="text-[13px] font-semibold text-[var(--text-primary)]">Catálogo público</p>
-                                        <p className="text-[10px] text-[var(--text-muted)]">Acceso sin iniciar sesión</p>
-                                    </div>
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => setOrderSettings(prev => ({ ...prev, publicCatalog: !prev.publicCatalog }))}
-                                    className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${
-                                        orderSettings.publicCatalog ? 'bg-primary-500' : 'bg-[var(--border-color)]'
-                                    }`}
-                                >
-                                    <motion.div
-                                        initial={false}
-                                        animate={{ x: orderSettings.publicCatalog ? 20 : 2 }}
-                                        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                                        className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm"
-                                    />
-                                </button>
-                            </div>
-
-                            {/* Sub-toggles del catálogo público */}
-                            {orderSettings.publicCatalog && (
+                            {/* Opciones de Catálogo - Solo si tiene módulo catalog habilitado */}
+                            {features.catalog === true && (
                                 <>
-                                    <div className="flex items-center justify-between p-3 bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] ml-4">
+                                    <div className="h-px bg-[var(--border-color)] my-4" />
+                                    
+                                    {/* Opciones de catálogo interno - Solo si tiene stock habilitado */}
+                                    {features.stock === true && (
+                                        <>
+                                            {/* Toggle: Mostrar stock a los clientes */}
+                                            <div className="flex items-center justify-between p-3 bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)]">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-purple-600">
+                                                        <Eye size={16} />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[13px] font-semibold text-[var(--text-primary)]">Mostrar stock a los clientes</p>
+                                                        <p className="text-[10px] text-[var(--text-muted)]">En el catálogo interno</p>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => updateConfig('showStockToClients', !configSettings.showStockToClients)}
+                                                    className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${
+                                                        configSettings.showStockToClients ? 'bg-primary-500' : 'bg-[var(--border-color)]'
+                                                    }`}
+                                                >
+                                                    <motion.div
+                                                        initial={false}
+                                                        animate={{ x: configSettings.showStockToClients ? 20 : 2 }}
+                                                        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                                                        className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm"
+                                                    />
+                                                </button>
+                                            </div>
+
+                                            {/* Toggle: Ocultar productos sin stock */}
+                                            <div className="flex items-center justify-between p-3 bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)]">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-red-600">
+                                                        <EyeOff size={16} />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[13px] font-semibold text-[var(--text-primary)]">Ocultar productos sin stock</p>
+                                                        <p className="text-[10px] text-[var(--text-muted)]">En el catálogo interno</p>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => updateConfig('hideOutOfStockInCatalog', !configSettings.hideOutOfStockInCatalog)}
+                                                    className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${
+                                                        configSettings.hideOutOfStockInCatalog ? 'bg-primary-500' : 'bg-[var(--border-color)]'
+                                                    }`}
+                                                >
+                                                    <motion.div
+                                                        initial={false}
+                                                        animate={{ x: configSettings.hideOutOfStockInCatalog ? 20 : 2 }}
+                                                        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                                                        className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm"
+                                                    />
+                                                </button>
+                                            </div>
+                                        </>
+                                    )}
+
+                                    {/* Toggle: Catálogo público */}
+                                    <div className="flex items-center justify-between p-3 bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)]">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-600">
-                                                <Tag size={16} />
+                                            <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
+                                                <Globe size={16} />
                                             </div>
                                             <div>
-                                                <p className="text-[13px] font-semibold text-[var(--text-primary)]">Mostrar precios</p>
-                                                <p className="text-[10px] text-[var(--text-muted)]">En catálogo público</p>
+                                                <p className="text-[13px] font-semibold text-[var(--text-primary)]">Catálogo público</p>
+                                                <p className="text-[10px] text-[var(--text-muted)]">Acceso sin iniciar sesión</p>
                                             </div>
                                         </div>
                                         <button
                                             type="button"
-                                            onClick={() => setOrderSettings(prev => ({ ...prev, showPriceInPublicCatalog: !prev.showPriceInPublicCatalog }))}
+                                            onClick={() => updateConfig('publicCatalog', !configSettings.publicCatalog)}
                                             className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${
-                                                orderSettings.showPriceInPublicCatalog ? 'bg-primary-500' : 'bg-[var(--border-color)]'
+                                                configSettings.publicCatalog ? 'bg-primary-500' : 'bg-[var(--border-color)]'
                                             }`}
                                         >
                                             <motion.div
                                                 initial={false}
-                                                animate={{ x: orderSettings.showPriceInPublicCatalog ? 20 : 2 }}
+                                                animate={{ x: configSettings.publicCatalog ? 20 : 2 }}
                                                 transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                                                 className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm"
                                             />
                                         </button>
                                     </div>
+
+                                    {/* Sub-toggles del catálogo público */}
+                                    {configSettings.publicCatalog && (
+                                        <div className="space-y-3 ml-4">
+                                            {/* Toggle: Mostrar precios */}
+                                            <div className="flex items-center justify-between p-3 bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)]">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-600">
+                                                        <Tag size={16} />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[13px] font-semibold text-[var(--text-primary)]">Mostrar precios</p>
+                                                        <p className="text-[10px] text-[var(--text-muted)]">En catálogo público</p>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => updateConfig('publicCatalogShowPrices', !configSettings.publicCatalogShowPrices)}
+                                                    className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${
+                                                        configSettings.publicCatalogShowPrices ? 'bg-primary-500' : 'bg-[var(--border-color)]'
+                                                    }`}
+                                                >
+                                                    <motion.div
+                                                        initial={false}
+                                                        animate={{ x: configSettings.publicCatalogShowPrices ? 20 : 2 }}
+                                                        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                                                        className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm"
+                                                    />
+                                                </button>
+                                            </div>
+
+                                            {/* Selector de lista de precios - Solo si tiene habilitadas las listas y mostrar precios */}
+                                            {features.priceLists === true && configSettings.publicCatalogShowPrices && (
+                                                <div className="p-3 bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)]">
+                                                    <div className="flex items-center gap-3 mb-2">
+                                                        <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600">
+                                                            <Tag size={16} />
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-[13px] font-semibold text-[var(--text-primary)]">Lista de precios a mostrar</p>
+                                                            <p className="text-[10px] text-[var(--text-muted)]">En catálogo público</p>
+                                                        </div>
+                                                    </div>
+                                                    <select
+                                                        value={configSettings.publicCatalogPriceListId ?? ''}
+                                                        onChange={(e) => {
+                                                            const value = e.target.value;
+                                                            updateConfig('publicCatalogPriceListId', value ? parseInt(value, 10) : null);
+                                                        }}
+                                                        className="w-full mt-2 px-3 py-2 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[13px] text-[var(--text-primary)] focus:outline-none focus:border-primary-500"
+                                                    >
+                                                        <option value="">Lista base</option>
+                                                        <option value="1">Lista 1</option>
+                                                        <option value="2">Lista 2</option>
+                                                    </select>
+                                                </div>
+                                            )}
+
+                                            {/* Toggle: Mostrar stock */}
+                                            <div className="flex items-center justify-between p-3 bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)]">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-8 rounded-lg bg-cyan-100 dark:bg-cyan-900/30 flex items-center justify-center text-cyan-600">
+                                                        <Package size={16} />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[13px] font-semibold text-[var(--text-primary)]">Mostrar stock</p>
+                                                        <p className="text-[10px] text-[var(--text-muted)]">En catálogo público</p>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => updateConfig('publicCatalogShowStock', !configSettings.publicCatalogShowStock)}
+                                                    className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${
+                                                        configSettings.publicCatalogShowStock ? 'bg-primary-500' : 'bg-[var(--border-color)]'
+                                                    }`}
+                                                >
+                                                    <motion.div
+                                                        initial={false}
+                                                        animate={{ x: configSettings.publicCatalogShowStock ? 20 : 2 }}
+                                                        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                                                        className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm"
+                                                    />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </>
                             )}
                             
                             <Button
                                 variant="primary"
-                                onClick={handleSaveOrderSettings}
-                                loading={savingOrderSettings}
+                                onClick={handleSaveConfig}
+                                loading={savingConfig}
+                                disabled={!hasChanges}
                                 className="w-full"
                             >
                                 <Save size={16} className="mr-2" />
-                                Guardar Configuración
+                                {hasChanges ? 'Guardar Configuración' : 'Sin cambios'}
                             </Button>
                         </div>
                     </div>

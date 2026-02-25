@@ -20,6 +20,7 @@ import ImporterPage from './pages/Importer/ImporterPage';
 import ProductsPage from './pages/Products/ProductsPage';
 import ProductDetailPage from './pages/Products/ProductDetailPage';
 import CatalogPage from './pages/Catalog/CatalogPage';
+import PublicCatalogPage from './pages/PublicCatalog/PublicCatalogPage';
 import MainLayout from './components/layout/MainLayout';
 import './App.css';
 
@@ -96,6 +97,10 @@ function App() {
         <Route path="/cuentas" element={<ProtectedRoute><div className="card">Cuentas Corrientes</div></ProtectedRoute>} />
         <Route path="/admin/companies" element={<ProtectedRoute><CompaniesPage /></ProtectedRoute>} />
         <Route path="/importador" element={<ProtectedRoute><ImporterPage /></ProtectedRoute>} />
+        
+        {/* RUTA PÚBLICA: Catálogo por slug (debe ir antes del catch-all *) */}
+        <Route path="/:slug" element={<PublicCatalogPage />} />
+        
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </div>

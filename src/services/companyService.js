@@ -105,11 +105,22 @@ const updateDisplayPreferences = async (id, preferences) => {
 /**
  * Actualizar configuración de pedidos de la compañía
  * @param {string} id - ID de la compañía
- * @param {Object} settings - { sellOnlyFullPackages }
+ * @param {Object} settings - { sellOnlyFullPackages, excludeOfferProductsFromGlobalDiscount }
  * @returns {Promise<Object>} Compañía actualizada
  */
 const updateOrderSettings = async (id, settings) => {
     const response = await api.put(`/companies/${id}/order-settings`, settings);
+    return response.data;
+};
+
+/**
+ * Actualizar configuración de catálogo de la compañía
+ * @param {string} id - ID de la compañía
+ * @param {Object} settings - { showStockToClients, hideOutOfStockInCatalog, publicCatalog, publicCatalogSettings }
+ * @returns {Promise<Object>} Compañía actualizada
+ */
+const updateCatalogSettings = async (id, settings) => {
+    const response = await api.put(`/companies/${id}/catalog-settings`, settings);
     return response.data;
 };
 
@@ -141,10 +152,21 @@ const deleteCompanyLogo = async (id) => {
     return response.data;
 };
 
+/**
+ * Obtener compañía por slug (público, no requiere autenticación)
+ * @param {string} slug - Slug de la compañía
+ * @returns {Promise<Object>} Datos de la compañía
+ */
+const getCompanyBySlug = async (slug) => {
+    const response = await api.get(`/companies/slug/${slug}`);
+    return response.data;
+};
+
 // Exportar funciones individuales
 export {
     getAllCompanies,
     getCompanyById,
+    getCompanyBySlug,
     createCompany,
     updateCompany,
     toggleCompanyStatus,
@@ -152,6 +174,7 @@ export {
     updateContactInfo,
     updateDisplayPreferences,
     updateOrderSettings,
+    updateCatalogSettings,
     uploadCompanyLogo,
     deleteCompanyLogo
 };
@@ -160,6 +183,7 @@ export {
 export const companyService = {
     getAll: getAllCompanies,
     getById: getCompanyById,
+    getBySlug: getCompanyBySlug,
     create: createCompany,
     update: updateCompany,
     delete: async (id) => {
@@ -171,6 +195,7 @@ export const companyService = {
     updateContactInfo,
     updateDisplayPreferences,
     updateOrderSettings,
+    updateCatalogSettings,
     uploadLogo: uploadCompanyLogo,
     deleteLogo: deleteCompanyLogo
 };

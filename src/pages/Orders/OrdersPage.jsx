@@ -504,23 +504,22 @@ const OrdersPage = ({ mode = 'order' }) => {
         return false;
     };
 
-    // PERMISOS: Determinar si puede eliminar (solo presupuestos no cancelados)
+    // PERMISOS: Determinar si puede eliminar (solo presupuestos)
     const canDelete = (order) => {
         if (isSuperadmin) return false; // Superadmin no elimina nada
         if (order.type === 'order') return false; // No se eliminan pedidos, solo presupuestos
-        if (order.status === 'cancelado') return false; // No se eliminan cancelados
         if (isAdmin) {
-            return true;
+            return true; // Admin puede eliminar cualquier presupuesto (incluidos cancelados)
         }
         if (isVendedor) {
             const isOwn = isSameId(order.salesRepId, user?.id);
-            const isPending = order.status === 'espera';
-            return isOwn && isPending;
+            // Vendedor puede eliminar sus presupuestos en espera o cancelados
+            return isOwn && (order.status === 'espera' || order.status === 'cancelado');
         }
         if (isClient) {
             const isOwn = isSameId(order.clientId, user?.client?.id);
-            const isPending = order.status === 'espera';
-            return isOwn && isPending;
+            // Cliente puede eliminar sus presupuestos en espera o cancelados
+            return isOwn && (order.status === 'espera' || order.status === 'cancelado');
         }
         return false;
     };

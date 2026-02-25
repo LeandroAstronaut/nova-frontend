@@ -146,8 +146,8 @@ const LoginPage = () => {
                                     >
                                         <LogIn className="text-white" size={22} />
                                     </motion.div>
-                                    <h1 className="text-lg font-bold text-(--text-primary) mb-1">¡Bienvenido!</h1>
-                                    <p className="text-(--text-secondary) text-[13px] font-medium">Inicia sesión en NOVA Orden</p>
+                                    <h1 className="text-xl font-semibold text-(--text-primary) mb-1">Inicio de Sesión</h1>
+                                    <p className="text-(--text-secondary) text-[13px] font-medium">Completa tus datos de acceso</p>
                                 </div>
 
                                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -216,7 +216,7 @@ const LoginPage = () => {
                                     >
                                         <Building2 className="text-white" size={22} />
                                     </motion.div>
-                                    <h1 className="text-lg font-bold text-(--text-primary) mb-1">Selecciona tu empresa</h1>
+                                    <h1 className="text-lg font-semibold text-(--text-primary) mb-1">Selecciona tu empresa</h1>
                                     <p className="text-(--text-secondary) text-[13px] font-medium">
                                         Tu cuenta está asociada a {companyOptions.length} empresas
                                     </p>

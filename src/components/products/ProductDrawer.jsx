@@ -59,7 +59,19 @@ const AutocompleteInput = ({
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [filteredSuggestions, setFilteredSuggestions] = useState([]);
     
+    // Usar ref para evitar actualizaciones innecesarias
+    const prevSuggestionsRef = useRef(suggestions);
+    const prevValueRef = useRef(value);
+    
     useEffect(() => {
+        const suggestionsChanged = JSON.stringify(prevSuggestionsRef.current) !== JSON.stringify(suggestions);
+        const valueChanged = prevValueRef.current !== value;
+        
+        if (!suggestionsChanged && !valueChanged) return;
+        
+        prevSuggestionsRef.current = suggestions;
+        prevValueRef.current = value;
+        
         if (value && suggestions.length > 0) {
             const filtered = suggestions.filter(s => 
                 s.toLowerCase().includes(value.toLowerCase())
@@ -503,31 +515,37 @@ const ProductDrawer = ({ isOpen, onClose, onSave, product = null, features = {} 
     // EFECTOS
     // ============================================================================
     
-    // Efecto para deshabilitar variantes si la feature no está habilitada
-    useEffect(() => {
-        if (!hasProductVariantsFeature && hasVariants) {
-            setHasVariants(false);
-        }
-    }, [hasProductVariantsFeature, hasVariants]);
+    // Ref para tracking de inicialización
+    const initializedRef = useRef(false);
     
+    // Efecto para cargar sugerencias cuando se abre
     useEffect(() => {
-        if (isOpen) {
+        if (isOpen && !initializedRef.current) {
             loadSuggestions();
         }
     }, [isOpen]);
 
+    // Efecto para cargar subcategorías cuando cambia la categoría
     useEffect(() => {
-        if (formData.category && isOpen) {
+        if (formData.category && isOpen && !initializedRef.current) {
             loadSubcategories(formData.category);
         }
     }, [formData.category, isOpen]);
 
+    // Efecto principal de inicialización del formulario
     useEffect(() => {
-        if (isOpen) {
-            let newFormData;
-            if (product) {
-                const usePricesWithTax = user?.company?.inputPricesWithTax === true;
-                
+        if (!isOpen) {
+            initializedRef.current = false;
+            return;
+        }
+        
+        // Evitar re-inicializar si ya se inicializó
+        if (initializedRef.current) return;
+        
+        let newFormData;
+        const usePricesWithTax = user?.company?.inputPricesWithTax === true;
+        
+        if (product) {
                 newFormData = {
                     code: product.code || '',
                     barcode: product.barcode || '',
@@ -570,7 +588,9 @@ const ProductDrawer = ({ isOpen, onClose, onSave, product = null, features = {} 
                     coverImageIndex: product.coverImageIndex || 0
                 };
                 
-                setHasVariants(hasProductVariantsFeature ? (product.hasVariants || false) : false);
+                // Solo permitir variantes si la feature está habilitada
+                const shouldHaveVariants = hasProductVariantsFeature && product.hasVariants;
+                setHasVariants(shouldHaveVariants || false);
                 setHasUniformVariantPricing(product.hasUniformVariantPricing !== false);
                 setVariantConfig(product.variantConfig || { label1: 'Variable 1', label2: 'Variable 2' });
                 
@@ -606,43 +626,44 @@ const ProductDrawer = ({ isOpen, onClose, onSave, product = null, features = {} 
                     return cleaned;
                 });
                 setVariants(cleanVariants);
-            } else {
-                newFormData = {
-                    code: '',
-                    barcode: '',
-                    name: '',
-                    category: '',
-                    subcategory: '',
-                    brand: '',
-                    unit: '',
-                    description: '',
-                    longDescription: '',
-                    pricing: {
-                        list1: { price: '', discount: '', offer: '' },
-                        list2: { price: '', discount: '', offer: '' },
-                        tax: 21
-                    },
-                    stock: 0,
-                    stockReserved: 0,
-                    stockQuoted: 0,
-                    minStock: 0,
-                    image: '',
-                    unitsPerPackage: 1,
-                    minOrderQuantity: 1,
-                    images: [],
-                    coverImageIndex: 0
-                };
-                setHasVariants(false);
-                setHasUniformVariantPricing(true);
-                setVariantConfig({ label1: 'Variable 1', label2: 'Variable 2' });
-                setVariants([]);
-            }
-            setFormData(newFormData);
-            initialDataRef.current = JSON.stringify(newFormData);
-            setErrors({});
-            setShowConfirmClose(false);
+        } else {
+            newFormData = {
+                code: '',
+                barcode: '',
+                name: '',
+                category: '',
+                subcategory: '',
+                brand: '',
+                unit: '',
+                description: '',
+                longDescription: '',
+                pricing: {
+                    list1: { price: '', discount: '', offer: '' },
+                    list2: { price: '', discount: '', offer: '' },
+                    tax: 21
+                },
+                stock: 0,
+                stockReserved: 0,
+                stockQuoted: 0,
+                minStock: 0,
+                image: '',
+                unitsPerPackage: 1,
+                minOrderQuantity: 1,
+                images: [],
+                coverImageIndex: 0
+            };
+            setHasVariants(false);
+            setHasUniformVariantPricing(true);
+            setVariantConfig({ label1: 'Variable 1', label2: 'Variable 2' });
+            setVariants([]);
         }
-    }, [isOpen, product, hasProductVariantsFeature]);
+        setFormData(newFormData);
+        initialDataRef.current = JSON.stringify(newFormData);
+        setErrors({});
+        setShowConfirmClose(false);
+        initializedRef.current = true;
+        
+    }, [isOpen]);
 
     // ============================================================================
     // FUNCIONES DE CARGA
@@ -1109,14 +1130,16 @@ const ProductDrawer = ({ isOpen, onClose, onSave, product = null, features = {} 
                                         {/* COLUMNA IZQUIERDA: Info Básica + Descripciones */}
                                         <div className="space-y-6">
                                             
-                                            {/* INFORMACIÓN BÁSICA - Sin fondo, sin icono */}
+                                            {/* INFORMACIÓN BÁSICA */}
                                             <motion.div 
                                                 initial={{ opacity: 0, y: 10 }}
                                                 animate={{ opacity: 1, y: 0 }}
                                             >
-                                                <h3 className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-4">
+                                                <h3 className="text-[11px] font-bold text-secondary-700 dark:text-secondary-300 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                                    <Package size={14} />
                                                     Información Básica
                                                 </h3>
+                                                <div className="h-px bg-secondary-200 dark:bg-secondary-700 mb-4" />
                                                 
                                                 <div className="space-y-4">
                                                     {/* Código y Barcode */}
@@ -1204,15 +1227,17 @@ const ProductDrawer = ({ isOpen, onClose, onSave, product = null, features = {} 
                                                 </div>
                                             </motion.div>
 
-                                            {/* DESCRIPCIONES - Sin fondo, sin icono */}
+                                            {/* DESCRIPCIONES */}
                                             <motion.div 
                                                 initial={{ opacity: 0, y: 10 }}
                                                 animate={{ opacity: 1, y: 0 }}
                                                 transition={{ delay: 0.05 }}
                                             >
-                                                <h3 className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-4">
+                                                <h3 className="text-[11px] font-bold text-secondary-700 dark:text-secondary-300 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                                    <FileText size={14} />
                                                     Descripciones
                                                 </h3>
+                                                <div className="h-px bg-secondary-200 dark:bg-secondary-700 mb-4" />
                                                 
                                                 <div className="space-y-4">
                                                     <div>
@@ -1252,10 +1277,10 @@ const ProductDrawer = ({ isOpen, onClose, onSave, product = null, features = {} 
                                                 animate={{ opacity: 1, y: 0 }}
                                                 transition={{ delay: 0.1 }}
                                             >
-                                                <h3 className="text-[11px] font-semibold text-primary-700 dark:text-primary-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                                <div className="bg-gradient-to-br from-primary-50/50 to-transparent dark:from-primary-900/10 rounded-2xl border border-primary-100 dark:border-primary-800 p-5">
+                                                <h3 className="text-[11px] font-semibold text-primary-700 dark:text-primary-400 uppercase tracking-wider mb-4 flex items-center gap-2">
                                                     <Box size={14} /> Configuración de Pedidos
                                                 </h3>
-                                                <div className="bg-gradient-to-br from-primary-50/50 to-transparent dark:from-primary-900/10 rounded-2xl border border-primary-100 dark:border-primary-800 p-5">
                                                 <div className="grid grid-cols-2 gap-4">
                                                     <div>
                                                         <label className="text-[10px] font-medium text-[var(--text-muted)] mb-1.5 block">
@@ -1308,10 +1333,10 @@ const ProductDrawer = ({ isOpen, onClose, onSave, product = null, features = {} 
                                                 transition={{ delay: 0.15 }}
                                                 className="flex-1"
                                             >
-                                                <h3 className="text-[11px] font-semibold text-primary-700 dark:text-primary-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                                <div className="bg-gradient-to-br from-primary-50/50 to-transparent dark:from-primary-900/10 rounded-2xl border border-primary-100 dark:border-primary-800 p-5">
+                                                <h3 className="text-[11px] font-semibold text-primary-700 dark:text-primary-400 uppercase tracking-wider mb-4 flex items-center gap-2">
                                                     <Boxes size={14} /> {hasStockFeature ? 'Gestión de Stock y Precios' : 'Gestión de Precios'}
                                                 </h3>
-                                                <div className="bg-[var(--bg-hover)] rounded-2xl border-2 border-primary-200 dark:border-primary-800 p-5">
 
                                                 {/* Toggle: Producto con variantes (solo si la feature está habilitada) */}
                                                 {hasProductVariantsFeature && (
@@ -1425,10 +1450,10 @@ const ProductDrawer = ({ isOpen, onClose, onSave, product = null, features = {} 
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ delay: 0.2 }}
                                     >
-                                        <h3 className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3 flex items-center gap-2">
+                                        <div className="bg-gradient-to-br from-primary-50/50 to-transparent dark:from-primary-900/10 rounded-2xl border border-primary-100 dark:border-primary-800 p-5">
+                                        <h3 className="text-[11px] font-semibold text-primary-700 dark:text-primary-400 uppercase tracking-wider mb-4 flex items-center gap-2">
                                             <ImageIcon size={14} /> Imágenes del Producto
                                         </h3>
-                                        <div className="bg-[var(--bg-hover)] rounded-2xl border border-[var(--border-color)] p-5">
                                             <div className="flex items-center justify-end mb-4">
                                                 <span className="text-[10px] text-[var(--text-muted)]">
                                                     {formData.images.length}/5 imágenes

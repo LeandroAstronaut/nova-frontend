@@ -6,7 +6,7 @@ const Input = ({ label, labelRight, icon: Icon, error, ...props }) => {
             {(label || labelRight) && (
                 <div className="flex items-center justify-between mb-1.5 px-1">
                     {label && (
-                        <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider ml-1">
+                        <label className="text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wider ml-1">
                             {label}
                         </label>
                     )}

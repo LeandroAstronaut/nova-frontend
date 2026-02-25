@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Edit2, Trash2, History, Activity } from 'lucide-react';
-import { getProductById, deleteProduct } from '../../services/productService';
+import { ArrowLeft, Edit2, Trash2, History, Activity, MoreHorizontal, Power, PowerOff } from 'lucide-react';
+import { getProductById, deleteProduct, toggleProductActive } from '../../services/productService';
 import ProductActivityDrawer from '../../components/products/ProductActivityDrawer';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -23,9 +23,12 @@ const ProductDetailPage = () => {
     const [isStockMovementsOpen, setIsStockMovementsOpen] = useState(false);
     const [isActivityOpen, setIsActivityOpen] = useState(false);
     const [deleteModal, setDeleteModal] = useState({ isOpen: false, loading: false });
+    const [toggleActiveModal, setToggleActiveModal] = useState({ isOpen: false, loading: false });
+    const [showActionsMenu, setShowActionsMenu] = useState(false);
 
     const isAdmin = user?.role?.name === 'admin';
     const isSuperadmin = user?.role?.name === 'superadmin';
+    const isVendedor = user?.role?.name === 'vendedor';
     const features = user?.company?.features || {};
     const showPricesWithTax = user?.company?.showPricesWithTax === true;
 
@@ -79,6 +82,24 @@ const ProductDetailPage = () => {
         }
     };
 
+    const handleToggleActiveClick = () => {
+        setToggleActiveModal({ isOpen: true, loading: false });
+    };
+
+    const handleToggleActiveConfirm = async () => {
+        try {
+            setToggleActiveModal(prev => ({ ...prev, loading: true }));
+            const result = await toggleProductActive(id);
+            addToast(result.message, 'success');
+            fetchProduct();
+        } catch (error) {
+            console.error('Error toggling product active state:', error);
+            addToast('Error al cambiar estado del producto', 'error');
+        } finally {
+            setToggleActiveModal({ isOpen: false, loading: false });
+        }
+    };
+
     if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center">
@@ -110,42 +131,69 @@ const ProductDetailPage = () => {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                    <Button 
-                        variant="secondary" 
-                        onClick={() => setIsEditDrawerOpen(true)}
-                        className="px-3! text-[11px] font-bold uppercase tracking-wider"
-                    >
-                        <Edit2 size={14} strokeWidth={2.5} />
-                        Editar
-                    </Button>
+                {/* Botones de acción */}
+                <div className="flex items-center gap-2 w-full md:w-auto">
+                    {/* Editar - Solo admin/superadmin */}
+                    {(isAdmin || isSuperadmin) && (
+                        <Button 
+                            variant="secondary" 
+                            onClick={() => setIsEditDrawerOpen(true)}
+                            className="px-3! text-[11px] font-bold uppercase tracking-wider"
+                        >
+                            <Edit2 size={14} strokeWidth={2.5} />
+                            Editar
+                        </Button>
+                    )}
 
+                    {/* Movimientos de stock - Visible para todos */}
                     <Button 
                         variant="secondary" 
                         onClick={() => setIsStockMovementsOpen(true)}
                         className="px-3! text-[11px] font-bold uppercase tracking-wider"
                     >
                         <History size={14} strokeWidth={2.5} />
-                        Movimientos de stock
+                        Movimientos
                     </Button>
 
-                    <Button 
-                        variant="secondary" 
-                        onClick={() => setIsActivityOpen(true)}
-                        className="px-3! text-[11px] font-bold uppercase tracking-wider"
-                    >
-                        <Activity size={14} strokeWidth={2.5} />
-                        Actividad
-                    </Button>
+                    {/* Menú de más acciones - alineado a la derecha */}
+                    <div className="relative ml-auto">
+                        <button
+                            onClick={() => setShowActionsMenu(!showActionsMenu)}
+                            className="p-2 hover:bg-(--bg-hover) rounded-lg text-(--text-muted) hover:text-(--text-primary) transition-colors"
+                        >
+                            <MoreHorizontal size={20} />
+                        </button>
 
-                    <Button 
-                        variant="secondary" 
-                        onClick={handleDeleteClick}
-                        className="px-3! text-[11px] font-bold uppercase tracking-wider text-danger-600 hover:text-danger-700"
-                    >
-                        <Trash2 size={14} strokeWidth={2.5} />
-                        Eliminar
-                    </Button>
+                        {showActionsMenu && (
+                            <div className="absolute right-0 top-full mt-2 w-56 bg-(--bg-card) rounded-xl shadow-xl border border-(--border-color) z-50 py-2">
+                                <button
+                                    onClick={() => { setIsActivityOpen(true); setShowActionsMenu(false); }}
+                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-[13px] text-(--text-primary) hover:bg-(--bg-hover) transition-colors"
+                                >
+                                    <Activity size={16} />
+                                    Ver Actividad
+                                </button>
+                                {(isAdmin || isSuperadmin) && (
+                                    <>
+                                        <button
+                                            onClick={() => { handleToggleActiveClick(); setShowActionsMenu(false); }}
+                                            className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-[13px] text-(--text-primary) hover:bg-(--bg-hover) transition-colors"
+                                        >
+                                            {product.active ? <PowerOff size={16} /> : <Power size={16} />}
+                                            {product.active ? 'Desactivar' : 'Activar'}
+                                        </button>
+                                        <button
+                                            onClick={() => { handleDeleteClick(); setShowActionsMenu(false); }}
+                                            className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-[13px] text-danger-600 dark:text-danger-400 hover:bg-danger-50 dark:hover:bg-danger-900/20 transition-colors"
+                                        >
+                                            <Trash2 size={16} />
+                                            Eliminar
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -195,6 +243,22 @@ const ProductDetailPage = () => {
                 }
                 confirmText={deleteModal.loading ? 'Eliminando...' : 'Eliminar'}
                 type="danger"
+            />
+
+            {/* Toggle Active Modal */}
+            <ConfirmModal
+                isOpen={toggleActiveModal.isOpen}
+                onClose={() => setToggleActiveModal({ isOpen: false, loading: false })}
+                onConfirm={handleToggleActiveConfirm}
+                title={product.active ? 'Desactivar Producto' : 'Activar Producto'}
+                description={
+                    <p>
+                        ¿Está seguro de {product.active ? 'desactivar' : 'activar'} el producto <strong>{product.name}</strong>?
+                        {product.active && ' El producto no estará disponible para nuevos pedidos.'}
+                    </p>
+                }
+                confirmText={toggleActiveModal.loading ? 'Procesando...' : (product.active ? 'Desactivar' : 'Activar')}
+                type={product.active ? 'warning' : 'success'}
             />
         </div>
     );

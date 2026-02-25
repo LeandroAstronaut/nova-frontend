@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import ReactApexChart from 'react-apexcharts';
-import { Calendar, ArrowUpRight } from 'lucide-react';
+import { Calendar, ArrowUpRight, TrendingUp } from 'lucide-react';
 import { getChartData } from '../../services/dashboardService';
 
-const SalesChart = ({ title = "Ventas", isLoading: parentLoading = false, onViewDetails }) => {
+const SalesChart = ({ title = "Ventas", isLoading: parentLoading = false, onViewDetails, showPricesWithTax = false, taxRate = 21 }) => {
     const [period, setPeriod] = useState('6months');
     const [chartData, setChartData] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -140,7 +140,7 @@ const SalesChart = ({ title = "Ventas", isLoading: parentLoading = false, onView
 
     if (isLoadingState) {
         return (
-            <div className="card rounded-xl h-[380px] flex items-center justify-center">
+            <div className="card p-0! overflow-hidden border-none shadow-sm ring-1 ring-[var(--border-color)] h-[380px] flex items-center justify-center">
                 <div className="animate-pulse flex flex-col items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-primary-100"></div>
                     <div className="text-[var(--text-muted)] text-xs">Cargando...</div>
@@ -151,7 +151,7 @@ const SalesChart = ({ title = "Ventas", isLoading: parentLoading = false, onView
 
     if (error) {
         return (
-            <div className="card rounded-xl h-[380px] flex items-center justify-center">
+            <div className="card p-0! overflow-hidden border-none shadow-sm ring-1 ring-[var(--border-color)] h-[380px] flex items-center justify-center">
                 <div className="text-center">
                     <p className="text-[var(--text-muted)] text-sm mb-2">{error}</p>
                     <button 
@@ -166,67 +166,81 @@ const SalesChart = ({ title = "Ventas", isLoading: parentLoading = false, onView
     }
 
     return (
-        <div className="card rounded-xl">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
-                <div className="flex items-center gap-3">
-                    <div>
-                        <h3 className="font-semibold text-[var(--text-primary)] text-base">{title}</h3>
-                        <p className="text-xs text-[var(--text-muted)] mt-0.5">Evolución de ventas</p>
-                    </div>
-                </div>
+        <div className="card p-0! overflow-hidden border-none shadow-sm ring-1 ring-[var(--border-color)]">
+            <div className="p-6">
+                <h3 className="text-[11px] font-bold text-secondary-700 dark:text-secondary-300 uppercase tracking-wider mb-2 flex items-center gap-2">
+                    <TrendingUp size={14} />
+                    {title}
+                </h3>
+                <div className="h-px bg-secondary-200 dark:bg-secondary-700 mb-4" />
+                
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+                    <p className="text-[13px] text-[var(--text-secondary)]">Evolución de ventas en el período seleccionado</p>
 
-                <div className="flex items-center gap-2">
-                    {onViewDetails && (
-                        <button
-                            onClick={onViewDetails}
-                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-primary-600 hover:text-primary-700 hover:bg-primary-50 transition-colors"
-                        >
-                            Ver detalle
-                            <ArrowUpRight size={14} />
-                        </button>
-                    )}
-                    <div className="relative">
-                        <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
-                        <select
-                            value={period}
-                            onChange={(e) => setPeriod(e.target.value)}
-                            className="bg-[var(--bg-hover)] border border-[var(--border-color)] rounded-lg pl-9 pr-8 py-1.5 text-xs text-[var(--text-secondary)] appearance-none cursor-pointer min-w-[100px] focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500/20"
-                        >
-                            {periods.map((p) => (
-                                <option key={p.value} value={p.value}>{p.label}</option>
-                            ))}
-                        </select>
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                            <svg width="10" height="6" viewBox="0 0 10 6" className="text-[var(--text-muted)]">
-                                <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
+                    <div className="flex items-center gap-2">
+                        {onViewDetails && (
+                            <button
+                                onClick={onViewDetails}
+                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-medium text-primary-600 hover:text-primary-700 hover:bg-primary-50 transition-colors"
+                            >
+                                Ver detalle
+                                <ArrowUpRight size={14} />
+                            </button>
+                        )}
+                        <div className="relative">
+                            <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+                            <select
+                                value={period}
+                                onChange={(e) => setPeriod(e.target.value)}
+                                className="bg-[var(--bg-hover)] border border-[var(--border-color)] rounded-lg pl-9 pr-8 py-1.5 text-[11px] text-[var(--text-secondary)] appearance-none cursor-pointer min-w-[100px] focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500/20"
+                            >
+                                {periods.map((p) => (
+                                    <option key={p.value} value={p.value}>{p.label}</option>
+                                ))}
+                            </select>
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                                <svg width="10" height="6" viewBox="0 0 10 6" className="text-[var(--text-muted)]">
+                                    <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <ReactApexChart
-                options={options}
-                series={series}
-                type="area"
-                height={260}
-            />
+                <ReactApexChart
+                    options={options}
+                    series={series}
+                    type="area"
+                    height={240}
+                />
 
-            <div className="grid grid-cols-3 gap-4 mt-5 pt-5 border-t border-[var(--border-color)]">
-                <div>
-                    <div className="text-[10px] text-[var(--text-muted)] uppercase tracking-wide mb-1">Total</div>
-                    <div className="text-base font-semibold text-[var(--text-primary)]">${total.toLocaleString('es-AR')}</div>
-                </div>
-                <div className="border-x border-[var(--border-color)] px-4">
-                    <div className="text-[10px] text-[var(--text-muted)] uppercase tracking-wide mb-1">Promedio</div>
-                    <div className="text-base font-semibold text-[var(--text-primary)]">${average.toLocaleString('es-AR')}</div>
-                </div>
-                <div className="text-right">
-                    <div className="text-[10px] text-[var(--text-muted)] uppercase tracking-wide mb-1">Crecimiento</div>
-                    <div className={`text-base font-semibold ${parseFloat(growth) >= 0 ? 'text-primary-600' : 'text-[var(--text-muted)]'}`}>
-                        {parseFloat(growth) >= 0 ? '+' : ''}{growth}%
+                <div className="grid grid-cols-3 gap-4 mt-5 pt-5 border-t border-[var(--border-color)]">
+                    <div>
+                        <div className="text-[10px] font-normal text-[var(--text-muted)] uppercase tracking-wider mb-1">
+                            Total {showPricesWithTax ? 'c/IVA' : 's/IVA'}
+                        </div>
+                        <div className="text-base font-bold text-[var(--text-primary)]">${total.toLocaleString('es-AR')}</div>
+                    </div>
+                    <div className="border-x border-[var(--border-color)] px-4">
+                        <div className="text-[10px] font-normal text-[var(--text-muted)] uppercase tracking-wider mb-1">
+                            Promedio {showPricesWithTax ? 'c/IVA' : 's/IVA'}
+                        </div>
+                        <div className="text-base font-bold text-[var(--text-primary)]">${average.toLocaleString('es-AR')}</div>
+                    </div>
+                    <div className="text-right">
+                        <div className="text-[10px] font-normal text-[var(--text-muted)] uppercase tracking-wider mb-1">Crecimiento</div>
+                        <div className={`text-base font-bold ${parseFloat(growth) >= 0 ? 'text-success-600 dark:text-success-400' : 'text-danger-600 dark:text-danger-400'}`}>
+                            {parseFloat(growth) >= 0 ? '+' : ''}{growth}%
+                        </div>
                     </div>
                 </div>
+                {showPricesWithTax && (
+                    <div className="mt-3 pt-3 border-t border-[var(--border-color)] text-center">
+                        <span className="text-[10px] text-success-600 dark:text-success-400">
+                            Precios incluyen IVA ({taxRate}%)
+                        </span>
+                    </div>
+                )}
             </div>
         </div>
     );

@@ -100,7 +100,7 @@ const ResetPasswordPage = () => {
                                 <ShieldCheck className="text-white" size={22} />
                             )}
                         </motion.div>
-                        <h1 className="text-lg font-bold text-(--text-primary) mb-1">
+                        <h1 className="text-lg font-semibold text-(--text-primary) mb-1">
                             {isSuccess ? '¡Contraseña actualizada!' : 'Restablecer contraseña'}
                         </h1>
                         <p className="text-(--text-secondary) text-[13px] font-medium">

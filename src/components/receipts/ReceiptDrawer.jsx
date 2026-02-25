@@ -1,11 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, FileText, Search, Building2, Check, ChevronLeft, User } from 'lucide-react';
+import { X, FileText, Search, Building2, Check, ChevronLeft, User, Mail } from 'lucide-react';
 import Button from '../common/Button';
+import { getClients } from '../../services/orderService';
 
-const ReceiptDrawer = ({ isOpen, onClose, onSave, clients, company = null, user = null, currentUser = null }) => {
+const ReceiptDrawer = ({ isOpen, onClose, onSave, clients: propClients, company = null, user = null, currentUser = null }) => {
     const [step, setStep] = useState(1);
+    const [localClients, setLocalClients] = useState([]);
+    const [loadingClients, setLoadingClients] = useState(false);
+    
+    // Usar clientes pasados como prop o los cargados localmente
+    const clients = propClients?.length > 0 ? propClients : localClients;
     const [formData, setFormData] = useState({
         clientId: '',
         type: 'ingreso',
@@ -53,6 +59,20 @@ const ReceiptDrawer = ({ isOpen, onClose, onSave, clients, company = null, user 
         return (clients || []).find(c => c._id === formData.clientId);
     }, [clients, formData.clientId]);
 
+    // Cargar clientes locales si no se pasan como prop
+    useEffect(() => {
+        if (isOpen && (!propClients || propClients.length === 0)) {
+            setLoadingClients(true);
+            getClients()
+                .then(data => {
+                    const clientsArray = Array.isArray(data) ? data : (data?.clients || data?.data || []);
+                    setLocalClients(clientsArray);
+                })
+                .catch(err => console.error('Error loading clients:', err))
+                .finally(() => setLoadingClients(false));
+        }
+    }, [isOpen, propClients]);
+    
     useEffect(() => {
         if (isOpen) {
             setStep(1);
@@ -290,7 +310,16 @@ const ReceiptDrawer = ({ isOpen, onClose, onSave, clients, company = null, user 
                                                         </div>
                                                     </motion.button>
                                                 );
-                                            }) : (
+                                            }) : loadingClients ? (
+                                                <div className="col-span-full py-12 text-center">
+                                                    <div className="w-16 h-16 bg-[var(--bg-hover)] rounded-2xl flex items-center justify-center mx-auto mb-4 animate-pulse">
+                                                        <Building2 size={32} className="text-[var(--text-muted)] opacity-50" />
+                                                    </div>
+                                                    <p className="text-[var(--text-muted)] text-sm font-medium">
+                                                        Cargando clientes...
+                                                    </p>
+                                                </div>
+                                            ) : (
                                                 <div className="col-span-full py-12 text-center">
                                                     <div className="w-16 h-16 bg-[var(--bg-hover)] rounded-2xl flex items-center justify-center mx-auto mb-4">
                                                         <Building2 size={32} className="text-[var(--text-muted)] opacity-50" />
@@ -314,12 +343,60 @@ const ReceiptDrawer = ({ isOpen, onClose, onSave, clients, company = null, user 
                                     >
                                         {/* COLUMNA IZQUIERDA: Datos del recibo */}
                                         <div className="space-y-5">
-                                            {/* CLIENTE - Título */}
+                                            {/* TÍTULO SECCIÓN */}
                                             <motion.div
                                                 initial={{ opacity: 0, y: 10 }}
                                                 animate={{ opacity: 1, y: 0 }}
                                             >
-                                                <label className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2 block">
+                                                <h3 className="text-[11px] font-bold text-secondary-700 dark:text-secondary-300 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                                    <FileText size={14} />
+                                                    Información del Recibo
+                                                </h3>
+                                                <div className="h-px bg-secondary-200 dark:bg-secondary-700 mb-4" />
+                                            </motion.div>
+
+                                            {/* TIPO: Ingreso / Egreso */}
+                                            <motion.div
+                                                initial={{ opacity: 0, y: 10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                            >
+                                                <label className="text-[11px] font-normal text-[var(--text-muted)] uppercase tracking-wider mb-2 block">
+                                                    Tipo de Recibo
+                                                </label>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setFormData({ ...formData, type: 'ingreso' })}
+                                                        className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all ${
+                                                            formData.type === 'ingreso'
+                                                                ? 'bg-success-50 border-success-300 text-success-700 dark:bg-success-900/20 dark:border-success-700 dark:text-success-400'
+                                                                : 'bg-[var(--bg-input)] border-[var(--border-color)] text-[var(--text-muted)] hover:border-success-300'
+                                                        }`}
+                                                    >
+                                                        <div className={`w-2 h-2 rounded-full ${formData.type === 'ingreso' ? 'bg-success-500' : 'bg-[var(--text-muted)]'}`} />
+                                                        Ingreso
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setFormData({ ...formData, type: 'egreso' })}
+                                                        className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all ${
+                                                            formData.type === 'egreso'
+                                                                ? 'bg-danger-50 border-danger-300 text-danger-700 dark:bg-danger-900/20 dark:border-danger-700 dark:text-danger-400'
+                                                                : 'bg-[var(--bg-input)] border-[var(--border-color)] text-[var(--text-muted)] hover:border-danger-300'
+                                                        }`}
+                                                    >
+                                                        <div className={`w-2 h-2 rounded-full ${formData.type === 'egreso' ? 'bg-danger-500' : 'bg-[var(--text-muted)]'}`} />
+                                                        Egreso
+                                                    </button>
+                                                </div>
+                                            </motion.div>
+
+                                            {/* CLIENTE */}
+                                            <motion.div
+                                                initial={{ opacity: 0, y: 10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                            >
+                                                <label className="text-[11px] font-normal text-[var(--text-muted)] uppercase tracking-wider mb-2 block">
                                                     Cliente
                                                 </label>
                                                 <div 
@@ -351,7 +428,7 @@ const ReceiptDrawer = ({ isOpen, onClose, onSave, clients, company = null, user 
                                                 animate={{ opacity: 1, y: 0 }}
                                                 transition={{ delay: 0.05 }}
                                             >
-                                                <label className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2 block">
+                                                <label className="text-[11px] font-normal text-[var(--text-muted)] uppercase tracking-wider mb-2 block">
                                                     Fecha
                                                 </label>
                                                 <input
@@ -370,7 +447,7 @@ const ReceiptDrawer = ({ isOpen, onClose, onSave, clients, company = null, user 
                                                 className="grid grid-cols-2 gap-4"
                                             >
                                                 <div>
-                                                    <label className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2 block">
+                                                    <label className="text-[11px] font-normal text-[var(--text-muted)] uppercase tracking-wider mb-2 block">
                                                         Monto
                                                     </label>
                                                     <div className="relative">
@@ -388,7 +465,7 @@ const ReceiptDrawer = ({ isOpen, onClose, onSave, clients, company = null, user 
                                                     {errors.amount && <p className="text-danger-500 text-xs mt-1">{errors.amount}</p>}
                                                 </div>
                                                 <div>
-                                                    <label className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2 block">
+                                                    <label className="text-[11px] font-normal text-[var(--text-muted)] uppercase tracking-wider mb-2 block">
                                                         Método
                                                     </label>
                                                     <select
@@ -411,7 +488,7 @@ const ReceiptDrawer = ({ isOpen, onClose, onSave, clients, company = null, user 
                                                 animate={{ opacity: 1, y: 0 }}
                                                 transition={{ delay: 0.15 }}
                                             >
-                                                <label className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2 block">
+                                                <label className="text-[11px] font-normal text-[var(--text-muted)] uppercase tracking-wider mb-2 block">
                                                     Concepto
                                                 </label>
                                                 <input
@@ -432,7 +509,7 @@ const ReceiptDrawer = ({ isOpen, onClose, onSave, clients, company = null, user 
                                                 animate={{ opacity: 1, y: 0 }}
                                                 transition={{ delay: 0.2 }}
                                             >
-                                                <label className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2 block">
+                                                <label className="text-[11px] font-normal text-[var(--text-muted)] uppercase tracking-wider mb-2 block">
                                                     Notas
                                                 </label>
                                                 <textarea
@@ -450,11 +527,16 @@ const ReceiptDrawer = ({ isOpen, onClose, onSave, clients, company = null, user 
                                             initial={{ opacity: 0, y: 10 }}
                                             animate={{ opacity: 1, y: 0 }}
                                             transition={{ delay: 0.25 }}
-                                            className="space-y-3"
+                                            className="space-y-5"
                                         >
-                                            <label className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider block">
-                                                Enviar detalle por email
-                                            </label>
+                                            {/* TÍTULO SECCIÓN */}
+                                            <div>
+                                                <h3 className="text-[11px] font-bold text-secondary-700 dark:text-secondary-300 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                                    <Mail size={14} />
+                                                    Enviar detalle por email
+                                                </h3>
+                                                <div className="h-px bg-secondary-200 dark:bg-secondary-700 mb-4" />
+                                            </div>
                                             
                                             <div>
                                                 {/* Email de la empresa */}
@@ -536,7 +618,7 @@ const ReceiptDrawer = ({ isOpen, onClose, onSave, clients, company = null, user 
                                             
                                             {/* Email personalizado */}
                                             <div className="space-y-2">
-                                                <label className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider block">
+                                                <label className="text-[11px] font-normal text-[var(--text-muted)] uppercase tracking-wider block">
                                                     Otras direcciones de email
                                                 </label>
                                                 <input

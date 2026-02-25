@@ -85,6 +85,7 @@ const ProductsPage = () => {
     // Ahora sí, después de todos los hooks, hacemos los cálculos y el return condicional
     const isAdmin = user?.role?.name === 'admin';
     const isSuperadmin = user?.role?.name === 'superadmin';
+    const isVendedor = user?.role?.name === 'vendedor';
     const features = user?.company?.features || {};
     const showPricesWithTax = user?.company?.showPricesWithTax === true;
     const inputPricesWithTax = user?.company?.inputPricesWithTax === true;
@@ -106,7 +107,7 @@ const ProductsPage = () => {
         return cols;
     }, [hasPriceListsFeature, hasStockFeature]);
     
-    if (!isAdmin && !isSuperadmin) {
+    if (!isAdmin && !isSuperadmin && !isVendedor) {
         return (
             <div className="min-h-screen flex items-center justify-center">
                 <div className="text-center">
@@ -417,38 +418,27 @@ const ProductsPage = () => {
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
-                    {/* Menú de 3 puntitos */}
-                    <div className="relative">
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                handleOpenExportMenu(e);
-                            }}
-                            className="p-2 rounded-lg text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-hover) transition-all border border-(--border-color)"
-                        >
-                            <MoreHorizontal size={18} />
-                        </button>
-                        {exportMenu.open && (
-                            <ActionMenu
-                                items={[{
-                                    icon: <Download size={16} />,
-                                    label: 'Exportar a CSV',
-                                    onClick: handleExport
-                                }]}
-                                position={exportMenu.position}
-                                onClose={() => setExportMenu({ open: false, position: null })}
-                            />
-                        )}
-                    </div>
-                    {/* Botón Nuevo Producto */}
+                    {/* Botón Exportar - Visible para todos */}
                     <Button
-                        variant="primary"
-                        onClick={handleCreateProduct}
-                        className="text-[11px] font-bold uppercase tracking-wider shadow-md shadow-primary-100 dark:shadow-primary-900/30"
+                        variant="secondary"
+                        onClick={handleExport}
+                        className="text-[11px] font-bold uppercase tracking-wider"
                     >
-                        <Plus size={14} strokeWidth={2.5} />
-                        Nuevo Producto
+                        <Download size={14} strokeWidth={2.5} />
+                        Exportar
                     </Button>
+
+                    {/* Botón Nuevo Producto - Solo admin/superadmin */}
+                    {(isAdmin || isSuperadmin) && (
+                        <Button
+                            variant="primary"
+                            onClick={handleCreateProduct}
+                            className="text-[11px] font-bold uppercase tracking-wider shadow-md shadow-primary-100 dark:shadow-primary-900/30"
+                        >
+                            <Plus size={14} strokeWidth={2.5} />
+                            Nuevo Producto
+                        </Button>
+                    )}
                 </div>
             </div>
 
@@ -756,16 +746,18 @@ const ProductsPage = () => {
                                                     <Eye size={16} strokeWidth={2.5} />
                                                 </button>
                                                 
-                                                {/* Botón Editar - Siempre visible */}
-                                                <button
-                                                    onClick={(e) => handleEditProduct(product, e)}
-                                                    className="p-1.5 rounded-lg text-(--text-muted) hover:text-info-600 hover:bg-info-50 dark:hover:bg-info-900/20 transition-colors"
-                                                    title="Editar"
-                                                >
-                                                    <Edit2 size={16} />
-                                                </button>
+                                                {/* Botón Editar - Solo admin/superadmin */}
+                                                {(isAdmin || isSuperadmin) && (
+                                                    <button
+                                                        onClick={(e) => handleEditProduct(product, e)}
+                                                        className="p-1.5 rounded-lg text-(--text-muted) hover:text-info-600 hover:bg-info-50 dark:hover:bg-info-900/20 transition-colors"
+                                                        title="Editar"
+                                                    >
+                                                        <Edit2 size={16} />
+                                                    </button>
+                                                )}
                                                 
-                                                {/* Menú de 3 puntitos - Otras acciones */}
+                                                {/* Menú de 3 puntitos - Visible para todos */}
                                                 <div>
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); handleOpenActionMenu(e, product._id); }}
@@ -782,11 +774,14 @@ const ProductsPage = () => {
                                                                     label: 'Ver detalle completo',
                                                                     onClick: () => handleNavigateToDetail(product)
                                                                 },
-                                                                {
+                                                                ...(isAdmin || isSuperadmin ? [{
                                                                     icon: <Edit2 size={16} />,
                                                                     label: 'Editar',
-                                                                    onClick: (e) => handleEditProduct(product, e)
-                                                                },
+                                                                    onClick: () => {
+                                                                        setEditingProduct(product);
+                                                                        setIsProductDrawerOpen(true);
+                                                                    }
+                                                                }] : []),
                                                                 ...(hasStockFeature ? [{
                                                                     icon: <History size={16} />,
                                                                     label: 'Movimientos de stock',
@@ -797,18 +792,20 @@ const ProductsPage = () => {
                                                                     label: 'Ver actividad',
                                                                     onClick: () => handleViewActivity(product)
                                                                 },
-                                                                {
-                                                                    icon: product.active ? <PowerOff size={16} /> : <Power size={16} />,
-                                                                    label: product.active ? 'Desactivar' : 'Activar',
-                                                                    variant: product.active ? 'warning' : 'success',
-                                                                    onClick: () => handleToggleActiveClick(product)
-                                                                },
-                                                                {
-                                                                    icon: <Trash2 size={16} />,
-                                                                    label: 'Eliminar',
-                                                                    variant: 'danger',
-                                                                    onClick: () => handleDeleteClick(product)
-                                                                }
+                                                                ...(isAdmin || isSuperadmin ? [
+                                                                    {
+                                                                        icon: product.active ? <PowerOff size={16} /> : <Power size={16} />,
+                                                                        label: product.active ? 'Desactivar' : 'Activar',
+                                                                        variant: product.active ? 'warning' : 'success',
+                                                                        onClick: () => handleToggleActiveClick(product)
+                                                                    },
+                                                                    {
+                                                                        icon: <Trash2 size={16} />,
+                                                                        label: 'Eliminar',
+                                                                        variant: 'danger',
+                                                                        onClick: () => handleDeleteClick(product)
+                                                                    }
+                                                                ] : [])
                                                             ]}
                                                             position={actionMenu.position}
                                                             openAbove={actionMenu.openAbove}
@@ -1089,16 +1086,18 @@ const ProductsPage = () => {
                                         <Eye size={18} strokeWidth={2.5} />
                                     </button>
                                     
-                                    {/* Botón Editar - Siempre visible */}
-                                    <button
-                                        onClick={(e) => handleEditProduct(product, e)}
-                                        className="p-2 rounded-lg text-(--text-muted) hover:text-info-600 hover:bg-info-50 dark:hover:bg-info-900/20 transition-all"
-                                        title="Editar"
-                                    >
-                                        <Edit2 size={18} />
-                                    </button>
+                                    {/* Botón Editar - Solo admin/superadmin */}
+                                    {(isAdmin || isSuperadmin) && (
+                                        <button
+                                            onClick={(e) => handleEditProduct(product, e)}
+                                            className="p-2 rounded-lg text-(--text-muted) hover:text-info-600 hover:bg-info-50 dark:hover:bg-info-900/20 transition-all"
+                                            title="Editar"
+                                        >
+                                            <Edit2 size={18} />
+                                        </button>
+                                    )}
                                     
-                                    {/* Menú de 3 puntitos - Otras acciones */}
+                                    {/* Menú de 3 puntitos - Visible para todos */}
                                     <button
                                         onClick={(e) => { e.stopPropagation(); handleOpenActionMenu(e, product._id); }}
                                         className="p-2 rounded-lg text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-hover) transition-all"
@@ -1107,7 +1106,7 @@ const ProductsPage = () => {
                                     </button>
                                 </div>
                                 
-                                {/* Menu - Mobile */}
+                                {/* Menu - Mobile - Visible para todos con opciones filtradas */}
                                 {actionMenu.open && actionMenu.productId === product._id && (
                                     <ActionMenu
                                         items={[
@@ -1116,28 +1115,38 @@ const ProductsPage = () => {
                                                 label: 'Ver detalle completo',
                                                 onClick: () => handleNavigateToDetail(product)
                                             },
-                                            {
+                                            ...(isAdmin || isSuperadmin ? [{
                                                 icon: <Edit2 size={16} />,
                                                 label: 'Editar',
-                                                onClick: (e) => handleEditProduct(product, e)
-                                            },
+                                                onClick: () => {
+                                                    setEditingProduct(product);
+                                                    setIsProductDrawerOpen(true);
+                                                }
+                                            }] : []),
                                             ...(hasStockFeature ? [{
                                                 icon: <History size={16} />,
                                                 label: 'Movimientos de stock',
                                                 onClick: () => handleViewStockMovements(product)
                                             }] : []),
                                             {
-                                                icon: product.active ? <PowerOff size={16} /> : <Power size={16} />,
-                                                label: product.active ? 'Desactivar' : 'Activar',
-                                                variant: product.active ? 'warning' : 'success',
-                                                onClick: () => handleToggleActiveClick(product)
+                                                icon: <Activity size={16} />,
+                                                label: 'Ver actividad',
+                                                onClick: () => handleViewActivity(product)
                                             },
-                                            {
-                                                icon: <Trash2 size={16} />,
-                                                label: 'Eliminar',
-                                                variant: 'danger',
-                                                onClick: () => handleDeleteClick(product)
-                                            }
+                                            ...(isAdmin || isSuperadmin ? [
+                                                {
+                                                    icon: product.active ? <PowerOff size={16} /> : <Power size={16} />,
+                                                    label: product.active ? 'Desactivar' : 'Activar',
+                                                    variant: product.active ? 'warning' : 'success',
+                                                    onClick: () => handleToggleActiveClick(product)
+                                                },
+                                                {
+                                                    icon: <Trash2 size={16} />,
+                                                    label: 'Eliminar',
+                                                    variant: 'danger',
+                                                    onClick: () => handleDeleteClick(product)
+                                                }
+                                            ] : [])
                                         ]}
                                         position={actionMenu.position}
                                         openAbove={actionMenu.openAbove}

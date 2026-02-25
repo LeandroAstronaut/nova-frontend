@@ -393,12 +393,12 @@ const ProductQuickView = ({
                                                     {product.subcategory && ` / ${product.subcategory}`}
                                                 </p>
                                             )}
-                                            {/* Código y Stock sintético */}
+                                            {/* Código y Stock sintético - Solo en modo compra, no en catálogo */}
                                             <div className="flex items-center gap-2 text-[11px] text-[var(--text-muted)]">
                                                 {!hasVariants && (
                                                     <span>Cod. {product.code}</span>
                                                 )}
-                                                {hasStockFeature && (
+                                                {hasStockFeature && !viewOnly && (
                                                     <>
                                                         {!hasVariants && <span className="text-[var(--border-color)]">|</span>}
                                                         <span className={isOutOfStock ? 'text-danger-600' : isLowStock ? 'text-warning-600' : 'text-success-600'}>
@@ -409,60 +409,62 @@ const ProductQuickView = ({
                                             </div>
                                         </div>
 
-                                        {/* Card de Precio */}
-                                        <div className="bg-[var(--bg-hover)] rounded-xl border border-[var(--border-color)] p-4">
-                                            <div className="flex items-center justify-between mb-2">
-                                                <span className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
-                                                    Precio {priceList === 2 ? 'Lista 2' : 'Lista 1'}
-                                                    {showPricesWithTax && hasTax && (
-                                                        <span className="ml-1.5 text-[10px] text-success-600 font-normal">(c/IVA)</span>
+                                        {/* Card de Precio - Oculta en modo catálogo cuando hay precios variables por variante */}
+                                        {!(viewOnly && hasVariants && !hasUniformPricing) && (
+                                            <div className="bg-[var(--bg-hover)] rounded-xl border border-[var(--border-color)] p-4">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <span className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+                                                        Precio {priceList === 2 ? 'Lista 2' : 'Lista 1'}
+                                                        {showPricesWithTax && hasTax && (
+                                                            <span className="ml-1.5 text-[10px] text-success-600 font-normal">(c/IVA)</span>
+                                                        )}
+                                                    </span>
+                                                    {discount > 0 && (
+                                                        <span className="px-2 py-0.5 bg-success-100 dark:bg-success-900/30 text-success-600 text-[10px] font-bold rounded-lg">
+                                                            -{discount}%
+                                                        </span>
                                                     )}
-                                                </span>
-                                                {discount > 0 && (
-                                                    <span className="px-2 py-0.5 bg-success-100 dark:bg-success-900/30 text-success-600 text-[10px] font-bold rounded-lg">
-                                                        -{discount}%
-                                                    </span>
-                                                )}
-                                            </div>
-
-                                            <div className="flex items-end gap-2">
-                                                <span className="text-xl font-bold text-[var(--text-primary)]">
-                                                    {formatPrice(displayFinalPrice)}
-                                                </span>
-                                                {(displayListPrice > displayFinalPrice) && (
-                                                    <span className="text-[12px] text-[var(--text-muted)] line-through mb-0.5">
-                                                        {formatPrice(displayListPrice)}
-                                                    </span>
-                                                )}
-                                            </div>
-                                            
-                                            {/* IVA info */}
-                                            <p className="text-[11px] text-[var(--text-muted)] mt-1">
-                                                {hasTax 
-                                                    ? (showPricesWithTax ? `Incluye IVA (${taxRate}%)` : `IVA ${taxRate}% no incluido`)
-                                                    : 'Sin IVA'
-                                                }
-                                            </p>
-                                            
-                                            {/* Warning descuento global */}
-                                            {hasOffer && excludeOfferFromGlobalDiscount && (
-                                                <div className="flex items-start gap-2 mt-2 p-2 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
-                                                    <AlertCircle size={12} className="text-amber-600 flex-shrink-0 mt-0.5" />
-                                                    <p className="text-[10px] text-amber-700 dark:text-amber-400">
-                                                        No aplica descuento global del pedido
-                                                    </p>
                                                 </div>
-                                            )}
-                                        </div>
+
+                                                <div className="flex items-end gap-2">
+                                                    <span className="text-xl font-bold text-[var(--text-primary)]">
+                                                        {formatPrice(displayFinalPrice)}
+                                                    </span>
+                                                    {(displayListPrice > displayFinalPrice) && (
+                                                        <span className="text-[12px] text-[var(--text-muted)] line-through mb-0.5">
+                                                            {formatPrice(displayListPrice)}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                
+                                                {/* IVA info */}
+                                                <p className="text-[11px] text-[var(--text-muted)] mt-1">
+                                                    {hasTax 
+                                                        ? (showPricesWithTax ? `Incluye IVA (${taxRate}%)` : `IVA ${taxRate}% no incluido`)
+                                                        : 'Sin IVA'
+                                                    }
+                                                </p>
+                                                
+                                                {/* Warning descuento global */}
+                                                {hasOffer && excludeOfferFromGlobalDiscount && (
+                                                    <div className="flex items-start gap-2 mt-2 p-2 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+                                                        <AlertCircle size={12} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                                                        <p className="text-[10px] text-amber-700 dark:text-amber-400">
+                                                            No aplica descuento global del pedido
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
 
                                         {/* Selector de Variantes */}
                                         {hasVariants && (
                                             <div>
                                                 <h4 className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3">
-                                                    {hasUniformPricing ? 'Opciones' : 'Seleccionar opción'}
+                                                    {viewOnly ? 'Opciones disponibles' : (hasUniformPricing ? 'Opciones' : 'Seleccionar opción')}
                                                 </h4>
                                                 
-                                                <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
+                                                <div className={`space-y-2 pr-1 ${viewOnly ? '' : 'max-h-[200px] overflow-y-auto'}`}>
                                                     {product.variants.filter(v => v.active !== false).map((variant) => {
                                                         const isSelected = selectedVariant?.id === variant.id;
                                                         
@@ -484,22 +486,38 @@ const ProductQuickView = ({
                                                             hasVOffer = vOffer > 0 || vDiscount > 0;
                                                         }
                                                         
+                                                        // Calcular stock de la variante para modo catálogo
+                                                        let vStock = null;
+                                                        if (viewOnly && hasStockFeature) {
+                                                            const vStockAvail = Math.max(0, (variant.stock || 0) - (variant.stockReserved || 0));
+                                                            vStock = {
+                                                                available: vStockAvail,
+                                                                isLow: variant.minStock > 0 && vStockAvail <= variant.minStock && vStockAvail > 0,
+                                                                isOut: vStockAvail === 0
+                                                            };
+                                                        }
+                                                        
                                                         return (
                                                             <button
                                                                 key={variant.id}
-                                                                onClick={() => handleVariantChange(variant)}
+                                                                onClick={() => !viewOnly && handleVariantChange(variant)}
+                                                                disabled={viewOnly}
                                                                 className={`w-full flex items-center justify-between p-3 rounded-xl border transition-all text-left ${
                                                                     isSelected 
                                                                         ? 'border-primary-500 bg-primary-50/30 dark:bg-primary-900/10' 
-                                                                        : 'border-[var(--border-color)] bg-[var(--bg-card)] hover:border-primary-300'
-                                                                }`}
+                                                                        : viewOnly 
+                                                                            ? 'border-[var(--border-color)] bg-[var(--bg-card)]'
+                                                                            : 'border-[var(--border-color)] bg-[var(--bg-card)] hover:border-primary-300'
+                                                                } ${viewOnly ? 'cursor-default' : ''}`}
                                                             >
                                                                 <div className="flex items-center gap-3">
-                                                                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
-                                                                        isSelected ? 'border-primary-500 bg-primary-500' : 'border-[var(--border-color)]'
-                                                                    }`}>
-                                                                        {isSelected && <div className="w-2 h-2 bg-white rounded-full" />}
-                                                                    </div>
+                                                                    {!viewOnly && (
+                                                                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                                                                            isSelected ? 'border-primary-500 bg-primary-500' : 'border-[var(--border-color)]'
+                                                                        }`}>
+                                                                            {isSelected && <div className="w-2 h-2 bg-white rounded-full" />}
+                                                                        </div>
+                                                                    )}
                                                                     <div>
                                                                         <p className="text-[13px] font-semibold text-[var(--text-primary)]">
                                                                             {variant.value1}
@@ -508,16 +526,40 @@ const ProductQuickView = ({
                                                                         {variant.sku && (
                                                                             <p className="text-[10px] text-[var(--text-muted)]">Cod. {variant.sku}</p>
                                                                         )}
+                                                                        {/* Stock en modo catálogo - NO se muestra según requerimiento */}
+                                                                        {/* {viewOnly && hasStockFeature && vStock && (
+                                                                            <p className={`text-[10px] font-medium mt-0.5 ${
+                                                                                vStock.isOut ? 'text-danger-600' : vStock.isLow ? 'text-warning-600' : 'text-success-600'
+                                                                            }`}>
+                                                                                Stock: {vStock.available} disp.
+                                                                            </p>
+                                                                        )} */}
                                                                     </div>
                                                                 </div>
                                                                 {!hasUniformPricing && (
                                                                     <div className="text-right">
+                                                                        {/* Badge de descuento en modo catálogo */}
+                                                                        {viewOnly && hasVOffer && (
+                                                                            <span className="inline-block px-1.5 py-0.5 bg-success-100 dark:bg-success-900/30 text-success-600 text-[9px] font-bold rounded mb-1">
+                                                                                {variant.pricing?.[priceList === 2 ? 'list2' : 'list1']?.discount > 0 
+                                                                                    ? `-${variant.pricing[priceList === 2 ? 'list2' : 'list1'].discount}%`
+                                                                                    : 'OFERTA'}
+                                                                            </span>
+                                                                        )}
                                                                         <p className="text-[13px] font-bold text-[var(--text-primary)]">
                                                                             {formatPrice(vDisplayFinal)}
                                                                         </p>
                                                                         {hasVOffer && (
                                                                             <p className="text-[10px] text-[var(--text-muted)] line-through">
                                                                                 {formatPrice(vDisplayList)}
+                                                                            </p>
+                                                                        )}
+                                                                        {/* Info IVA en modo catálogo */}
+                                                                        {viewOnly && (
+                                                                            <p className="text-[9px] text-[var(--text-muted)] mt-0.5">
+                                                                                {hasTax 
+                                                                                    ? (showPricesWithTax ? `Incluye IVA (${taxRate}%)` : `IVA ${taxRate}% no incl.`)
+                                                                                    : 'Sin IVA'}
                                                                             </p>
                                                                         )}
                                                                     </div>
@@ -529,8 +571,8 @@ const ProductQuickView = ({
                                             </div>
                                         )}
 
-                                        {/* Stock Info - Admin details (solo si es admin) */}
-                                        {hasStockFeature && isAdmin && (
+                                        {/* Stock Info - Admin details (solo si es admin y no es modo catálogo) */}
+                                        {hasStockFeature && isAdmin && !viewOnly && (
                                             <div className="flex items-center gap-2 p-2 bg-[var(--bg-hover)] rounded-lg text-[11px]">
                                                 <span className="text-[var(--text-muted)]">Stock:</span>
                                                 <span className="font-medium text-[var(--text-primary)]">{stock.stock} fis.</span>

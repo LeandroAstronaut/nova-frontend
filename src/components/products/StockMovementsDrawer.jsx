@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -147,6 +147,12 @@ const StockMovementsDrawer = ({ isOpen, onClose, product }) => {
         hasMore: false
     });
 
+    // Preserve last valid product so the exit animation can complete
+    // even when the parent sets product=null at the same time as isOpen=false
+    const lastProductRef = useRef(product);
+    if (product) lastProductRef.current = product;
+    const displayProduct = lastProductRef.current;
+
     // Reset selected variant and movements when product changes
     useEffect(() => {
         setSelectedVariantId(null);
@@ -212,18 +218,18 @@ const StockMovementsDrawer = ({ isOpen, onClose, product }) => {
         }
     };
 
-    if (!product) return null;
+    if (!displayProduct) return null;
 
     // Calcular stock total de todas las variantes
     const getTotalStock = () => {
-        if (!product.hasVariants || !product.variants?.length) {
+        if (!displayProduct.hasVariants || !displayProduct.variants?.length) {
             return {
-                stock: product.stock || 0,
-                stockReserved: product.stockReserved || 0,
-                stockQuoted: product.stockQuoted || 0
+                stock: displayProduct.stock || 0,
+                stockReserved: displayProduct.stockReserved || 0,
+                stockQuoted: displayProduct.stockQuoted || 0
             };
         }
-        return product.variants.reduce((totals, variant) => {
+        return displayProduct.variants.reduce((totals, variant) => {
             totals.stock += variant.stock || 0;
             totals.stockReserved += variant.stockReserved || 0;
             totals.stockQuoted += variant.stockQuoted || 0;
@@ -233,10 +239,10 @@ const StockMovementsDrawer = ({ isOpen, onClose, product }) => {
 
     // Obtener stock de la variante seleccionada o totales
     const getDisplayStock = () => {
-        if (!product.hasVariants || !selectedVariantId) {
+        if (!displayProduct.hasVariants || !selectedVariantId) {
             return getTotalStock();
         }
-        const variant = product.variants?.find(v => v.id === selectedVariantId);
+        const variant = displayProduct.variants?.find(v => v.id === selectedVariantId);
         if (!variant) return getTotalStock();
         return {
             stock: variant.stock || 0,
@@ -246,14 +252,15 @@ const StockMovementsDrawer = ({ isOpen, onClose, product }) => {
     };
 
     const displayStock = getDisplayStock();
-    const hasVariants = product.hasVariants && product.variants?.length > 0;
+    const hasVariants = displayProduct.hasVariants && displayProduct.variants?.length > 0;
 
     return createPortal(
-        <AnimatePresence mode="wait">
+        <AnimatePresence>
             {isOpen && (
                 <>
                     {/* Backdrop */}
                     <motion.div
+                        key="backdrop"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
@@ -264,6 +271,7 @@ const StockMovementsDrawer = ({ isOpen, onClose, product }) => {
 
                     {/* Drawer */}
                     <motion.div
+                        key="drawer"
                         initial={{ x: '100%' }}
                         animate={{ x: 0 }}
                         exit={{ x: '100%' }}
@@ -281,7 +289,7 @@ const StockMovementsDrawer = ({ isOpen, onClose, product }) => {
                                         Historial de Stock
                                     </h2>
                                     <p className="text-[11px] text-[var(--text-muted)] font-medium truncate max-w-[300px]">
-                                        {product.code} • {product.name}
+                                        {displayProduct.code} • {displayProduct.name}
                                     </p>
                                 </div>
                             </div>
@@ -305,10 +313,10 @@ const StockMovementsDrawer = ({ isOpen, onClose, product }) => {
                                         className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg text-[11px] text-[var(--text-primary)] focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/30 appearance-none cursor-pointer transition-all hover:border-primary-300"
                                     >
                                         <option value="">Todas las variantes</option>
-                                        {product.variants.map(variant => (
+                                        {displayProduct.variants.map(variant => (
                                             <option key={variant.id} value={variant.id}>
-                                                {product.variantConfig?.label1}: {variant.value1}
-                                                {variant.value2 && ` • ${product.variantConfig?.label2}: ${variant.value2}`}
+                                                {displayProduct.variantConfig?.label1}: {variant.value1}
+                                                {variant.value2 && ` • ${displayProduct.variantConfig?.label2}: ${variant.value2}`}
                                                 {variant.sku && ` (${variant.sku})`}
                                             </option>
                                         ))}

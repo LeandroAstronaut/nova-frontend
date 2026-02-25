@@ -18,7 +18,9 @@ import {
     Briefcase,
     Settings,
     UserCircle,
-    HelpCircle
+    HelpCircle,
+    Upload,
+    BookOpen
 } from 'lucide-react';
 import SupportDrawer from '../common/SupportDrawer';
 import { useAuth } from '../../context/AuthContext';
@@ -46,7 +48,7 @@ const SidebarItem = ({ to, icon: Icon, label, collapsed, onNavigated }) => {
             to={to}
             onClick={handleClick}
             className={({ isActive }) => `
-                relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group
+                relative flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-200 group
                 ${isActive 
                     ? 'bg-primary-50/80 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300' 
                     : 'text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-hover)'
@@ -135,16 +137,19 @@ const Sidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }) => {
     const isSuperadmin = user?.role?.name === 'superadmin';
     const isAdmin = user?.role?.name === 'admin';
     const isClient = user?.role?.name === 'cliente';
+    const isVendedor = user?.role?.name === 'vendedor';
 
     const mainNavItems = [
         { name: 'Dashboard', path: '/', icon: LayoutDashboard, visible: true },
+        { name: 'Catálogo', path: '/catalogo', icon: BookOpen, visible: features.catalog === true },
         { name: 'Pedidos', path: '/pedidos', icon: ClipboardList, visible: features.orders !== false },
         { name: 'Presupuestos', path: '/presupuestos', icon: FileEdit, visible: features.orders !== false },
         { name: 'Recibos', path: '/recibos', icon: Receipt, visible: features.receipts === true },
-        { name: 'Productos', path: '/productos', icon: Box, visible: isAdmin || isSuperadmin },
+        { name: 'Productos', path: '/productos', icon: Box, visible: isAdmin || isSuperadmin || isVendedor },
         { name: 'Clientes', path: '/clientes', icon: Briefcase, visible: !isClient },
         { name: 'Usuarios', path: '/usuarios', icon: Users, visible: isAdmin || isSuperadmin },
-        { name: 'Cuentas Corrientes', path: '/cuentas', icon: Landmark, visible: !isClient && features.currentAccount === true },
+        { name: 'Importador', path: '/importador', icon: Upload, visible: isAdmin && features.importer === true },
+        // { name: 'Cuentas Corrientes', path: '/cuentas', icon: Landmark, visible: !isClient && features.currentAccount === true },
         { name: 'Compañías', path: '/admin/companies', icon: Building2, visible: isSuperadmin },
     ].filter(item => item.visible !== false);
 
@@ -282,7 +287,7 @@ const Sidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }) => {
                                     key={item.name}
                                     onClick={() => setShowSupportDrawer(true)}
                                     className={`
-                                        w-full flex items-center gap-3 px-3 py-2.5 rounded-xl
+                                        w-full flex items-center gap-3 px-3 py-2 rounded-xl
                                         text-(--text-secondary) hover:text-primary-600 dark:hover:text-primary-400
                                         hover:bg-primary-50/50 dark:hover:bg-primary-900/10
                                         transition-all duration-200 group
@@ -325,7 +330,7 @@ const Sidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }) => {
                     <button
                         onClick={handleLogout}
                         className={`
-                            w-full flex items-center gap-3 px-3 py-2.5 rounded-xl
+                            w-full flex items-center gap-3 px-3 py-2 rounded-xl
                             text-(--text-muted) hover:text-danger-600 dark:hover:text-danger-400
                             hover:bg-danger-50/50 dark:hover:bg-danger-900/10
                             transition-all duration-200 group

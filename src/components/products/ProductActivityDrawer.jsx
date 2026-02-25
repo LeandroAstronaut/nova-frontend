@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -141,6 +141,12 @@ const ProductActivityDrawer = ({ isOpen, onClose, product }) => {
         hasMore: false
     });
 
+    // Preserve last valid product so the exit animation can complete
+    // even when the parent sets product=null at the same time as isOpen=false
+    const lastProductRef = useRef(product);
+    if (product) lastProductRef.current = product;
+    const displayProduct = lastProductRef.current;
+
     useEffect(() => {
         if (isOpen && product?._id) {
             setActivities([]);
@@ -187,14 +193,13 @@ const ProductActivityDrawer = ({ isOpen, onClose, product }) => {
         }
     };
 
-    if (!product) return null;
-
     return createPortal(
-        <AnimatePresence mode="wait">
+        <AnimatePresence>
             {isOpen && (
                 <>
                     {/* Backdrop */}
                     <motion.div
+                        key="backdrop"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
@@ -205,6 +210,7 @@ const ProductActivityDrawer = ({ isOpen, onClose, product }) => {
 
                     {/* Drawer */}
                     <motion.div
+                        key="drawer"
                         initial={{ x: '100%' }}
                         animate={{ x: 0 }}
                         exit={{ x: '100%' }}
@@ -222,7 +228,7 @@ const ProductActivityDrawer = ({ isOpen, onClose, product }) => {
                                         Historial de Actividad
                                     </h2>
                                     <p className="text-[11px] text-[var(--text-muted)] font-medium truncate max-w-[300px]">
-                                        {product.code} • {product.name}
+                                        {displayProduct.code} • {displayProduct.name}
                                     </p>
                                 </div>
                             </div>

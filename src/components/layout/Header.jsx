@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, Menu, ChevronDown, Sun, Moon, LogOut, User, Settings, Bell, Building2, RefreshCw, X, Briefcase, Shield } from 'lucide-react';
+import { Menu, ChevronDown, Sun, Moon, LogOut, User, Settings, Bell, Building2, RefreshCw, X, Briefcase, Shield, Search } from 'lucide-react';
+import GlobalSearch from './GlobalSearch';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useNavigate, Link } from 'react-router-dom';
@@ -41,7 +42,9 @@ const Header = ({ onMenuClick }) => {
     const [isLoadingCompanies, setIsLoadingCompanies] = useState(false);
     const [isSwitching, setIsSwitching] = useState(false);
     const [logoRev, setLogoRev] = useState(0);
+    const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
     const menuRef = useRef(null);
+    const mobileSearchRef = useRef(null);
 
     // Forzar re-render cuando cambie el logo
     useEffect(() => {
@@ -135,37 +138,72 @@ const Header = ({ onMenuClick }) => {
                         <Menu size={20} />
                     </button>
 
-                    {/* Logo y Nombre de Empresa - SOLO MOBILE */}
-                    <div className="flex md:hidden items-center gap-2">
-                        {user?.company?.logo ? (
-                            <img 
-                                key={`${user.company.logo}-${logoRev}`}
-                                src={user.company.logo} 
-                                alt={user?.company?.name || 'Logo'} 
-                                className="w-8 h-8 object-contain rounded-lg bg-white p-0.5"
-                            />
-                        ) : (
-                            <div className="w-8 h-8 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center">
-                                <Building2 size={16} className="text-primary-600" />
-                            </div>
-                        )}
-                        <span className="text-sm font-semibold text-(--text-primary) truncate max-w-[140px]">
-                            {user?.company?.name || 'NOVA'}
-                        </span>
+                    {/* Logo y Nombre de Empresa - SOLO MOBILE (oculto cuando búsqueda está abierta) */}
+                    {!isMobileSearchOpen && (
+                        <div className="flex md:hidden items-center gap-2">
+                            {user?.company?.logo ? (
+                                <img 
+                                    key={`${user.company.logo}-${logoRev}`}
+                                    src={user.company.logo} 
+                                    alt={user?.company?.name || 'Logo'} 
+                                    className="w-8 h-8 object-contain rounded-lg bg-white p-0.5"
+                                />
+                            ) : (
+                                <div className="w-8 h-8 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center">
+                                    <Building2 size={16} className="text-primary-600" />
+                                </div>
+                            )}
+                            <span className="text-sm font-semibold text-(--text-primary) truncate max-w-[140px]">
+                                {user?.company?.name || 'NOVA'}
+                            </span>
+                        </div>
+                    )}
+
+                    {/* Búsqueda Desktop */}
+                    <div className="hidden md:block">
+                        <GlobalSearch />
                     </div>
 
-                    <div className="hidden md:flex relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-(--text-muted) group-focus-within:text-primary-500 transition-colors pointer-events-none" size={18} />
-                        <input
-                            type="text"
-                            placeholder="Buscar cliente"
-                            className="input pl-9 text-xs w-48 lg:w-64"
-                        />
+                    {/* Búsqueda Mobile Expandida */}
+                    <div 
+                        ref={mobileSearchRef} 
+                        className={`flex md:hidden items-center ${
+                            isMobileSearchOpen ? 'flex-1' : 'w-0 overflow-hidden'
+                        }`}
+                    >
+                        <div className={`transition-all duration-300 ease-out ${isMobileSearchOpen ? 'w-full opacity-100' : 'w-0 opacity-0'}`}>
+                            <GlobalSearch 
+                                onClose={() => setIsMobileSearchOpen(false)} 
+                                isMobileOpen={isMobileSearchOpen} 
+                            />
+                        </div>
                     </div>
                 </div>
 
                 {/* Right side */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 sm:gap-2">
+                    {/* Mobile Search Toggle */}
+                    {!isMobileSearchOpen && user?.role?.name !== 'cliente' && (
+                        <button
+                            onClick={() => setIsMobileSearchOpen(true)}
+                            className="md:hidden p-2 hover:bg-(--bg-hover) rounded-lg text-(--text-secondary) transition-colors"
+                            aria-label="Buscar"
+                        >
+                            <Search size={20} />
+                        </button>
+                    )}
+                    
+                    {/* Close Mobile Search */}
+                    {isMobileSearchOpen && (
+                        <button
+                            onClick={() => setIsMobileSearchOpen(false)}
+                            className="md:hidden p-2 hover:bg-(--bg-hover) rounded-lg text-(--text-secondary) transition-colors"
+                            aria-label="Cerrar búsqueda"
+                        >
+                            <X size={20} />
+                        </button>
+                    )}
+
                     {/* Theme Toggle */}
                     <button
                         onClick={toggleTheme}
@@ -261,7 +299,7 @@ const Header = ({ onMenuClick }) => {
                                     <Link 
                                         to="/perfil"
                                         onClick={() => setIsUserMenuOpen(false)}
-                                        className="w-full flex items-center gap-3 px-4 py-2 text-[13.5px] text-(--text-secondary) hover:bg-(--bg-hover) hover:text-(--text-primary) transition-colors"
+                                        className="w-full flex items-center gap-3 px-4 py-2 text-[13px] text-(--text-secondary) hover:bg-(--bg-hover) hover:text-(--text-primary) transition-colors"
                                     >
                                         <User size={16} />
                                         Mi Perfil
@@ -270,7 +308,7 @@ const Header = ({ onMenuClick }) => {
                                         <Link 
                                             to="/configuracion"
                                             onClick={() => setIsUserMenuOpen(false)}
-                                            className="w-full flex items-center gap-3 px-4 py-2 text-[13.5px] text-(--text-secondary) hover:bg-(--bg-hover) hover:text-(--text-primary) transition-colors"
+                                            className="w-full flex items-center gap-3 px-4 py-2 text-[13px] text-(--text-secondary) hover:bg-(--bg-hover) hover:text-(--text-primary) transition-colors"
                                         >
                                             <Settings size={16} />
                                             Configuración
@@ -284,7 +322,7 @@ const Header = ({ onMenuClick }) => {
                                                 setIsCompanyModalOpen(true);
                                                 setIsUserMenuOpen(false);
                                             }}
-                                            className="w-full flex items-center gap-3 px-4 py-2 text-[13.5px] text-(--text-secondary) hover:bg-(--bg-hover) hover:text-(--text-primary) transition-colors"
+                                            className="w-full flex items-center gap-3 px-4 py-2 text-[13px] text-(--text-secondary) hover:bg-(--bg-hover) hover:text-(--text-primary) transition-colors"
                                         >
                                             <RefreshCw size={16} />
                                             <span className="flex-1 text-left">Cambiar de Empresa</span>
@@ -301,7 +339,7 @@ const Header = ({ onMenuClick }) => {
                                 {/* Logout */}
                                 <button 
                                     onClick={handleLogout}
-                                    className="w-full flex items-center gap-3 px-4 py-2 text-[13.5px] text-danger-600 hover:bg-danger-50 dark:hover:bg-danger-900/20 transition-colors"
+                                    className="w-full flex items-center gap-3 px-4 py-2 text-[13px] text-danger-600 hover:bg-danger-50 dark:hover:bg-danger-900/20 transition-colors"
                                 >
                                     <LogOut size={16} />
                                     Cerrar Sesión

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Printer, Send, MessageCircle, Ban, FileText, User, Building2, Calendar, DollarSign, CheckCircle, XCircle } from 'lucide-react';
+import { ArrowLeft, Printer, Send, MessageCircle, Ban, FileText, User, Building2, Calendar, DollarSign, CheckCircle, XCircle, MoreHorizontal, History } from 'lucide-react';
 import { getReceipt, cancelReceipt, sendReceiptEmail } from '../../services/receiptService';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -70,6 +70,7 @@ const ReceiptDetailPage = () => {
     const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
     const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
     const [emailLoading, setEmailLoading] = useState(false);
+    const [showActionsMenu, setShowActionsMenu] = useState(false);
 
     const isCreator = receipt?.createdBy?._id === user?.id;
     // Solo el creador puede anular el recibo (tanto admin como vendedor)
@@ -167,20 +168,16 @@ const ReceiptDetailPage = () => {
                         <ArrowLeft size={20} />
                     </button>
                     <div>
-                        <div className="flex items-center gap-3">
-                            <h1 className="text-xl font-bold text-(--text-primary) leading-tight">
-                                Recibo #{String(receipt.receiptNumber).padStart(5, '0')}
-                            </h1>
-                            <StatusBadge status={receipt.status} />
-                            <TypeBadge type={receipt.type} />
-                        </div>
-                        <p className="text-[13px] text-(--text-secondary) mt-0.5">
+                        <h1 className="text-xl font-bold text-(--text-primary) leading-tight">
+                            Recibo #{String(receipt.receiptNumber).padStart(5, '0')}
+                        </h1>
+                        <p className="text-[13px] text-(--text-secondary) mt-0.5 font-medium">
                             {receipt.clientId?.businessName} • {new Date(receipt.date).toLocaleDateString('es-AR')}
                         </p>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 w-full md:w-auto">
                     <Button 
                         variant="secondary" 
                         onClick={handlePrintPDF}
@@ -190,46 +187,67 @@ const ReceiptDetailPage = () => {
                         PDF
                     </Button>
 
-                    {receipt.status === 'activo' && (
-                        <>
-                            <Button 
-                                variant="secondary" 
-                                onClick={handleSendEmail}
-                                className="px-3! text-[11px] font-bold uppercase tracking-wider"
-                            >
-                                <Send size={14} strokeWidth={2.5} />
-                                Email
-                            </Button>
-                            <Button 
-                                variant="secondary" 
-                                onClick={handleSendWhatsApp}
-                                className="px-3! text-[11px] font-bold uppercase tracking-wider"
-                            >
-                                <MessageCircle size={14} strokeWidth={2.5} />
-                                WhatsApp
-                            </Button>
-                        </>
-                    )}
-
-                    {canCancel && (
-                        <Button 
-                            variant="secondary" 
-                            onClick={handleCancel}
-                            className="px-3! text-[11px] font-bold uppercase tracking-wider text-danger-600 hover:text-danger-700"
-                        >
-                            <Ban size={14} strokeWidth={2.5} />
-                            Anular
-                        </Button>
-                    )}
-
                     <Button 
                         variant="secondary" 
-                        onClick={handleViewActivity}
-                        className="px-3! text-[11px] font-bold uppercase tracking-wider"
+                        onClick={handleSendEmail}
+                        className="px-3! text-[11px] font-bold uppercase tracking-wider hidden md:flex"
                     >
-                        <FileText size={14} strokeWidth={2.5} />
-                        Actividad
+                        <Send size={14} strokeWidth={2.5} />
+                        Email
                     </Button>
+                    <Button 
+                        variant="secondary" 
+                        onClick={handleSendWhatsApp}
+                        className="px-3! text-[11px] font-bold uppercase tracking-wider hidden md:flex"
+                    >
+                        <MessageCircle size={14} strokeWidth={2.5} />
+                        WhatsApp
+                    </Button>
+
+                    {/* Menú de más acciones - alineado a la derecha */}
+                    <div className="relative ml-auto">
+                        <button
+                            onClick={() => setShowActionsMenu(!showActionsMenu)}
+                            className="p-2 hover:bg-(--bg-hover) rounded-lg text-(--text-muted) hover:text-(--text-primary) transition-colors"
+                        >
+                            <MoreHorizontal size={20} />
+                        </button>
+
+                        {showActionsMenu && (
+                            <div className="absolute right-0 top-full mt-2 w-56 bg-(--bg-card) rounded-xl shadow-xl border border-(--border-color) z-50 py-2">
+                                <button
+                                    onClick={() => { handleSendEmail(); setShowActionsMenu(false); }}
+                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-[13px] text-(--text-primary) hover:bg-(--bg-hover) transition-colors md:hidden"
+                                >
+                                    <Send size={16} />
+                                    Enviar por Email
+                                </button>
+                                <button
+                                    onClick={() => { handleSendWhatsApp(); setShowActionsMenu(false); }}
+                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-[13px] text-(--text-primary) hover:bg-(--bg-hover) transition-colors md:hidden"
+                                >
+                                    <MessageCircle size={16} />
+                                    Enviar por WhatsApp
+                                </button>
+                                <button
+                                    onClick={() => { handleViewActivity(); setShowActionsMenu(false); }}
+                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-[13px] text-(--text-primary) hover:bg-(--bg-hover) transition-colors"
+                                >
+                                    <History size={16} />
+                                    Ver Actividad
+                                </button>
+                                {canCancel && (
+                                    <button
+                                        onClick={() => { handleCancel(); setShowActionsMenu(false); }}
+                                        className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-[13px] text-danger-600 dark:text-danger-400 hover:bg-danger-50 dark:hover:bg-danger-900/20 transition-colors"
+                                    >
+                                        <Ban size={16} />
+                                        Anular
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 

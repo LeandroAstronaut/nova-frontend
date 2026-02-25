@@ -16,7 +16,8 @@ const ProductCatalog = ({
     company,
     page = 1,
     pagination = { total: 0, totalPages: 1 },
-    onPageChange
+    onPageChange,
+    viewOnly = false
 }) => {
     // Estado local para el input de búsqueda (sin sincronización automática con props)
     const [searchInput, setSearchInput] = useState('');
@@ -184,33 +185,37 @@ const ProductCatalog = ({
 
     return (
         <div className="space-y-4">
-            {/* Nota general sobre IVA, bultos y descuentos */}
-            <div className={`p-2.5 md:p-2 md:px-3  rounded-lg text-xs font-normal flex items-center gap-2 ${
-                showPricesWithTax 
-                    ? 'bg-success-50 dark:bg-success-900/20 text-success-600 border border-success-100 dark:border-success-800' 
-                    : 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 border border-amber-100 dark:border-amber-800'
-            }`}>
-                <Tag size={14} />
-                {showPricesWithTax 
-                    ? 'Los precios mostrados incluyen IVA'
-                    : 'Los precios mostrados no incluyen IVA'
-                }
-                {company?.sellOnlyFullPackages && ' · Solo bultos cerrados.'}
-                {company?.excludeOfferProductsFromGlobalDiscount && ' · Productos en oferta no aplican descuento global.'}
-            </div>
+            {/* Nota general sobre IVA, bultos y descuentos - Oculta en modo catálogo */}
+            {!viewOnly && (
+                <div className={`p-2.5 md:p-2 md:px-3  rounded-lg text-xs font-normal flex items-center gap-2 ${
+                    showPricesWithTax 
+                        ? 'bg-success-50 dark:bg-success-900/20 text-success-600 border border-success-100 dark:border-success-800' 
+                        : 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 border border-amber-100 dark:border-amber-800'
+                }`}>
+                    <Tag size={14} />
+                    {showPricesWithTax 
+                        ? 'Los precios mostrados incluyen IVA'
+                        : 'Los precios mostrados no incluyen IVA'
+                    }
+                    {company?.sellOnlyFullPackages && ' · Solo bultos cerrados.'}
+                    {company?.excludeOfferProductsFromGlobalDiscount && ' · Productos en oferta no aplican descuento global.'}
+                </div>
+            )}
 
-            {/* Header con Search */}
-            <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={14} strokeWidth={2.5} />
-                <input
-                    type="text"
-                    placeholder="Buscar producto..."
-                    className="w-full pl-9 pr-4 py-2 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-xs font-medium text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900 focus:bg-[var(--bg-card)] transition-all"
-                    value={searchInput}
-                    onChange={(e) => setSearchInput(e.target.value)}
-                    autoFocus
-                />
-            </div>
+            {/* Header con Search - Oculto en modo catálogo (se maneja desde afuera) */}
+            {!viewOnly && (
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={14} strokeWidth={2.5} />
+                    <input
+                        type="text"
+                        placeholder="Buscar producto..."
+                        className="w-full pl-9 pr-4 py-2 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-xs font-medium text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900 focus:bg-[var(--bg-card)] transition-all"
+                        value={searchInput}
+                        onChange={(e) => setSearchInput(e.target.value)}
+                        autoFocus
+                    />
+                </div>
+            )}
 
             {loading ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-4">
@@ -321,6 +326,19 @@ const ProductCatalog = ({
                                                     const minOrderQuantity = product.minOrderQuantity || 1;
                                                     const sellOnlyFullPackages = company?.sellOnlyFullPackages === true;
                                                     const hasRestrictions = unitsPerPackage > 1 || minOrderQuantity > 1 || sellOnlyFullPackages || priceInfo.hasVariants;
+                                                    
+                                                    // En modo catálogo (viewOnly), no mostrar botón de agregar
+                                                    if (viewOnly) {
+                                                        return (
+                                                            <div className="text-[8px] md:text-[9px] text-right space-y-0.5">
+                                                                {priceInfo.hasVariants && (
+                                                                    <div className="px-1.5 py-0.5 bg-primary-50 dark:bg-primary-900/20 text-primary-600 rounded">
+                                                                        Ver opciones
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    }
                                                     
                                                     if (hasRestrictions) {
                                                         return (

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { changePassword } from '../../services/userService';
@@ -13,24 +13,15 @@ import {
     Save,
     Calendar,
     Clock,
-    Edit2
+    Edit2,
+    CheckCircle2,
+    AlertCircle,
+    MessageCircle,
+    Percent,
+    Tag,
+    Info
 } from 'lucide-react';
 import Button from '../../components/common/Button';
-import ConfirmModal from '../../components/common/ConfirmModal';
-
-const InfoRow = ({ label, value, icon: Icon }) => (
-    <div className="flex items-start gap-3 py-3 border-b border-(--border-color) last:border-0">
-        {Icon && (
-            <div className="w-8 h-8 rounded-lg bg-(--bg-hover) flex items-center justify-center shrink-0">
-                <Icon size={16} className="text-(--text-muted)" />
-            </div>
-        )}
-        <div className="flex-1">
-            <p className="text-[11px] font-medium text-(--text-muted) uppercase tracking-wider">{label}</p>
-            <p className="text-[13px] font-semibold text-(--text-primary) mt-0.5">{value || '-'}</p>
-        </div>
-    </div>
-);
 
 const RoleBadge = ({ roleName }) => {
     const configs = {
@@ -55,7 +46,7 @@ const RoleBadge = ({ roleName }) => {
     const Icon = config.icon;
 
     return (
-        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wider border ${config.styles}`}>
+        <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider border ${config.styles}`}>
             <Icon size={14} />
             {config.label}
         </span>
@@ -74,7 +65,7 @@ const ProfilePage = () => {
     });
     const [errors, setErrors] = useState({});
 
-    // Datos del usuario (solo informativos)
+    // Datos del usuario
     const userData = {
         firstName: user?.firstName || '',
         lastName: user?.lastName || '',
@@ -87,7 +78,10 @@ const ProfilePage = () => {
         birthDate: user?.birthDate ? new Date(user.birthDate).toLocaleDateString('es-AR') : 'No especificada',
         createdAt: user?.createdAt ? new Date(user.createdAt).toLocaleDateString('es-AR') : '',
         lastLogin: user?.lastLogin ? new Date(user.lastLogin).toLocaleString('es-AR') : 'Nunca',
-        commission: user?.commission || 0
+        commission: user?.commission || 0,
+        canViewCommission: user?.canViewCommission ?? true,
+        canEditProductDiscount: user?.canEditProductDiscount ?? true,
+        canEditBudgetDiscount: user?.canEditBudgetDiscount ?? true
     };
 
     const isVendedor = userData.role === 'vendedor';
@@ -128,7 +122,6 @@ const ProfilePage = () => {
             const errorMsg = error.response?.data?.message || 'Error al cambiar la contraseña';
             addToast(errorMsg, 'error');
             
-            // Si es error de contraseña actual incorrecta
             if (error.response?.status === 401) {
                 setErrors({ currentPassword: 'La contraseña actual es incorrecta' });
             }
@@ -141,141 +134,285 @@ const ProfilePage = () => {
         <div className="space-y-6">
             {/* Header */}
             <div>
-                <h1 className="text-xl font-bold text-(--text-primary) leading-tight">
+                <h1 className="text-xl font-bold text-[var(--text-primary)] leading-tight">
                     Mi Perfil
                 </h1>
-                <p className="text-[13px] text-(--text-secondary) mt-0.5 font-medium">
+                <p className="text-[13px] text-[var(--text-secondary)] mt-0.5 font-medium">
                     Gestiona tu información personal y seguridad de la cuenta.
                 </p>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Columna izquierda - Info del usuario */}
+                {/* COLUMNA IZQUIERDA - Información Personal */}
                 <div className="lg:col-span-2 space-y-6">
-                    {/* Card de información principal */}
-                    <div className="card p-0! overflow-hidden border-none shadow-sm ring-1 ring-(--border-color)">
-                        <div className="px-6 py-6 border-b border-(--border-color) bg-gradient-to-br from-primary-50/50 to-transparent dark:from-primary-900/10">
-                            <div className="flex items-center gap-4">
-                                <div className={`w-20 h-20 rounded-2xl flex items-center justify-center font-bold text-3xl ${
-                                    userData.role === 'admin' 
-                                        ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600' 
-                                        : userData.role === 'cliente'
-                                            ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-600'
-                                            : 'bg-amber-100 dark:bg-amber-900/30 text-amber-600'
-                                }`}>
-                                    {userData.firstName[0]}{userData.lastName[0]}
+                    
+                    {/* Card Principal con Avatar */}
+                    <div className="bg-gradient-to-br from-primary-50/50 to-transparent dark:from-primary-900/10 rounded-2xl border border-primary-100 dark:border-primary-800 p-4">
+                        <div className="flex items-center gap-4">
+                            <div className={`w-14 h-14 rounded-xl flex items-center justify-center font-bold text-xl shadow-sm ${
+                                userData.role === 'admin' 
+                                    ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600' 
+                                    : userData.role === 'cliente'
+                                        ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-600'
+                                        : 'bg-amber-100 dark:bg-amber-900/30 text-amber-600'
+                            }`}>
+                                {userData.firstName[0]}{userData.lastName[0]}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <h2 className="text-lg font-bold text-[var(--text-primary)] truncate">
+                                    {userData.firstName} {userData.lastName}
+                                </h2>
+                                <p className="text-[13px] text-[var(--text-secondary)] mt-0.5 truncate">{userData.email}</p>
+                                <div className="mt-2">
+                                    <RoleBadge roleName={userData.role} />
                                 </div>
-                                <div className="flex-1">
-                                    <h2 className="text-xl font-bold text-(--text-primary)">
-                                        {userData.firstName} {userData.lastName}
-                                    </h2>
-                                    <p className="text-sm text-(--text-secondary) mt-1">{userData.email}</p>
-                                    <div className="mt-3">
-                                        <RoleBadge roleName={userData.role} />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Información Personal */}
+                    <div className="card p-0! overflow-hidden border-none shadow-sm ring-1 ring-[var(--border-color)]">
+                        <div className="p-6">
+                            <h3 className="text-[11px] font-bold text-secondary-700 dark:text-secondary-300 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                <User size={14} />
+                                Información Personal
+                            </h3>
+                            <div className="h-px bg-secondary-200 dark:bg-secondary-700 mb-4" />
+                            
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-[10px] font-normal text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">
+                                        Nombre
+                                    </label>
+                                    <div className="relative">
+                                        <User className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={14} />
+                                        <input
+                                            type="text"
+                                            value={userData.firstName}
+                                            disabled
+                                            className="w-full pl-8 pr-2.5 py-1.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[13px] font-medium text-[var(--text-primary)] opacity-60 cursor-not-allowed"
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-normal text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">
+                                        Apellido
+                                    </label>
+                                    <div className="relative">
+                                        <User className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={14} />
+                                        <input
+                                            type="text"
+                                            value={userData.lastName}
+                                            disabled
+                                            className="w-full pl-8 pr-2.5 py-1.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[13px] font-medium text-[var(--text-primary)] opacity-60 cursor-not-allowed"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="mt-4">
+                                <label className="text-[10px] font-normal text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">
+                                    Email
+                                </label>
+                                <div className="relative">
+                                    <Mail className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={14} />
+                                    <input
+                                        type="email"
+                                        value={userData.email}
+                                        disabled
+                                        className="w-full pl-8 pr-2.5 py-1.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[13px] font-medium text-[var(--text-primary)] opacity-60 cursor-not-allowed"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="mt-4">
+                                <label className="text-[10px] font-normal text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">
+                                    Fecha de Nacimiento
+                                </label>
+                                <div className="relative">
+                                    <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={14} />
+                                    <input
+                                        type="text"
+                                        value={userData.birthDate}
+                                        disabled
+                                        className="w-full pl-8 pr-2.5 py-1.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[13px] font-medium text-[var(--text-primary)] opacity-60 cursor-not-allowed"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Contacto */}
+                    <div className="card p-0! overflow-hidden border-none shadow-sm ring-1 ring-[var(--border-color)]">
+                        <div className="p-6">
+                            <h3 className="text-[11px] font-bold text-secondary-700 dark:text-secondary-300 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                <Phone size={14} />
+                                Contacto
+                            </h3>
+                            <div className="h-px bg-secondary-200 dark:bg-secondary-700 mb-4" />
+                            
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-[10px] font-normal text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">
+                                        Teléfono
+                                    </label>
+                                    <div className="relative">
+                                        <Phone className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={14} />
+                                        <input
+                                            type="text"
+                                            value={userData.phone || 'No especificado'}
+                                            disabled
+                                            className="w-full pl-8 pr-2.5 py-1.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[13px] font-medium text-[var(--text-primary)] opacity-60 cursor-not-allowed"
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-normal text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">
+                                        WhatsApp
+                                    </label>
+                                    <div className="relative">
+                                        <MessageCircle className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={14} />
+                                        <input
+                                            type="text"
+                                            value={userData.whatsapp || 'No especificado'}
+                                            disabled
+                                            className="w-full pl-8 pr-2.5 py-1.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[13px] font-medium text-[var(--text-primary)] opacity-60 cursor-not-allowed"
+                                        />
                                     </div>
                                 </div>
                             </div>
                         </div>
-                        
-                        <div className="p-6">
-                            <h3 className="text-sm font-bold text-(--text-muted) uppercase tracking-wider mb-4">
-                                Información de Contacto
-                            </h3>
-                            <InfoRow 
-                                label="Email" 
-                                value={userData.email}
-                                icon={Mail}
-                            />
-                            <InfoRow 
-                                label="Teléfono" 
-                                value={userData.phone || 'No especificado'}
-                                icon={Phone}
-                            />
-                            <InfoRow 
-                                label="WhatsApp" 
-                                value={userData.whatsapp || 'No especificado'}
-                                icon={Phone}
-                            />
-                            <InfoRow 
-                                label="Fecha de Nacimiento" 
-                                value={userData.birthDate}
-                                icon={Calendar}
-                            />
-                        </div>
                     </div>
 
-                    {/* Información de la cuenta */}
-                    <div className="card p-0! overflow-hidden border-none shadow-sm ring-1 ring-(--border-color)">
-                        <div className="px-6 py-4 border-b border-(--border-color) bg-(--bg-hover)">
-                            <h3 className="text-sm font-bold text-(--text-muted) uppercase tracking-wider">
+                    {/* Información de la Cuenta */}
+                    <div className="card p-0! overflow-hidden border-none shadow-sm ring-1 ring-[var(--border-color)]">
+                        <div className="p-6">
+                            <h3 className="text-[11px] font-bold text-secondary-700 dark:text-secondary-300 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                <Shield size={14} />
                                 Información de la Cuenta
                             </h3>
-                        </div>
-                        
-                        <div className="p-6">
-                            <InfoRow 
-                                label="Rol" 
-                                value={isAdmin ? 'Administrador' : isVendedor ? 'Vendedor' : 'Usuario de Cliente'}
-                                icon={Shield}
-                            />
-                            {userData.company && (
-                                <InfoRow 
-                                    label="Empresa" 
-                                    value={userData.company}
-                                    icon={Building2}
-                                />
-                            )}
+                            <div className="h-px bg-secondary-200 dark:bg-secondary-700 mb-4" />
+                            
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-[10px] font-normal text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">
+                                        Rol
+                                    </label>
+                                    <div className="relative">
+                                        <Shield className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={14} />
+                                        <input
+                                            type="text"
+                                            value={isAdmin ? 'Administrador' : isVendedor ? 'Vendedor' : 'Usuario de Cliente'}
+                                            disabled
+                                            className="w-full pl-8 pr-2.5 py-1.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[13px] font-medium text-[var(--text-primary)] opacity-60 cursor-not-allowed"
+                                        />
+                                    </div>
+                                </div>
+                                
+                                {userData.company && (
+                                    <div>
+                                        <label className="text-[10px] font-normal text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">
+                                            Empresa
+                                        </label>
+                                        <div className="relative">
+                                            <Building2 className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={14} />
+                                            <input
+                                                type="text"
+                                                value={userData.company}
+                                                disabled
+                                                className="w-full pl-8 pr-2.5 py-1.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[13px] font-medium text-[var(--text-primary)] opacity-60 cursor-not-allowed"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
                             {isCliente && userData.client && (
-                                <InfoRow 
-                                    label="Cliente Asignado" 
-                                    value={userData.client}
-                                    icon={Briefcase}
-                                />
+                                <div className="mt-4">
+                                    <label className="text-[10px] font-normal text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">
+                                        Cliente Asignado
+                                    </label>
+                                    <div className="relative">
+                                        <Briefcase className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={14} />
+                                        <input
+                                            type="text"
+                                            value={userData.client}
+                                            disabled
+                                            className="w-full pl-8 pr-2.5 py-1.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[13px] font-medium text-[var(--text-primary)] opacity-60 cursor-not-allowed"
+                                        />
+                                    </div>
+                                </div>
                             )}
+
                             {isVendedor && (
-                                <InfoRow 
-                                    label="Comisión" 
-                                    value={`${userData.commission}%`}
-                                    icon={User}
-                                />
+                                <div className="mt-4">
+                                    <label className="text-[10px] font-normal text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">
+                                        Comisión (%)
+                                    </label>
+                                    <div className="relative">
+                                        <Percent className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={14} />
+                                        <input
+                                            type="text"
+                                            value={`${userData.commission}%`}
+                                            disabled
+                                            className="w-full pl-8 pr-2.5 py-1.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[13px] font-medium text-[var(--text-primary)] opacity-60 cursor-not-allowed"
+                                        />
+                                    </div>
+                                </div>
                             )}
-                            <InfoRow 
-                                label="Miembro desde" 
-                                value={userData.createdAt}
-                                icon={Calendar}
-                            />
-                            <InfoRow 
-                                label="Último acceso" 
-                                value={userData.lastLogin}
-                                icon={Clock}
-                            />
+
+                            <div className="mt-4 grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-[10px] font-normal text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">
+                                        Miembro desde
+                                    </label>
+                                    <div className="relative">
+                                        <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={14} />
+                                        <input
+                                            type="text"
+                                            value={userData.createdAt}
+                                            disabled
+                                            className="w-full pl-8 pr-2.5 py-1.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[13px] font-medium text-[var(--text-primary)] opacity-60 cursor-not-allowed"
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-normal text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">
+                                        Último acceso
+                                    </label>
+                                    <div className="relative">
+                                        <Clock className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={14} />
+                                        <input
+                                            type="text"
+                                            value={userData.lastLogin}
+                                            disabled
+                                            className="w-full pl-8 pr-2.5 py-1.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[13px] font-medium text-[var(--text-primary)] opacity-60 cursor-not-allowed"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Columna derecha - Seguridad */}
+                {/* COLUMNA DERECHA - Seguridad */}
                 <div className="space-y-6">
-                    {/* Cambiar contraseña */}
-                    <div className="card p-0! overflow-hidden border-none shadow-sm ring-1 ring-(--border-color)">
-                        <div className="px-6 py-4 border-b border-(--border-color) bg-(--bg-hover)">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-primary-600">
-                                    <Lock size={20} />
-                                </div>
-                                <div>
-                                    <h2 className="text-base font-bold text-(--text-primary)">Seguridad</h2>
-                                    <p className="text-[11px] text-(--text-muted)">Gestiona tu contraseña</p>
-                                </div>
-                            </div>
-                        </div>
-                        
+                    
+                    {/* Cambiar Contraseña */}
+                    <div className="card p-0! overflow-hidden border-none shadow-sm ring-1 ring-[var(--border-color)]">
                         <div className="p-6">
+                            <h3 className="text-[11px] font-bold text-secondary-700 dark:text-secondary-300 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                <Lock size={14} />
+                                Seguridad
+                            </h3>
+                            <div className="h-px bg-secondary-200 dark:bg-secondary-700 mb-4" />
+                            
                             {!showPasswordForm ? (
-                                <div className="text-center">
-                                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-(--bg-hover) flex items-center justify-center">
-                                        <Lock size={28} className="text-(--text-muted)" />
+                                <div className="text-center py-4">
+                                    <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[var(--bg-hover)] flex items-center justify-center">
+                                        <Lock size={28} className="text-[var(--text-muted)]" />
                                     </div>
-                                    <p className="text-sm text-(--text-secondary) mb-4">
+                                    <p className="text-sm text-[var(--text-secondary)] mb-5">
                                         Es recomendable cambiar tu contraseña periódicamente para mantener tu cuenta segura.
                                     </p>
                                     <Button
@@ -295,69 +432,80 @@ const ProfilePage = () => {
                                             setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
                                             setErrors({});
                                         }}
-                                        className="text-xs text-(--text-muted) hover:text-(--text-primary) transition-colors"
+                                        className="text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors flex items-center gap-1"
                                     >
                                         ← Volver
                                     </button>
 
                                     <div>
-                                        <label className="block text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-2">
+                                        <label className="text-[10px] font-normal text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">
                                             Contraseña Actual
                                         </label>
-                                        <input
-                                            type="password"
-                                            value={passwordData.currentPassword}
-                                            onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
-                                            className={`w-full px-3 py-2.5 bg-(--bg-input) border rounded-lg text-sm text-(--text-primary) focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900 ${
-                                                errors.currentPassword ? 'border-danger-500' : 'border-(--border-color)'
-                                            }`}
-                                            placeholder="••••••••"
-                                        />
+                                        <div className="relative">
+                                            <Lock className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={14} />
+                                            <input
+                                                type="password"
+                                                value={passwordData.currentPassword}
+                                                onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                                                className={`w-full pl-8 pr-2.5 py-1.5 bg-[var(--bg-input)] border rounded-lg text-[13px] font-medium text-[var(--text-primary)] focus:outline-none focus:border-primary-500 transition-colors placeholder:text-[var(--text-muted)]/50 ${
+                                                    errors.currentPassword ? 'border-danger-500' : 'border-[var(--border-color)]'
+                                                }`}
+                                                placeholder="••••••••"
+                                            />
+                                        </div>
                                         {errors.currentPassword && (
-                                            <p className="text-danger-500 text-xs mt-1">{errors.currentPassword}</p>
+                                            <p className="text-danger-500 text-[10px] mt-1 flex items-center gap-1">
+                                                <AlertCircle size={10} /> {errors.currentPassword}
+                                            </p>
                                         )}
                                     </div>
 
                                     <div>
-                                        <label className="block text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-2">
+                                        <label className="text-[10px] font-normal text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">
                                             Nueva Contraseña
                                         </label>
-                                        <input
-                                            type="password"
-                                            value={passwordData.newPassword}
-                                            onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-                                            className={`w-full px-3 py-2.5 bg-(--bg-input) border rounded-lg text-sm text-(--text-primary) focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900 ${
-                                                errors.newPassword ? 'border-danger-500' : 'border-(--border-color)'
-                                            }`}
-                                            placeholder="Mínimo 6 caracteres"
-                                        />
+                                        <div className="relative">
+                                            <Lock className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={14} />
+                                            <input
+                                                type="password"
+                                                value={passwordData.newPassword}
+                                                onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                                                className={`w-full pl-8 pr-2.5 py-1.5 bg-[var(--bg-input)] border rounded-lg text-[13px] font-medium text-[var(--text-primary)] focus:outline-none focus:border-primary-500 transition-colors placeholder:text-[var(--text-muted)]/50 ${
+                                                    errors.newPassword ? 'border-danger-500' : 'border-[var(--border-color)]'
+                                                }`}
+                                                placeholder="Mínimo 6 caracteres"
+                                            />
+                                        </div>
                                         {errors.newPassword && (
-                                            <p className="text-danger-500 text-xs mt-1">{errors.newPassword}</p>
+                                            <p className="text-danger-500 text-[10px] mt-1">{errors.newPassword}</p>
                                         )}
                                     </div>
 
                                     <div>
-                                        <label className="block text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-2">
+                                        <label className="text-[10px] font-normal text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">
                                             Confirmar Nueva Contraseña
                                         </label>
-                                        <input
-                                            type="password"
-                                            value={passwordData.confirmPassword}
-                                            onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
-                                            className={`w-full px-3 py-2.5 bg-(--bg-input) border rounded-lg text-sm text-(--text-primary) focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900 ${
-                                                errors.confirmPassword ? 'border-danger-500' : 'border-(--border-color)'
-                                            }`}
-                                            placeholder="Repite la nueva contraseña"
-                                        />
+                                        <div className="relative">
+                                            <Lock className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={14} />
+                                            <input
+                                                type="password"
+                                                value={passwordData.confirmPassword}
+                                                onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                                                className={`w-full pl-8 pr-2.5 py-1.5 bg-[var(--bg-input)] border rounded-lg text-[13px] font-medium text-[var(--text-primary)] focus:outline-none focus:border-primary-500 transition-colors placeholder:text-[var(--text-muted)]/50 ${
+                                                    errors.confirmPassword ? 'border-danger-500' : 'border-[var(--border-color)]'
+                                                }`}
+                                                placeholder="Repite la nueva contraseña"
+                                            />
+                                        </div>
                                         {errors.confirmPassword && (
-                                            <p className="text-danger-500 text-xs mt-1">{errors.confirmPassword}</p>
+                                            <p className="text-danger-500 text-[10px] mt-1">{errors.confirmPassword}</p>
                                         )}
                                     </div>
 
                                     <Button
                                         variant="primary"
                                         onClick={handlePasswordChange}
-                                        isLoading={loading}
+                                        loading={loading}
                                         className="w-full mt-2"
                                     >
                                         <Save size={16} className="mr-2" />
@@ -368,13 +516,46 @@ const ProfilePage = () => {
                         </div>
                     </div>
 
+                    {/* Permisos (solo si aplica) */}
+                    {isVendedor && (
+                        <div className="bg-gradient-to-br from-primary-50/50 to-transparent dark:from-primary-900/10 rounded-2xl border border-primary-100 dark:border-primary-800 p-5">
+                            <h3 className="text-[11px] font-semibold text-primary-700 dark:text-primary-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                <Shield size={14} /> Mis Permisos
+                            </h3>
+                            
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <Percent size={14} className="text-[var(--text-muted)]" />
+                                        <span className="text-[13px] text-[var(--text-primary)]">Ver comisiones</span>
+                                    </div>
+                                    <div className={`w-2 h-2 rounded-full ${userData.canViewCommission ? 'bg-success-500' : 'bg-danger-500'}`} />
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <Tag size={14} className="text-[var(--text-muted)]" />
+                                        <span className="text-[13px] text-[var(--text-primary)]">Editar descuentos</span>
+                                    </div>
+                                    <div className={`w-2 h-2 rounded-full ${userData.canEditProductDiscount ? 'bg-success-500' : 'bg-danger-500'}`} />
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <Percent size={14} className="text-[var(--text-muted)]" />
+                                        <span className="text-[13px] text-[var(--text-primary)]">Descuento global</span>
+                                    </div>
+                                    <div className={`w-2 h-2 rounded-full ${userData.canEditBudgetDiscount ? 'bg-success-500' : 'bg-danger-500'}`} />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Tips de seguridad */}
                     <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl p-4 border border-amber-100 dark:border-amber-800">
-                        <h4 className="text-sm font-bold text-amber-800 dark:text-amber-400 mb-2 flex items-center gap-2">
-                            <Shield size={16} />
+                        <h4 className="text-[11px] font-bold text-amber-800 dark:text-amber-400 mb-2 flex items-center gap-2">
+                            <Info size={14} />
                             Consejos de Seguridad
                         </h4>
-                        <ul className="text-xs text-amber-700 dark:text-amber-300 space-y-1.5">
+                        <ul className="text-[11px] text-amber-700 dark:text-amber-300 space-y-1.5">
                             <li>• Usa al menos 8 caracteres</li>
                             <li>• Combina letras, números y símbolos</li>
                             <li>• No uses información personal</li>

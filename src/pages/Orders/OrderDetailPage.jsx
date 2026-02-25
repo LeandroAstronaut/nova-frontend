@@ -378,7 +378,7 @@ const OrderDetailPage = () => {
                 </div>
                 
                 {/* Botones de acción */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 w-full md:w-auto">
                     {/* Botón de próximo paso */}
                     {canConvertToOrder() && (
                         <Button 
@@ -428,12 +428,13 @@ const OrderDetailPage = () => {
                         <Button
                             variant="secondary"
                             onClick={() => setIsUpdatePricesModalOpen(true)}
-                            className="px-3! text-[11px] font-bold uppercase tracking-wider bg-warning-50! text-warning-600! border-warning-200! hover:bg-warning-100!"
+                            className="px-3! text-[11px] font-bold uppercase tracking-wider"
                             title={`${priceChangesCount} producto${priceChangesCount > 1 ? 's' : ''} con precios actualizados`}
                         >
                             <RefreshCw size={14} strokeWidth={2.5} className={checkingPriceChanges ? 'animate-spin' : ''} />
-                            Actualizar Precios
-                            <span className="ml-1 px-1.5 py-0.5 bg-warning-600 text-white text-[9px] rounded-full">
+                            <span className="hidden md:inline">Actualizar Precios</span>
+                            <span className="md:hidden">Actualizar</span>
+                            <span className="ml-1 px-1.5 py-0.5 bg-danger-500 text-white text-[9px] rounded-full">
                                 {priceChangesCount}
                             </span>
                         </Button>
@@ -450,7 +451,7 @@ const OrderDetailPage = () => {
                     </Button>
 
                     {/* Menú de más acciones - visible para todos los roles */}
-                    <div className="relative">
+                    <div className="relative ml-auto">
                         <button
                             onClick={() => setShowActionsMenu(!showActionsMenu)}
                             className="p-2 hover:bg-(--bg-hover) rounded-lg text-(--text-muted) hover:text-(--text-primary) transition-colors"

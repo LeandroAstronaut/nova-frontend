@@ -1,18 +1,16 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useState, useEffect } from 'react';
 import { 
     Building2, Plus, Edit2, Trash2, Power, Check, X, 
     Package, FileText, Receipt, Users, Landmark, ShoppingCart, 
     Search, Download, MoreHorizontal, ChevronUp, ChevronDown,
-    Briefcase, Shield, Mail, Phone, Percent, Box, Grid3X3, Eye, DollarSign,
-    Upload, Trash2 as TrashIcon, Image as ImageIcon, Tag
+    Grid3X3, Upload, Percent
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { companyService, updateDisplayPreferences, updateOrderSettings, uploadCompanyLogo, deleteCompanyLogo } from '../../services/companyService';
+import { motion } from 'framer-motion';
+import { companyService } from '../../services/companyService';
 import { useToast } from '../../context/ToastContext';
 import ConfirmModal from '../../components/common/ConfirmModal';
 import Button from '../../components/common/Button';
-import Input from '../../components/common/Input';
+import CompanyDrawer from '../../components/companies/CompanyDrawer';
 
 const StatusBadge = ({ active }) => {
     return (
@@ -59,7 +57,7 @@ const PlanBadge = ({ plan }) => {
 
 // Función para exportar a CSV
 const exportToCSV = (data) => {
-    const headers = ['Nombre', 'Email', 'Slug', 'Plan', 'Estado', 'Usuarios Activos', 'Max Usuarios', 'Pedidos', 'Catálogo', 'Recibos', 'Ctas.Corrientes', 'Stock', 'Listas', 'Usr.Cliente', 'Prod.Variables'];
+    const headers = ['Nombre', 'Email', 'Slug', 'Plan', 'Estado', 'Usuarios Activos', 'Max Usuarios', 'Pedidos', 'Catálogo', 'Recibos', 'Ctas.Corrientes', 'Stock', 'Listas', 'Importador', 'Usr.Cliente', 'Prod.Variables'];
     const rows = data.map(company => [
         company.name,
         company.email,
@@ -75,6 +73,7 @@ const exportToCSV = (data) => {
         company.features.stock ? 'Sí' : 'No',
         company.features.priceLists ? 'Sí' : 'No',
         company.features.clientUsers ? 'Sí' : 'No',
+        company.features.importer ? 'Sí' : 'No',
         company.features.productVariants ? 'Sí' : 'No'
     ]);
     
@@ -94,40 +93,11 @@ const CompaniesPage = () => {
     const [editingCompany, setEditingCompany] = useState(null);
     const [deleteModal, setDeleteModal] = useState({ open: false, company: null });
     const { addToast: showToast } = useToast();
-    
-    // Estado para manejo de logo
-    const [localLogo, setLocalLogo] = useState(null);
-    const [uploadingLogo, setUploadingLogo] = useState(false);
-    const fileInputRef = useRef(null);
 
     // Sorting State
     const [sort, setSort] = useState({
         sortBy: 'name',
         order: 'asc'
-    });
-
-    // Form state
-    const [formData, setFormData] = useState({
-        name: '',
-        email: '',
-        slug: '',
-        plan: 'basico',
-        active: true,
-        features: {
-            catalog: false,
-            importador: false,
-            stock: false,
-            priceLists: false,
-            receipts: false,
-            currentAccount: false,
-            orders: true,
-            clientUsers: false,
-            productVariants: false,
-            maxUsers: 3
-        },
-        showPricesWithTax: false,
-        inputPricesWithTax: false,
-        excludeOfferProductsFromGlobalDiscount: false
     });
 
     const fetchCompanies = async () => {
@@ -186,63 +156,25 @@ const CompaniesPage = () => {
         c.slug.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const handleInputChange = (e) => {
-        const { name, value, type, checked } = e.target;
-        if (name.startsWith('features.')) {
-            const featureName = name.split('.')[1];
-            setFormData(prev => ({
-                ...prev,
-                features: { ...prev.features, [featureName]: type === 'checkbox' ? checked : value }
-            }));
-        } else if (name === 'showPricesWithTax' || name === 'inputPricesWithTax' || name === 'excludeOfferProductsFromGlobalDiscount') {
-            setFormData(prev => ({ ...prev, [name]: checked }));
+    // Handle create/edit company
+    const handleSaveCompany = async (companyId, formData) => {
+        if (companyId) {
+            await companyService.update(companyId, formData);
+            showToast('Compañía actualizada exitosamente', 'success');
         } else {
-            setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+            await companyService.create(formData);
+            showToast('Compañía creada exitosamente', 'success');
         }
+        fetchCompanies();
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        try {
-            if (editingCompany) {
-                await companyService.update(editingCompany._id, formData);
-                // También actualizar preferencias de visualización
-                await updateDisplayPreferences(editingCompany._id, {
-                    showPricesWithTax: formData.showPricesWithTax,
-                    inputPricesWithTax: formData.inputPricesWithTax
-                });
-                // Actualizar configuración de pedidos
-                await updateOrderSettings(editingCompany._id, {
-                    excludeOfferProductsFromGlobalDiscount: formData.excludeOfferProductsFromGlobalDiscount
-                });
-                showToast('Compañía actualizada exitosamente', 'success');
-            } else {
-                await companyService.create(formData);
-                showToast('Compañía creada exitosamente', 'success');
-            }
-            setShowDrawer(false);
-            setEditingCompany(null);
-            resetForm();
-            fetchCompanies();
-        } catch (error) {
-            showToast(error.response?.data?.message || 'Error al guardar compañía', 'error');
-        }
+    const handleOpenCreate = () => {
+        setEditingCompany(null);
+        setShowDrawer(true);
     };
 
     const handleEdit = (company) => {
         setEditingCompany(company);
-        setFormData({
-            name: company.name,
-            email: company.email,
-            slug: company.slug,
-            plan: company.plan,
-            active: company.active,
-            features: { ...company.features },
-            showPricesWithTax: company.showPricesWithTax || false,
-            inputPricesWithTax: company.inputPricesWithTax || false,
-            excludeOfferProductsFromGlobalDiscount: company.excludeOfferProductsFromGlobalDiscount || false
-        });
-        setLocalLogo(company.logo || null);
         setShowDrawer(true);
     };
 
@@ -257,114 +189,14 @@ const CompaniesPage = () => {
         }
     };
 
-    const handleToggleStatus = async () => {
+    const handleToggleStatus = async (companyId) => {
         try {
-            await companyService.toggleStatus(editingCompany._id);
-            const newStatus = !editingCompany.active;
-            showToast(`Compañía ${newStatus ? 'activada' : 'desactivada'}`, 'success');
-            setEditingCompany(prev => ({ ...prev, active: newStatus }));
-            setFormData(prev => ({ ...prev, active: newStatus }));
+            await companyService.toggleStatus(companyId);
+            // Refresh the companies list to reflect the status change
             fetchCompanies();
         } catch (error) {
             showToast('Error al cambiar estado', 'error');
-        }
-    };
-
-    const resetForm = () => {
-        setFormData({
-            name: '',
-            email: '',
-            slug: '',
-            plan: 'basico',
-            active: true,
-            features: {
-                catalog: false,
-                importador: false,
-                stock: false,
-                priceLists: false,
-                receipts: false,
-                currentAccount: false,
-                orders: true,
-                clientUsers: false,
-                productVariants: false,
-                maxUsers: 3
-            },
-            showPricesWithTax: false,
-            inputPricesWithTax: false,
-            excludeOfferProductsFromGlobalDiscount: false
-        });
-    }
-
-    const openCreateDrawer = () => {
-        setEditingCompany(null);
-        resetForm();
-        setLocalLogo(null);
-        setShowDrawer(true);
-    };
-
-    const handleLogoUpload = async (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        
-        if (!editingCompany) return;
-        
-        const file = e.target.files[0];
-        if (!file) return;
-        
-        // Resetear el input después de un pequeño delay
-        setTimeout(() => {
-            if (e.target) e.target.value = '';
-        }, 100);
-
-        // Validar tipo de archivo
-        if (!file.type.startsWith('image/')) {
-            showToast('Por favor selecciona un archivo de imagen válido', 'error');
-            return;
-        }
-
-        // Validar tamaño (1MB máximo)
-        if (file.size > 1 * 1024 * 1024) {
-            showToast('La imagen no debe superar los 1MB', 'error');
-            return;
-        }
-
-        setUploadingLogo(true);
-        try {
-            const result = await uploadCompanyLogo(editingCompany._id, file);
-            if (result.logo) {
-                setLocalLogo(result.logo);
-                // Actualizar la compañía en la lista
-                setCompanies(prev => prev.map(c => 
-                    c._id === editingCompany._id ? { ...c, logo: result.logo } : c
-                ));
-            }
-            showToast('Logo actualizado exitosamente', 'success');
-        } catch (error) {
-            console.error('Error uploading logo:', error);
-            showToast('Error al subir el logo: ' + (error.response?.data?.message || error.message), 'error');
-        } finally {
-            setUploadingLogo(false);
-        }
-    };
-
-    const handleDeleteLogo = async () => {
-        if (!editingCompany) return;
-        if (!window.confirm('¿Estás seguro de que deseas eliminar el logo?')) return;
-
-        setUploadingLogo(true);
-        try {
-            await deleteCompanyLogo(editingCompany._id);
-            setLocalLogo(null);
-            // Actualizar la compañía en la lista
-            setCompanies(prev => prev.map(c => 
-                c._id === editingCompany._id ? { ...c, logo: null } : c
-            ));
-            showToast('Logo eliminado exitosamente', 'success');
-        } catch (error) {
-            console.error('Error deleting logo:', error);
-            showToast('Error al eliminar el logo', 'error');
-        } finally {
-            setUploadingLogo(false);
+            throw error;
         }
     };
 
@@ -391,7 +223,7 @@ const CompaniesPage = () => {
                     </Button>
                     <Button 
                         variant="primary" 
-                        onClick={openCreateDrawer} 
+                        onClick={handleOpenCreate} 
                         className="text-[11px] font-bold uppercase tracking-wider shadow-md shadow-primary-100 dark:shadow-primary-900/30"
                     >
                         <Plus size={14} strokeWidth={2.5} />
@@ -511,6 +343,9 @@ const CompaniesPage = () => {
                                                 {company.features.clientUsers && (
                                                     <FeatureBadge active={true} icon={Users} label="Usr.Cliente" />
                                                 )}
+                                                {company.features.importer && (
+                                                    <FeatureBadge active={true} icon={Upload} label="Importador" />
+                                                )}
                                                 {company.features.commissionCalculation && (
                                                     <FeatureBadge active={true} icon={Percent} label="Comisiones" />
                                                 )}
@@ -520,39 +355,26 @@ const CompaniesPage = () => {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-center">
-                                            <span className="text-[12px] font-semibold text-(--text-secondary)">
-                                                <span className={company.activeUsersCount >= company.features.maxUsers ? 'text-danger-600 font-bold' : ''}>
-                                                    {company.activeUsersCount || 0}
-                                                </span>
-                                                <span className="text-(--text-muted)">/{company.features.maxUsers}</span>
+                                            <span className={`text-[11px] font-bold ${company.activeUsersCount >= company.features.maxUsers ? 'text-danger-600' : ''}`}>
+                                                {company.activeUsersCount || 0}/{company.features.maxUsers}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 text-center">
                                             <StatusBadge active={company.active} />
                                         </td>
                                         <td className="px-6 py-4 text-right">
-                                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); handleEdit(company); }}
-                                                    className="p-1.5 rounded-lg text-(--text-muted) hover:text-primary-600 dark:hover:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-all"
-                                                    title="Editar"
-                                                >
-                                                    <Edit2 size={16} strokeWidth={2.5} />
-                                                </button>
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); setDeleteModal({ open: true, company }); }}
-                                                    className="p-1.5 rounded-lg text-(--text-muted) hover:text-danger-600 dark:hover:text-danger-400 hover:bg-danger-50 dark:hover:bg-danger-900/30 transition-all"
-                                                    title="Eliminar"
-                                                >
-                                                    <Trash2 size={16} strokeWidth={2.5} />
-                                                </button>
-                                            </div>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); handleEdit(company); }}
+                                                className="p-1.5 rounded-lg text-(--text-muted) hover:text-primary-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            >
+                                                <Edit2 size={14} />
+                                            </button>
                                         </td>
                                     </tr>
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan="6" className="px-6 py-12 text-center">
+                                    <td colSpan="6" className="px-6 py-8 text-center">
                                         <div className="text-(--text-muted) text-[11px] font-bold uppercase tracking-widest bg-(--bg-hover) w-fit mx-auto px-4 py-2 rounded-lg border border-(--border-color)">
                                             No se encontraron compañías
                                         </div>
@@ -566,21 +388,19 @@ const CompaniesPage = () => {
                 {/* Vista Mobile - Cards */}
                 <div className="md:hidden">
                     {loading ? (
-                        <div className="p-6 text-center">
-                            <div className="flex items-center justify-center gap-2 text-(--text-muted) text-[11px] font-bold uppercase tracking-widest">
-                                <div className="w-3.5 h-3.5 border-2 border-(--border-color) border-t-primary-600 dark:border-t-primary-400 rounded-full animate-spin"></div>
-                                Cargando...
-                            </div>
+                        <div className="p-6 flex items-center justify-center gap-2 text-(--text-muted) text-[11px] font-bold uppercase tracking-widest">
+                            <div className="w-3.5 h-3.5 border-2 border-(--border-color) border-t-primary-600 dark:border-t-primary-400 rounded-full animate-spin"></div>
+                            Cargando...
                         </div>
                     ) : filteredCompanies.length > 0 ? (
                         <div className="divide-y divide-(--border-color)">
                             {filteredCompanies.map((company) => (
                                 <div 
-                                    key={company._id} 
-                                    className="p-4 hover:bg-(--bg-hover) transition-colors cursor-pointer"
+                                    key={company._id}
+                                    className="p-4 hover:bg-(--bg-hover) cursor-pointer transition-colors"
                                     onClick={() => handleEdit(company)}
                                 >
-                                    <div className="flex items-center justify-between mb-3">
+                                    <div className="flex items-start justify-between mb-2">
                                         <div>
                                             <div className="text-[14px] font-bold text-(--text-primary)">{company.name}</div>
                                             <div className="text-[10px] text-(--text-muted)">/{company.slug}</div>
@@ -611,6 +431,9 @@ const CompaniesPage = () => {
                                         )}
                                         {company.features.clientUsers && (
                                             <FeatureBadge active={true} icon={Users} label="Usr.Cliente" />
+                                        )}
+                                        {company.features.importer && (
+                                            <FeatureBadge active={true} icon={Upload} label="Importador" />
                                         )}
                                         {company.features.commissionCalculation && (
                                             <FeatureBadge active={true} icon={Percent} label="Comisiones" />
@@ -657,433 +480,16 @@ const CompaniesPage = () => {
                 </div>
             </div>
 
-            {/* Create/Edit Drawer */}
-            {showDrawer && createPortal(
-                <AnimatePresence>
-                    <>
-                        {/* Backdrop */}
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            onClick={() => setShowDrawer(false)}
-                            className="fixed inset-0 bg-secondary-900/50 dark:bg-black/60 backdrop-blur-sm z-[9999]"
-                        />
+            {/* Create/Edit Drawer - Componente separado */}
+            <CompanyDrawer
+                isOpen={showDrawer}
+                onClose={() => setShowDrawer(false)}
+                company={editingCompany}
+                onSave={handleSaveCompany}
+                onToggleStatus={editingCompany ? () => handleToggleStatus(editingCompany._id) : null}
+            />
 
-                        {/* Drawer */}
-                        <motion.div
-                            initial={{ x: '100%' }}
-                            animate={{ x: 0 }}
-                            exit={{ x: '100%' }}
-                            transition={{ type: 'spring', damping: 28, stiffness: 220 }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="fixed top-4 left-4 right-4 md:left-auto h-[calc(100vh-2rem)] w-auto md:w-full md:max-w-[480px] bg-(--bg-card) shadow-2xl z-[10000] flex flex-col border border-(--border-color) rounded-2xl overflow-hidden"
-                        >
-                            {/* Header */}
-                            <div className="px-6 py-4 border-b border-(--border-color) flex items-center justify-between shrink-0">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-primary-600 dark:text-primary-400">
-                                        <Building2 size={20} />
-                                    </div>
-                                    <div>
-                                        <h2 className="text-base font-bold text-(--text-primary)">
-                                            {editingCompany ? 'Editar Compañía' : 'Nueva Compañía'}
-                                        </h2>
-                                        <p className="text-[11px] text-(--text-muted)">
-                                            {editingCompany ? 'Modifique los datos de la compañía' : 'Complete los datos de la nueva compañía'}
-                                        </p>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={() => setShowDrawer(false)}
-                                    className="p-2 hover:bg-(--bg-hover) rounded-lg text-(--text-muted) hover:text-(--text-primary) transition-colors"
-                                >
-                                    <X size={20} />
-                                </button>
-                            </div>
-                            
-                            {/* Body */}
-                            <div className="flex-1 overflow-y-auto p-6 space-y-5">
-                                <form id="company-form" onSubmit={handleSubmit} className="space-y-5">
-                                    {/* Nombre */}
-                                    <div>
-                                        <label className="block text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-2">
-                                            Nombre *
-                                        </label>
-                                        <div className="relative">
-                                            <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-(--text-muted)" size={16} />
-                                            <input
-                                                type="text"
-                                                name="name"
-                                                value={formData.name}
-                                                onChange={handleInputChange}
-                                                placeholder="Nombre de la compañía"
-                                                required
-                                                className="w-full pl-10 pr-3 py-2.5 bg-(--bg-input) border border-(--border-color) rounded-lg text-sm text-(--text-primary) placeholder:text-(--text-muted) focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {/* Email */}
-                                    <div>
-                                        <label className="block text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-2">
-                                            Email *
-                                        </label>
-                                        <div className="relative">
-                                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-(--text-muted)" size={16} />
-                                            <input
-                                                type="email"
-                                                name="email"
-                                                value={formData.email}
-                                                onChange={handleInputChange}
-                                                placeholder="empresa@ejemplo.com"
-                                                required
-                                                className="w-full pl-10 pr-3 py-2.5 bg-(--bg-input) border border-(--border-color) rounded-lg text-sm text-(--text-primary) placeholder:text-(--text-muted) focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {/* Slug */}
-                                    <div>
-                                        <label className="block text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-2">
-                                            Slug *
-                                        </label>
-                                        <div className="relative">
-                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-(--text-muted) text-sm">/</span>
-                                            <input
-                                                type="text"
-                                                name="slug"
-                                                value={formData.slug}
-                                                onChange={handleInputChange}
-                                                placeholder="nombre-compania"
-                                                required
-                                                disabled={!!editingCompany}
-                                                className={`w-full pl-8 pr-3 py-2.5 bg-(--bg-input) border border-(--border-color) rounded-lg text-sm text-(--text-primary) placeholder:text-(--text-muted) focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900 ${editingCompany ? 'opacity-60 cursor-not-allowed' : ''}`}
-                                            />
-                                        </div>
-                                        {editingCompany && (
-                                            <p className="text-[10px] text-(--text-muted) mt-1">El slug no se puede modificar</p>
-                                        )}
-                                    </div>
-
-                                    {/* Plan */}
-                                    <div>
-                                        <label className="block text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-2">
-                                            Plan *
-                                        </label>
-                                        <div className="grid grid-cols-3 gap-2">
-                                            {[
-                                                { key: 'basico', label: 'Básico', color: 'secondary' },
-                                                { key: 'estandar', label: 'Estándar', color: 'primary' },
-                                                { key: 'premium', label: 'Premium', color: 'warning' }
-                                            ].map(({ key, label, color }) => (
-                                                <button
-                                                    key={key}
-                                                    type="button"
-                                                    onClick={() => setFormData(prev => ({ ...prev, plan: key }))}
-                                                    className={`flex flex-col items-center gap-1 px-2 py-3 rounded-lg border-2 transition-all ${
-                                                        formData.plan === key
-                                                            ? `border-${color}-500 bg-${color}-50 dark:bg-${color}-900/20`
-                                                            : 'border-(--border-color) hover:border-(--border-color) hover:bg-(--bg-hover)'
-                                                    }`}
-                                                >
-                                                    <span className={`text-[11px] font-bold text-center leading-tight ${formData.plan === key ? `text-${color}-600` : 'text-(--text-secondary)'}`}>
-                                                        {label}
-                                                    </span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    {/* Máximo de Usuarios */}
-                                    <div>
-                                        <label className="block text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-2">
-                                            Máximo de Usuarios
-                                        </label>
-                                        <div className="relative">
-                                            <Users className="absolute left-3 top-1/2 -translate-y-1/2 text-(--text-muted)" size={16} />
-                                            <input
-                                                type="number"
-                                                name="features.maxUsers"
-                                                value={formData.features.maxUsers}
-                                                onChange={handleInputChange}
-                                                min="1"
-                                                max="100"
-                                                className="w-full pl-10 pr-3 py-2.5 bg-(--bg-input) border border-(--border-color) rounded-lg text-sm text-(--text-primary) focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {/* Módulos Habilitados */}
-                                    <div>
-                                        <label className="block text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
-                                            Módulos Habilitados
-                                        </label>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            {[
-                                                { key: 'orders', label: 'Pedidos', icon: ShoppingCart },
-                                                { key: 'catalog', label: 'Catálogo', icon: Package },
-                                                { key: 'receipts', label: 'Recibos', icon: Receipt },
-                                                { key: 'currentAccount', label: 'Ctas. Corrientes', icon: Landmark },
-                                                { key: 'stock', label: 'Stock', icon: Building2 },
-                                                { key: 'priceLists', label: 'Listas de Precio', icon: FileText },
-                                                { key: 'clientUsers', label: 'Usuarios Cliente', icon: Users },
-                                                { key: 'commissionCalculation', label: 'Cálculo de Comisiones', icon: Percent },
-                                                { key: 'productVariants', label: 'Productos Variables', icon: Grid3X3 },
-                                            ].map(({ key, label, icon: Icon }) => (
-                                                <label
-                                                    key={key}
-                                                    className={`
-                                                        flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all
-                                                        ${formData.features[key] 
-                                                            ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' 
-                                                            : 'border-(--border-color) hover:bg-(--bg-hover)'}
-                                                    `}
-                                                >
-                                                    <input
-                                                        type="checkbox"
-                                                        name={`features.${key}`}
-                                                        checked={formData.features[key]}
-                                                        onChange={handleInputChange}
-                                                        className="hidden"
-                                                    />
-                                                    <Icon size={18} className={formData.features[key] ? 'text-primary-600' : 'text-(--text-muted)'} />
-                                                    <span className={`text-sm ${formData.features[key] ? 'font-semibold text-primary-700' : 'text-(--text-secondary)'}`}>
-                                                        {label}
-                                                    </span>
-                                                    {formData.features[key] && <Check size={14} className="text-primary-600 ml-auto" />}
-                                                </label>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    {/* Preferencias de Visualización - Solo en edición */}
-                                    {editingCompany && (
-                                        <div className="pt-4 border-t border-(--border-color)">
-                                            <label className="block text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
-                                                Preferencias de Visualización
-                                            </label>
-                                            <div className="space-y-3">
-                                                {/* Toggle: Mostrar precios con IVA */}
-                                                <label className="flex items-center justify-between p-3 bg-(--bg-hover) rounded-lg border border-(--border-color) cursor-pointer">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-8 h-8 rounded-lg bg-success-100 dark:bg-success-900/30 flex items-center justify-center text-success-600">
-                                                            <DollarSign size={16} />
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-sm font-semibold text-(--text-primary)">Mostrar precios con IVA incluido</p>
-                                                            <p className="text-[10px] text-(--text-muted)">En productos, presupuestos y pedidos</p>
-                                                        </div>
-                                                    </div>
-                                                    <div className={`relative w-12 h-6 rounded-full transition-colors ${formData.showPricesWithTax ? 'bg-primary-500' : 'bg-(--border-color)'}`}>
-                                                        <input
-                                                            type="checkbox"
-                                                            name="showPricesWithTax"
-                                                            checked={formData.showPricesWithTax}
-                                                            onChange={handleInputChange}
-                                                            className="sr-only"
-                                                        />
-                                                        <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${formData.showPricesWithTax ? 'translate-x-7' : 'translate-x-1'}`} />
-                                                    </div>
-                                                </label>
-
-                                                {/* Toggle: Cargar precios con IVA */}
-                                                <label className="flex items-center justify-between p-3 bg-(--bg-hover) rounded-lg border border-(--border-color) cursor-pointer">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600">
-                                                            <DollarSign size={16} />
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-sm font-semibold text-(--text-primary)">En alta/edición cargo precios con IVA incluido</p>
-                                                            <p className="text-[10px] text-(--text-muted)">El sistema calculará el precio sin IVA automáticamente</p>
-                                                        </div>
-                                                    </div>
-                                                    <div className={`relative w-12 h-6 rounded-full transition-colors ${formData.inputPricesWithTax ? 'bg-primary-500' : 'bg-(--border-color)'}`}>
-                                                        <input
-                                                            type="checkbox"
-                                                            name="inputPricesWithTax"
-                                                            checked={formData.inputPricesWithTax}
-                                                            onChange={handleInputChange}
-                                                            className="sr-only"
-                                                        />
-                                                        <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${formData.inputPricesWithTax ? 'translate-x-7' : 'translate-x-1'}`} />
-                                                    </div>
-                                                </label>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Configuración de Pedidos - Solo en edición */}
-                                    {editingCompany && (
-                                        <div className="pt-4 border-t border-(--border-color)">
-                                            <label className="block text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
-                                                Configuración de Pedidos
-                                            </label>
-                                            <div className="space-y-3">
-                                                {/* Toggle: Proteger precios de oferta */}
-                                                <label className="flex items-center justify-between p-3 bg-(--bg-hover) rounded-lg border border-(--border-color) cursor-pointer">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-8 h-8 rounded-lg bg-pink-100 dark:bg-pink-900/30 flex items-center justify-center text-pink-600">
-                                                            <Tag size={16} />
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-sm font-semibold text-(--text-primary)">Proteger precios de oferta</p>
-                                                            <p className="text-[10px] text-(--text-muted)">Los productos con precio de oferta no aplican descuento global del pedido</p>
-                                                        </div>
-                                                    </div>
-                                                    <div className={`relative w-12 h-6 rounded-full transition-colors ${formData.excludeOfferProductsFromGlobalDiscount ? 'bg-primary-500' : 'bg-(--border-color)'}`}>
-                                                        <input
-                                                            type="checkbox"
-                                                            name="excludeOfferProductsFromGlobalDiscount"
-                                                            checked={formData.excludeOfferProductsFromGlobalDiscount}
-                                                            onChange={handleInputChange}
-                                                            className="sr-only"
-                                                        />
-                                                        <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${formData.excludeOfferProductsFromGlobalDiscount ? 'translate-x-7' : 'translate-x-1'}`} />
-                                                    </div>
-                                                </label>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Estado Activo - Solo en edición */}
-                                    {editingCompany && (
-                                        <div className="pt-4 border-t border-(--border-color)">
-                                            <label className="block text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
-                                                Estado de la Compañía
-                                            </label>
-                                            <div className="flex items-center justify-between p-4 bg-(--bg-hover) rounded-lg">
-                                                <div className="flex items-center gap-3">
-                                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${formData.active ? 'bg-success-100 text-success-600' : 'bg-danger-100 text-danger-600'}`}>
-                                                        <Power size={20} />
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-sm font-semibold text-(--text-primary)">
-                                                            {formData.active ? 'Compañía Activa' : 'Compañía Inactiva'}
-                                                        </p>
-                                                        <p className="text-[11px] text-(--text-muted)">
-                                                            {formData.active 
-                                                                ? 'Los usuarios pueden iniciar sesión' 
-                                                                : 'Los usuarios no pueden iniciar sesión'}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                                <button
-                                                    type="button"
-                                                    onClick={handleToggleStatus}
-                                                    className={`px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all ${
-                                                        formData.active 
-                                                            ? 'bg-danger-100 text-danger-600 hover:bg-danger-200' 
-                                                            : 'bg-success-100 text-success-600 hover:bg-success-200'
-                                                    }`}
-                                                >
-                                                    {formData.active ? 'Desactivar' : 'Activar'}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Logo de la Empresa - Solo en edición */}
-                                    {editingCompany && (
-                                        <div className="pt-4 border-t border-(--border-color)">
-                                            <div className="block text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
-                                                Logo de la Empresa
-                                            </div>
-                                            <div className="p-4 bg-(--bg-hover) rounded-lg">
-                                                <div className="flex flex-col items-center">
-                                                    {/* Vista previa del logo */}
-                                                    <div className="w-24 h-24 rounded-xl bg-(--bg-card) border-2 border-dashed border-(--border-color) flex items-center justify-center mb-3 overflow-hidden">
-                                                        {localLogo ? (
-                                                            <img 
-                                                                src={localLogo} 
-                                                                alt="Logo de la empresa" 
-                                                                className="w-full h-full object-contain p-2"
-                                                            />
-                                                        ) : (
-                                                            <Building2 size={40} className="text-(--text-muted)" />
-                                                        )}
-                                                    </div>
-
-                                                    {/* Botones de acción */}
-                                                    <div className="flex gap-2">
-                                                        <input
-                                                            ref={fileInputRef}
-                                                            type="file"
-                                                            accept="image/*"
-                                                            onChange={handleLogoUpload}
-                                                            onClick={(e) => e.stopPropagation()}
-                                                            className="hidden"
-                                                            disabled={uploadingLogo}
-                                                        />
-                                                        <Button
-                                                            type="button"
-                                                            variant="secondary"
-                                                            className="!px-3 !py-1.5 !text-xs"
-                                                            isLoading={uploadingLogo}
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                e.preventDefault();
-                                                                fileInputRef.current?.click();
-                                                            }}
-                                                        >
-                                                            <Upload size={14} className="mr-1.5" />
-                                                            {localLogo ? 'Cambiar Logo' : 'Subir Logo'}
-                                                        </Button>
-
-                                                        {localLogo && (
-                                                            <Button
-                                                                type="button"
-                                                                variant="secondary"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    e.preventDefault();
-                                                                    handleDeleteLogo();
-                                                                }}
-                                                                className="!px-3 !py-1.5 !text-xs text-danger-600 hover:text-danger-700"
-                                                                isLoading={uploadingLogo}
-                                                            >
-                                                                <TrashIcon size={14} className="mr-1.5" />
-                                                                Eliminar
-                                                            </Button>
-                                                        )}
-                                                    </div>
-
-                                                    <p className="text-[10px] text-(--text-muted) mt-2 text-center">
-                                                        Formatos: JPG, PNG, GIF, WEBP • Máximo 1MB
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-                                </form>
-                            </div>
-
-                            {/* Footer */}
-                            <div className="px-6 py-4 border-t border-(--border-color) bg-(--bg-hover) flex gap-3">
-                                <Button
-                                    type="button"
-                                    variant="secondary"
-                                    className="flex-1"
-                                    onClick={() => setShowDrawer(false)}
-                                >
-                                    Cancelar
-                                </Button>
-                                <Button 
-                                    type="submit" 
-                                    variant="primary"
-                                    className="flex-1"
-                                    form="company-form"
-                                >
-                                    {editingCompany ? 'Guardar Cambios' : 'Crear Compañía'}
-                                </Button>
-                            </div>
-                        </motion.div>
-                    </>
-                </AnimatePresence>,
-                document.body
-            )}
-
-            {/* Delete Confirmation */}
+            {/* Delete Confirmation Modal */}
             <ConfirmModal
                 isOpen={deleteModal.open}
                 onClose={() => setDeleteModal({ open: false, company: null })}

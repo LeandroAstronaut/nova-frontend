@@ -1,23 +1,26 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { motion } from 'framer-motion';
 import { 
     Building2, 
-    Users, 
-    CreditCard, 
-    Mail, 
     Phone, 
+    Mail, 
     MapPin, 
     Save,
     Shield,
-    Bell,
     Database,
     Package,
     Globe,
-    ShoppingCart,
-    Grid3X3
+    Tag,
+    Info,
+    MessageCircle,
+    Hash,
+    CreditCard,
+    Headphones
 } from 'lucide-react';
 import Button from '../../components/common/Button';
+import SupportDrawer from '../../components/common/SupportDrawer';
 import { updateContactInfo, updateOrderSettings } from '../../services/companyService';
 
 const SettingsPage = () => {
@@ -31,9 +34,7 @@ const SettingsPage = () => {
         phone: '',
         whatsapp: '',
         email: '',
-        address: '',
-        notificationsEnabled: true,
-        autoBackup: true
+        address: ''
     });
 
     const isAdmin = user?.role?.name === 'admin';
@@ -48,9 +49,7 @@ const SettingsPage = () => {
                 phone: user.company.phone || '',
                 whatsapp: user.company.whatsapp || '',
                 email: user.company.email || '',
-                address: user.company.address || '',
-                notificationsEnabled: user.company.notificationsEnabled !== false,
-                autoBackup: user.company.autoBackup !== false
+                address: user.company.address || ''
             });
         }
     }, [user]);
@@ -65,7 +64,6 @@ const SettingsPage = () => {
                 address: formData.address
             });
             
-            // Actualizar el contexto del usuario
             await updateUserContext();
             
             addToast('Información de contacto guardada exitosamente', 'success');
@@ -77,10 +75,6 @@ const SettingsPage = () => {
         }
     };
     
-    // Estado para preferencias de visualización
-
-    
-    // Estado para configuración de pedidos
     const [orderSettings, setOrderSettings] = useState({
         sellOnlyFullPackages: user?.company?.sellOnlyFullPackages === true,
         publicCatalog: user?.company?.publicCatalog === true,
@@ -89,7 +83,6 @@ const SettingsPage = () => {
     });
     const [savingOrderSettings, setSavingOrderSettings] = useState(false);
     
-    // Actualizar orderSettings cuando cambie user
     useEffect(() => {
         if (user?.company) {
             setOrderSettings({
@@ -106,7 +99,6 @@ const SettingsPage = () => {
         try {
             await updateOrderSettings(user.company._id, orderSettings);
             
-            // Actualizar el contexto del usuario
             await updateUserContext();
             
             addToast('Configuración de pedidos guardada exitosamente', 'success');
@@ -118,11 +110,12 @@ const SettingsPage = () => {
         }
     };
 
-    // Solo admin puede ver esta página
+    const [showSupportDrawer, setShowSupportDrawer] = useState(false);
+
     if (!isAdmin && !isSuperadmin) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh]">
-                <div className="text-(--text-muted) text-center">
+                <div className="text-[var(--text-muted)] text-center">
                     <Shield size={48} className="mx-auto mb-4 opacity-50" />
                     <h2 className="text-lg font-semibold mb-2">Acceso Restringido</h2>
                     <p className="text-sm">Solo los administradores pueden acceder a la configuración.</p>
@@ -137,188 +130,119 @@ const SettingsPage = () => {
         <div className="space-y-6">
             {/* Header */}
             <div>
-                <h1 className="text-xl font-bold text-(--text-primary) leading-tight">
+                <h1 className="text-xl font-bold text-[var(--text-primary)] leading-tight">
                     Configuración
                 </h1>
-                <p className="text-[13px] text-(--text-secondary) mt-0.5 font-medium">
+                <p className="text-[13px] text-[var(--text-secondary)] mt-0.5 font-medium">
                     Gestiona la configuración de tu empresa y preferencias del sistema.
                 </p>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Columna izquierda */}
+                {/* COLUMNA IZQUIERDA */}
                 <div className="space-y-6">
-                    {/* Información de la Empresa (Solo lectura) */}
-                    <div className="card p-0! overflow-hidden border-none shadow-sm ring-1 ring-(--border-color)">
-                        <div className="px-6 py-4 border-b border-(--border-color) bg-(--bg-hover)">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-primary-600">
-                                    <Building2 size={20} />
+                    
+                    {/* Información Fiscal (Solo lectura) */}
+                    <div className="card p-0! overflow-hidden border-none shadow-sm ring-1 ring-[var(--border-color)]">
+                        <div className="p-6">
+                            <h3 className="text-[11px] font-bold text-secondary-700 dark:text-secondary-300 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                <Building2 size={14} />
+                                Información Fiscal
+                            </h3>
+                            <div className="h-px bg-secondary-200 dark:bg-secondary-700 mb-4" />
+                            
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-[10px] font-normal text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">
+                                            Nombre de la Empresa
+                                        </label>
+                                        <div className="relative">
+                                            <Building2 className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={14} />
+                                            <input
+                                                type="text"
+                                                value={formData.companyName}
+                                                disabled
+                                                className="w-full pl-8 pr-2.5 py-1.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[13px] font-medium text-[var(--text-primary)] opacity-60 cursor-not-allowed"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-normal text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">
+                                            Razón Social
+                                        </label>
+                                        <div className="relative">
+                                            <Building2 className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={14} />
+                                            <input
+                                                type="text"
+                                                value={formData.businessName}
+                                                disabled
+                                                className="w-full pl-8 pr-2.5 py-1.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[13px] font-medium text-[var(--text-primary)] opacity-60 cursor-not-allowed"
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
+
                                 <div>
-                                    <h2 className="text-base font-bold text-(--text-primary)">Información Fiscal</h2>
-                                    <p className="text-[11px] text-(--text-muted)">Datos de la empresa (solo lectura)</p>
+                                    <label className="text-[10px] font-normal text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">
+                                        CUIT
+                                    </label>
+                                    <div className="relative">
+                                        <Hash className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={14} />
+                                        <input
+                                            type="text"
+                                            value={formData.cuit}
+                                            disabled
+                                            className="w-full pl-8 pr-2.5 py-1.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[13px] font-medium text-[var(--text-primary)] opacity-60 cursor-not-allowed"
+                                        />
+                                    </div>
                                 </div>
+
+                                <button
+                                    onClick={() => setShowSupportDrawer(true)}
+                                    className="w-full bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3 border border-amber-100 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors text-left"
+                                >
+                                    <div className="flex items-start gap-2">
+                                        <Headphones size={14} className="text-amber-600 mt-0.5" />
+                                        <p className="text-[11px] text-amber-700 dark:text-amber-300">
+                                            Para modificar el nombre, razón social o CUIT, <span className="font-semibold underline">contacta al soporte técnico</span>.
+                                        </p>
+                                    </div>
+                                </button>
                             </div>
                         </div>
+                    </div>
+
+                    {/* Plan y Usuarios */}
+                    <div className="bg-gradient-to-br from-primary-50/50 to-transparent dark:from-primary-900/10 rounded-2xl border border-primary-100 dark:border-primary-800 p-5">
+                        <h3 className="text-[11px] font-semibold text-primary-700 dark:text-primary-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                            <CreditCard size={14} /> Plan y Usuarios
+                        </h3>
                         
-                        <div className="p-6 space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-2">
-                                        Nombre de la Empresa
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.companyName}
-                                        disabled
-                                        className="w-full px-3 py-2.5 bg-(--bg-hover) border border-(--border-color) rounded-lg text-sm text-(--text-muted) cursor-not-allowed"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-2">
-                                        Razón Social
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.businessName}
-                                        disabled
-                                        className="w-full px-3 py-2.5 bg-(--bg-hover) border border-(--border-color) rounded-lg text-sm text-(--text-muted) cursor-not-allowed"
-                                    />
-                                </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="bg-[var(--bg-card)] rounded-xl p-4 text-center border border-[var(--border-color)]">
+                                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-1">Plan</p>
+                                <p className="text-lg font-black text-[var(--text-primary)]">{user?.company?.plan || 'Básico'}</p>
                             </div>
-
-                            <div>
-                                <label className="block text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-2">
-                                    CUIT
-                                </label>
-                                <input
-                                    type="text"
-                                    value={formData.cuit}
-                                    disabled
-                                    className="w-full px-3 py-2.5 bg-(--bg-hover) border border-(--border-color) rounded-lg text-sm text-(--text-muted) cursor-not-allowed"
-                                />
-                            </div>
-
-                            <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3 border border-amber-100 dark:border-amber-800">
-                                <p className="text-xs text-amber-700 dark:text-amber-300">
-                                    Para modificar el nombre, razón social o CUIT, contacta al soporte técnico.
+                            <div className="bg-[var(--bg-card)] rounded-xl p-4 text-center border border-[var(--border-color)]">
+                                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-1">Usuarios</p>
+                                <p className="text-lg font-black text-[var(--text-primary)]">
+                                    {user?.company?.userCount || 1} / {features.maxUsers || 3}
                                 </p>
                             </div>
                         </div>
                     </div>
-                </div>
-
-                {/* Columna derecha */}
-                <div className="space-y-6">
-                    {/* Información de Contacto (Editable) */}
-                    <div className="card p-0! overflow-hidden border-none shadow-sm ring-1 ring-(--border-color)">
-                        <div className="px-6 py-4 border-b border-(--border-color) bg-(--bg-hover)">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-success-100 dark:bg-success-900/30 flex items-center justify-center text-success-600">
-                                    <Phone size={20} />
-                                </div>
-                                <div>
-                                    <h2 className="text-base font-bold text-(--text-primary)">Información de Contacto</h2>
-                                    <p className="text-[11px] text-(--text-muted)">Datos de contacto editables</p>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div className="p-6 space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-2">
-                                        Teléfono
-                                    </label>
-                                    <div className="relative">
-                                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-(--text-muted)" size={16} />
-                                        <input
-                                            type="tel"
-                                            value={formData.phone}
-                                            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                            className="w-full pl-10 pr-3 py-2.5 bg-(--bg-input) border border-(--border-color) rounded-lg text-sm text-(--text-primary) focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900"
-                                            placeholder="+54 341 1234567"
-                                        />
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="block text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-2">
-                                        WhatsApp
-                                    </label>
-                                    <div className="relative">
-                                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-(--text-muted)" size={16} />
-                                        <input
-                                            type="tel"
-                                            value={formData.whatsapp}
-                                            onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
-                                            className="w-full pl-10 pr-3 py-2.5 bg-(--bg-input) border border-(--border-color) rounded-lg text-sm text-(--text-primary) focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900"
-                                            placeholder="+54 9 341 1234567"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-2">
-                                    Email
-                                </label>
-                                <div className="relative">
-                                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-(--text-muted)" size={16} />
-                                    <input
-                                        type="email"
-                                        value={formData.email}
-                                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                        className="w-full pl-10 pr-3 py-2.5 bg-(--bg-input) border border-(--border-color) rounded-lg text-sm text-(--text-primary) focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900"
-                                        placeholder="info@empresa.com"
-                                    />
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-2">
-                                    Dirección
-                                </label>
-                                <div className="relative">
-                                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-(--text-muted)" size={16} />
-                                    <input
-                                        type="text"
-                                        value={formData.address}
-                                        onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                                        className="w-full pl-10 pr-3 py-2.5 bg-(--bg-input) border border-(--border-color) rounded-lg text-sm text-(--text-primary) focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900"
-                                        placeholder="Calle 123, Ciudad, Provincia"
-                                    />
-                                </div>
-                            </div>
-
-                            <Button
-                                variant="primary"
-                                onClick={handleSaveContactInfo}
-                                isLoading={loading}
-                                className="w-full mt-2"
-                            >
-                                <Save size={18} className="mr-2" />
-                                Guardar Cambios
-                            </Button>
-                        </div>
-                    </div>
 
                     {/* Módulos Activos */}
-                    <div className="card p-0! overflow-hidden border-none shadow-sm ring-1 ring-(--border-color)">
-                        <div className="px-6 py-4 border-b border-(--border-color) bg-(--bg-hover)">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center text-violet-600">
-                                    <Database size={20} />
-                                </div>
-                                <div>
-                                    <h2 className="text-base font-bold text-(--text-primary)">Módulos Activos</h2>
-                                    <p className="text-[11px] text-(--text-muted)">Funcionalidades habilitadas</p>
-                                </div>
-                            </div>
-                        </div>
-                        
+                    <div className="card p-0! overflow-hidden border-none shadow-sm ring-1 ring-[var(--border-color)]">
                         <div className="p-6">
-                            <div className="grid grid-cols-2 gap-3">
+                            <h3 className="text-[11px] font-bold text-secondary-700 dark:text-secondary-300 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                <Database size={14} />
+                                Módulos Activos
+                            </h3>
+                            <div className="h-px bg-secondary-200 dark:bg-secondary-700 mb-4" />
+                            
+                            <div className="grid grid-cols-2 gap-2">
                                 {[
                                     { key: 'orders', label: 'Pedidos/Presupuestos', active: features.orders !== false },
                                     { key: 'receipts', label: 'Recibos', active: features.receipts === true },
@@ -326,202 +250,231 @@ const SettingsPage = () => {
                                     { key: 'stock', label: 'Stock', active: features.stock === true },
                                     { key: 'currentAccount', label: 'Ctas. Corrientes', active: features.currentAccount === true },
                                     { key: 'priceLists', label: 'Listas de Precios', active: features.priceLists === true },
-                                    { key: 'importador', label: 'Importador', active: features.importador === true },
+                                    { key: 'importer', label: 'Importador', active: features.importer === true },
                                     { key: 'clientUsers', label: 'Usuarios Cliente', active: features.clientUsers === true },
+                                    { key: 'commissionCalculation', label: 'Cálculo de Comisiones', active: features.commissionCalculation === true },
                                     { key: 'productVariants', label: 'Productos Variables', active: features.productVariants === true },
                                 ].map((module) => (
                                     <div 
                                         key={module.key}
-                                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium ${
+                                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-medium ${
                                             module.active 
                                                 ? 'bg-success-50 dark:bg-success-900/20 text-success-600 border border-success-100 dark:border-success-800' 
-                                                : 'bg-(--bg-hover) text-(--text-muted) border border-(--border-color)'
+                                                : 'bg-[var(--bg-hover)] text-[var(--text-muted)] border border-[var(--border-color)]'
                                         }`}
                                     >
-                                        <div className={`w-2 h-2 rounded-full ${module.active ? 'bg-success-500' : 'bg-(--text-muted)'}`} />
+                                        <div className={`w-1.5 h-1.5 rounded-full ${module.active ? 'bg-success-500' : 'bg-[var(--text-muted)]'}`} />
                                         {module.label}
                                     </div>
                                 ))}
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    {/* Configuración de Pedidos */}
-                    <div className="card p-0! overflow-hidden border-none shadow-sm ring-1 ring-(--border-color)">
-                        <div className="px-6 py-4 border-b border-(--border-color) bg-(--bg-hover)">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center text-orange-600">
-                                    <Package size={20} />
+                {/* COLUMNA DERECHA */}
+                <div className="space-y-6">
+                    
+                    {/* Información de Contacto (Editable) */}
+                    <div className="card p-0! overflow-hidden border-none shadow-sm ring-1 ring-[var(--border-color)]">
+                        <div className="p-6">
+                            <h3 className="text-[11px] font-bold text-secondary-700 dark:text-secondary-300 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                <Phone size={14} />
+                                Información de Contacto
+                            </h3>
+                            <div className="h-px bg-secondary-200 dark:bg-secondary-700 mb-4" />
+                            
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-[10px] font-normal text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">
+                                            Teléfono
+                                        </label>
+                                        <div className="relative">
+                                            <Phone className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={14} />
+                                            <input
+                                                type="tel"
+                                                value={formData.phone}
+                                                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                                className="w-full pl-8 pr-2.5 py-1.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[13px] font-medium text-[var(--text-primary)] focus:outline-none focus:border-primary-500 transition-colors placeholder:text-[var(--text-muted)]/50"
+                                                placeholder="+54 341 1234567"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-normal text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">
+                                            WhatsApp
+                                        </label>
+                                        <div className="relative">
+                                            <MessageCircle className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={14} />
+                                            <input
+                                                type="tel"
+                                                value={formData.whatsapp}
+                                                onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
+                                                className="w-full pl-8 pr-2.5 py-1.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[13px] font-medium text-[var(--text-primary)] focus:outline-none focus:border-primary-500 transition-colors placeholder:text-[var(--text-muted)]/50"
+                                                placeholder="+54 9 341 1234567"
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
+
                                 <div>
-                                    <h2 className="text-base font-bold text-(--text-primary)">Configuración de Pedidos y Catálogo</h2>
-                                    <p className="text-[11px] text-(--text-muted)">Reglas para la compra de productos y catálogo público</p>
+                                    <label className="text-[10px] font-normal text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">
+                                        Email
+                                    </label>
+                                    <div className="relative">
+                                        <Mail className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={14} />
+                                        <input
+                                            type="email"
+                                            value={formData.email}
+                                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                            className="w-full pl-8 pr-2.5 py-1.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[13px] font-medium text-[var(--text-primary)] focus:outline-none focus:border-primary-500 transition-colors placeholder:text-[var(--text-muted)]/50"
+                                            placeholder="info@empresa.com"
+                                        />
+                                    </div>
                                 </div>
+
+                                <div>
+                                    <label className="text-[10px] font-normal text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">
+                                        Dirección
+                                    </label>
+                                    <div className="relative">
+                                        <MapPin className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={14} />
+                                        <input
+                                            type="text"
+                                            value={formData.address}
+                                            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                                            className="w-full pl-8 pr-2.5 py-1.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[13px] font-medium text-[var(--text-primary)] focus:outline-none focus:border-primary-500 transition-colors placeholder:text-[var(--text-muted)]/50"
+                                            placeholder="Calle 123, Ciudad, Provincia"
+                                        />
+                                    </div>
+                                </div>
+
+                                <Button
+                                    variant="primary"
+                                    onClick={handleSaveContactInfo}
+                                    loading={loading}
+                                    className="w-full"
+                                >
+                                    <Save size={16} className="mr-2" />
+                                    Guardar Cambios
+                                </Button>
                             </div>
                         </div>
-                        
-                        <div className="p-6 space-y-4">
-                            {/* Toggle: Solo bultos cerrados */}
-                            <div className="p-4 bg-(--bg-hover) rounded-xl border border-(--border-color)">
-                                <div class="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center text-orange-600">
-                                            <Package size={16} />
-                                        </div>
-                                        <div>
-                                            <p className="text-[13px] font-semibold text-(--text-primary)">Solo bultos cerrados</p>
-                                            <p className="text-[11px] text-(--text-muted)">Los clientes solo podrán pedir cantidades en múltiplos del bulto</p>
-                                        </div>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => setOrderSettings(prev => ({ ...prev, sellOnlyFullPackages: !prev.sellOnlyFullPackages }))}
-                                        className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${
-                                            orderSettings.sellOnlyFullPackages ? 'bg-primary-500' : 'bg-(--border-color)'
-                                        }`}
-                                    >
-                                        <div
-                                            className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${
-                                                orderSettings.sellOnlyFullPackages ? 'translate-x-7' : 'translate-x-1'
-                                            }`}
-                                        />
-                                    </button>
-                                </div>
-                            </div>
+                    </div>
 
-                            <div className="border-t border-(--border-color) my-4" />
+                    {/* Configuración de Pedidos */}
+                    <div className="bg-gradient-to-br from-primary-50/50 to-transparent dark:from-primary-900/10 rounded-2xl border border-primary-100 dark:border-primary-800 p-5">
+                        <h3 className="text-[11px] font-semibold text-primary-700 dark:text-primary-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                            <Package size={14} /> Configuración de Pedidos
+                        </h3>
+                        
+                        <div className="space-y-4">
+                            {/* Toggle: Solo bultos cerrados */}
+                            <div className="flex items-center justify-between p-3 bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)]">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center text-orange-600">
+                                        <Package size={16} />
+                                    </div>
+                                    <div>
+                                        <p className="text-[13px] font-semibold text-[var(--text-primary)]">Solo bultos cerrados</p>
+                                        <p className="text-[10px] text-[var(--text-muted)]">Solo cantidades en múltiplos del bulto</p>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setOrderSettings(prev => ({ ...prev, sellOnlyFullPackages: !prev.sellOnlyFullPackages }))}
+                                    className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${
+                                        orderSettings.sellOnlyFullPackages ? 'bg-primary-500' : 'bg-[var(--border-color)]'
+                                    }`}
+                                >
+                                    <motion.div
+                                        initial={false}
+                                        animate={{ x: orderSettings.sellOnlyFullPackages ? 20 : 2 }}
+                                        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                                        className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm"
+                                    />
+                                </button>
+                            </div>
 
                             {/* Toggle: Catálogo público */}
-                            <div className="p-4 bg-(--bg-hover) rounded-xl border border-(--border-color)">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
-                                            <Globe size={16} />
-                                        </div>
-                                        <div>
-                                            <p className="text-[13px] font-semibold text-(--text-primary)">Catálogo público</p>
-                                            <p className="text-[11px] text-(--text-muted)">Permite acceder al catálogo sin iniciar sesión</p>
-                                        </div>
+                            <div className="flex items-center justify-between p-3 bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)]">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
+                                        <Globe size={16} />
                                     </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => setOrderSettings(prev => ({ ...prev, publicCatalog: !prev.publicCatalog }))}
-                                        className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${
-                                            orderSettings.publicCatalog ? 'bg-primary-500' : 'bg-(--border-color)'
-                                        }`}
-                                    >
-                                        <div
-                                            className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${
-                                                orderSettings.publicCatalog ? 'translate-x-7' : 'translate-x-1'
-                                            }`}
-                                        />
-                                    </button>
+                                    <div>
+                                        <p className="text-[13px] font-semibold text-[var(--text-primary)]">Catálogo público</p>
+                                        <p className="text-[10px] text-[var(--text-muted)]">Acceso sin iniciar sesión</p>
+                                    </div>
                                 </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setOrderSettings(prev => ({ ...prev, publicCatalog: !prev.publicCatalog }))}
+                                    className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${
+                                        orderSettings.publicCatalog ? 'bg-primary-500' : 'bg-[var(--border-color)]'
+                                    }`}
+                                >
+                                    <motion.div
+                                        initial={false}
+                                        animate={{ x: orderSettings.publicCatalog ? 20 : 2 }}
+                                        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                                        className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm"
+                                    />
+                                </button>
                             </div>
 
-                            {/* Toggle: Mostrar precio en catálogo público (solo si está activado) */}
+                            {/* Sub-toggles del catálogo público */}
                             {orderSettings.publicCatalog && (
-                                <div className="p-4 bg-(--bg-hover) rounded-xl border border-(--border-color) ml-4">
-                                    <div className="flex items-center justify-between">
+                                <>
+                                    <div className="flex items-center justify-between p-3 bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] ml-4">
                                         <div className="flex items-center gap-3">
                                             <div className="w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-600">
                                                 <Tag size={16} />
                                             </div>
                                             <div>
-                                                <p className="text-[13px] font-semibold text-(--text-primary)">Mostrar precios en catálogo público</p>
-                                                <p className="text-[11px] text-(--text-muted)">Los visitantes verán los precios de los productos</p>
+                                                <p className="text-[13px] font-semibold text-[var(--text-primary)]">Mostrar precios</p>
+                                                <p className="text-[10px] text-[var(--text-muted)]">En catálogo público</p>
                                             </div>
                                         </div>
                                         <button
                                             type="button"
                                             onClick={() => setOrderSettings(prev => ({ ...prev, showPriceInPublicCatalog: !prev.showPriceInPublicCatalog }))}
-                                            className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${
-                                                orderSettings.showPriceInPublicCatalog ? 'bg-primary-500' : 'bg-(--border-color)'
+                                            className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${
+                                                orderSettings.showPriceInPublicCatalog ? 'bg-primary-500' : 'bg-[var(--border-color)]'
                                             }`}
                                         >
-                                            <div
-                                                className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${
-                                                    orderSettings.showPriceInPublicCatalog ? 'translate-x-7' : 'translate-x-1'
-                                                }`}
+                                            <motion.div
+                                                initial={false}
+                                                animate={{ x: orderSettings.showPriceInPublicCatalog ? 20 : 2 }}
+                                                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                                                className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm"
                                             />
                                         </button>
                                     </div>
-                                </div>
-                            )}
-
-                            {/* Toggle: Permitir compras anónimas (solo si está activado) */}
-                            {orderSettings.publicCatalog && (
-                                <div className="p-4 bg-(--bg-hover) rounded-xl border border-(--border-color) ml-4">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-purple-600">
-                                                <ShoppingCart size={16} />
-                                            </div>
-                                            <div>
-                                                <p className="text-[13px] font-semibold text-(--text-primary)">Permitir compras anónimas</p>
-                                                <p className="text-[11px] text-(--text-muted)">Los visitantes pueden hacer pedidos sin registrarse</p>
-                                            </div>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => setOrderSettings(prev => ({ ...prev, allowAnonymousPurchases: !prev.allowAnonymousPurchases }))}
-                                            className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${
-                                                orderSettings.allowAnonymousPurchases ? 'bg-primary-500' : 'bg-(--border-color)'
-                                            }`}
-                                        >
-                                            <div
-                                                className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${
-                                                    orderSettings.allowAnonymousPurchases ? 'translate-x-7' : 'translate-x-1'
-                                                }`}
-                                            />
-                                        </button>
-                                    </div>
-                                </div>
+                                </>
                             )}
                             
                             <Button
                                 variant="primary"
                                 onClick={handleSaveOrderSettings}
-                                isLoading={savingOrderSettings}
+                                loading={savingOrderSettings}
                                 className="w-full"
                             >
-                                <Save size={18} className="mr-2" />
+                                <Save size={16} className="mr-2" />
                                 Guardar Configuración
                             </Button>
                         </div>
                     </div>
-
-                    {/* Plan y Usuarios */}
-                    <div className="card p-0! overflow-hidden border-none shadow-sm ring-1 ring-(--border-color)">
-                        <div className="px-6 py-4 border-b border-(--border-color) bg-(--bg-hover)">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
-                                    <Users size={20} />
-                                </div>
-                                <div>
-                                    <h2 className="text-base font-bold text-(--text-primary)">Plan y Usuarios</h2>
-                                    <p className="text-[11px] text-(--text-muted)">Información de suscripción</p>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div className="p-6">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="bg-(--bg-hover) rounded-xl p-4 text-center">
-                                    <p className="text-[11px] text-(--text-muted) uppercase tracking-wider mb-1">Plan</p>
-                                    <p className="text-lg font-black text-(--text-primary)">{user?.company?.plan || 'Básico'}</p>
-                                </div>
-                                <div className="bg-(--bg-hover) rounded-xl p-4 text-center">
-                                    <p className="text-[11px] text-(--text-muted) uppercase tracking-wider mb-1">Usuarios</p>
-                                    <p className="text-lg font-black text-(--text-primary)">
-                                        {user?.company?.userCount || 1} / {features.maxUsers || 3}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>
+
+            {/* Support Drawer */}
+            <SupportDrawer 
+                isOpen={showSupportDrawer} 
+                onClose={() => setShowSupportDrawer(false)} 
+                user={user} 
+            />
         </div>
     );
 };

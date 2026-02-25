@@ -2,112 +2,97 @@ import React from 'react';
 import { 
     Plus, 
     FileText, 
-    ShoppingCart, 
     Users, 
     Package,
-    DollarSign,
     Receipt,
-    User,
 } from 'lucide-react';
 
-const QuickActions = ({ features = {}, userRole = 'vendedor', onAction }) => {
-    const allActions = [
-        {
-            id: 'new-order',
-            label: 'Nuevo Pedido',
-            icon: ShoppingCart,
-            roles: ['admin', 'vendedor'],
-            alwaysShow: true,
-        },
+const QuickActions = ({ features = {}, userRole = 'vendedor', onAction, compact = false }) => {
+    const isClient = userRole === 'cliente';
+    const isAdmin = userRole === 'admin';
+    const isSeller = userRole === 'vendedor';
+    
+    // Acciones según rol
+    const actions = [
         {
             id: 'new-budget',
             label: 'Nuevo Presupuesto',
             icon: FileText,
-            roles: ['admin', 'vendedor'],
-            alwaysShow: true,
-        },
-        {
-            id: 'new-client',
-            label: 'Nuevo Cliente',
-            icon: Users,
-            roles: ['admin', 'vendedor'],
-            alwaysShow: true,
+            show: true, // Todos ven esto
         },
         {
             id: 'view-catalog',
             label: 'Ver Catálogo',
             icon: Package,
-            roles: ['admin', 'vendedor', 'cliente'],
-            feature: 'catalog',
+            show: features.catalog === true, // Solo si tiene feature catalog
         },
         {
-            id: 'view-products',
-            label: 'Productos',
-            icon: Package,
-            roles: ['admin', 'vendedor'],
-            alwaysShow: true,
+            id: 'new-client',
+            label: 'Nuevo Cliente',
+            icon: Users,
+            show: !isClient, // No va para usuarios cliente
         },
         {
             id: 'new-receipt',
             label: 'Nuevo Recibo',
             icon: Receipt,
-            roles: ['admin', 'vendedor'],
-            feature: 'receipts',
+            show: features.receipts === true && !isClient, // Solo si tiene feature y no es cliente
         },
-        {
-            id: 'view-commissions',
-            label: 'Mis Comisiones',
-            icon: DollarSign,
-            roles: ['vendedor'],
-            feature: 'commissionCalculation',
-        },
-        {
-            id: 'view-account',
-            label: 'Mi Cuenta',
-            icon: User,
-            roles: ['cliente'],
-            alwaysShow: true,
-        },
-    ];
+    ].filter(action => action.show);
 
-    const availableActions = allActions.filter(action => {
-        if (!action.roles.includes(userRole) && userRole !== 'admin') {
-            return false;
-        }
-        if (action.feature && !features[action.feature]) {
-            return false;
-        }
-        return true;
-    });
-
-    return (
-        <div className="card rounded-xl p-5">
-            <div className="flex items-center gap-2 mb-4">
-                <div className="w-9 h-9 rounded-lg bg-primary-50 flex items-center justify-center">
-                    <Plus size={16} className="text-primary-600" strokeWidth={1.5} />
-                </div>
-                <div>
-                    <h3 className="font-semibold text-[var(--text-primary)] text-base">Accesos Rápidos</h3>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-                {availableActions.map((action) => {
+    if (compact) {
+        // Versión compacta - horizontal debajo de alertas
+        return (
+            <div className="flex flex-wrap gap-2">
+                {actions.map((action) => {
                     const Icon = action.icon;
-                    
                     return (
                         <button
                             key={action.id}
                             onClick={() => onAction?.(action.id)}
-                            className="flex flex-col items-center gap-2 p-3 rounded-lg bg-[var(--bg-hover)] hover:bg-primary-50 border border-[var(--border-color)] hover:border-primary-200 transition-all group"
+                            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg-hover)] hover:bg-primary-50 dark:hover:bg-primary-900/20 border border-[var(--border-color)] hover:border-primary-200 dark:hover:border-primary-800 transition-all group"
                         >
-                            <Icon size={18} className="text-primary-500 group-hover:text-primary-600" strokeWidth={1.5} />
-                            <span className="text-xs font-medium text-[var(--text-secondary)] group-hover:text-primary-700 text-center">
+                            <Icon size={16} className="text-primary-500 dark:text-primary-400 group-hover:text-primary-600" strokeWidth={1.5} />
+                            <span className="text-[12px] font-medium text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]">
                                 {action.label}
                             </span>
                         </button>
                     );
                 })}
+            </div>
+        );
+    }
+
+    // Versión card completa (por si se necesita en otro lugar)
+    return (
+        <div className="card p-0! overflow-hidden border-none shadow-sm ring-1 ring-[var(--border-color)]">
+            <div className="p-6">
+                <h3 className="text-[11px] font-bold text-secondary-700 dark:text-secondary-300 uppercase tracking-wider mb-2 flex items-center gap-2">
+                    <Plus size={14} />
+                    Accesos Rápidos
+                </h3>
+                <div className="h-px bg-secondary-200 dark:bg-secondary-700 mb-4" />
+
+                <div className="grid grid-cols-2 gap-3">
+                    {actions.map((action) => {
+                        const Icon = action.icon;
+                        
+                        return (
+                            <button
+                                key={action.id}
+                                onClick={() => onAction?.(action.id)}
+                                className="flex flex-col items-center gap-2 p-3 rounded-xl bg-[var(--bg-hover)] hover:bg-primary-50 dark:hover:bg-primary-900/20 border border-[var(--border-color)] hover:border-primary-200 dark:hover:border-primary-800 transition-all group"
+                            >
+                                <div className="w-9 h-9 rounded-xl bg-primary-50 dark:bg-primary-900/30 flex items-center justify-center group-hover:bg-primary-100 dark:group-hover:bg-primary-900/50 transition-colors">
+                                    <Icon size={18} className="text-primary-500 dark:text-primary-400 group-hover:text-primary-600" strokeWidth={1.5} />
+                                </div>
+                                <span className="text-[11px] font-medium text-[var(--text-secondary)] group-hover:text-primary-700 dark:group-hover:text-primary-400 text-center">
+                                    {action.label}
+                                </span>
+                            </button>
+                        );
+                    })}
+                </div>
             </div>
         </div>
     );

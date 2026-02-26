@@ -157,13 +157,18 @@ const CompaniesPage = () => {
     );
 
     // Handle create/edit company
-    const handleSaveCompany = async (companyId, formData) => {
-        if (companyId) {
-            await companyService.update(companyId, formData);
-            showToast('Compañía actualizada exitosamente', 'success');
-        } else {
-            await companyService.create(formData);
+    const handleSaveCompany = async (companyIdOrData, maybeFormData) => {
+        // Detectar si es creación o edición según el tipo del primer parámetro
+        const isCreating = typeof companyIdOrData === 'object';
+        
+        if (isCreating) {
+            // Creación: recibimos (formData)
+            await companyService.create(companyIdOrData);
             showToast('Compañía creada exitosamente', 'success');
+        } else {
+            // Edición: recibimos (companyId, formData)
+            await companyService.update(companyIdOrData, maybeFormData);
+            showToast('Compañía actualizada exitosamente', 'success');
         }
         fetchCompanies();
     };

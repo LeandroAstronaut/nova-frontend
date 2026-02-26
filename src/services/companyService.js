@@ -125,6 +125,17 @@ const updateCatalogSettings = async (id, settings) => {
 };
 
 /**
+ * Actualizar configuración de importación de la compañía
+ * @param {string} id - ID de la compañía
+ * @param {Object} config - { format, winmak, columnMapping, options }
+ * @returns {Promise<Object>} Compañía actualizada
+ */
+const updateImportConfig = async (id, config) => {
+    const response = await api.put(`/companies/${id}/import-config`, config);
+    return response.data;
+};
+
+/**
  * Subir logo de la compañía
  * @param {string} id - ID de la compañía
  * @param {File} file - Archivo de imagen
@@ -175,6 +186,7 @@ export {
     updateDisplayPreferences,
     updateOrderSettings,
     updateCatalogSettings,
+    updateImportConfig,
     uploadCompanyLogo,
     deleteCompanyLogo
 };
@@ -196,6 +208,7 @@ export const companyService = {
     updateDisplayPreferences,
     updateOrderSettings,
     updateCatalogSettings,
+    updateImportConfig,
     uploadLogo: uploadCompanyLogo,
     deleteLogo: deleteCompanyLogo
 };

@@ -20,10 +20,13 @@ import {
     Percent,
     Grid3X3,
     CreditCard,
-    Hash
+    Hash,
+    FileUp,
+    Settings,
+    FileSpreadsheet
 } from 'lucide-react';
 import Button from '../common/Button';
-import { uploadCompanyLogo, deleteCompanyLogo, updateDisplayPreferences, updateOrderSettings } from '../../services/companyService';
+import { uploadCompanyLogo, deleteCompanyLogo, updateDisplayPreferences, updateOrderSettings, updateImportConfig } from '../../services/companyService';
 import { useToast } from '../../context/ToastContext';
 
 // ============================================================================
@@ -111,12 +114,37 @@ const CompanyDrawer = ({
         },
         showPricesWithTax: false,
         inputPricesWithTax: false,
-        excludeOfferProductsFromGlobalDiscount: false
+        excludeOfferProductsFromGlobalDiscount: false,
+        importConfig: {
+            format: 'standard',
+            winmak: {
+                delimiter: ';',
+                defaultTaxRate: 21,
+                encoding: 'utf8'
+            },
+            columnMapping: {},
+            options: {
+                autoCreateCategories: true
+            }
+        }
     });
 
     // Inicializar formulario
     useEffect(() => {
         if (!isOpen) return;
+        
+        const defaultImportConfig = {
+            format: 'standard',
+            winmak: {
+                delimiter: ';',
+                defaultTaxRate: 21,
+                encoding: 'utf8'
+            },
+            columnMapping: {},
+            options: {
+                autoCreateCategories: true
+            }
+        };
         
         if (company) {
             setFormData({
@@ -141,7 +169,19 @@ const CompanyDrawer = ({
                 },
                 showPricesWithTax: company.showPricesWithTax || false,
                 inputPricesWithTax: company.inputPricesWithTax || false,
-                excludeOfferProductsFromGlobalDiscount: company.excludeOfferProductsFromGlobalDiscount || false
+                excludeOfferProductsFromGlobalDiscount: company.excludeOfferProductsFromGlobalDiscount || false,
+                importConfig: {
+                    ...defaultImportConfig,
+                    ...company.importConfig,
+                    winmak: {
+                        ...defaultImportConfig.winmak,
+                        ...(company.importConfig?.winmak || {})
+                    },
+                    options: {
+                        ...defaultImportConfig.options,
+                        ...(company.importConfig?.options || {})
+                    }
+                }
             });
             setLocalLogo(company.logo || null);
         } else {
@@ -166,7 +206,8 @@ const CompanyDrawer = ({
                 },
                 showPricesWithTax: false,
                 inputPricesWithTax: false,
-                excludeOfferProductsFromGlobalDiscount: false
+                excludeOfferProductsFromGlobalDiscount: false,
+                importConfig: defaultImportConfig
             });
             setLocalLogo(null);
         }
@@ -194,6 +235,20 @@ const CompanyDrawer = ({
         }));
     };
 
+    const handleImportConfigChange = (path, value) => {
+        setFormData(prev => {
+            const keys = path.split('.');
+            const newConfig = { ...prev.importConfig };
+            let current = newConfig;
+            for (let i = 0; i < keys.length - 1; i++) {
+                current[keys[i]] = { ...current[keys[i]] };
+                current = current[keys[i]];
+            }
+            current[keys[keys.length - 1]] = value;
+            return { ...prev, importConfig: newConfig };
+        });
+    };
+
     const handleSubmit = async (e) => {
         if (e) e.preventDefault();
         try {
@@ -208,6 +263,10 @@ const CompanyDrawer = ({
                 await updateOrderSettings(company._id, {
                     excludeOfferProductsFromGlobalDiscount: formData.excludeOfferProductsFromGlobalDiscount
                 });
+                // Actualizar configuración de importación si tiene el feature habilitado
+                if (formData.features.importer) {
+                    await updateImportConfig(company._id, formData.importConfig);
+                }
             } else {
                 await onSave(formData);
             }
@@ -667,6 +726,132 @@ const CompanyDrawer = ({
                                                         onChange={(checked) => setFormData(prev => ({ ...prev, excludeOfferProductsFromGlobalDiscount: checked }))}
                                                     />
                                                 </div>
+                                            </motion.div>
+                                        )}
+
+                                        {/* CONFIGURACIÓN DE IMPORTACIÓN - Solo si tiene importer habilitado */}
+                                        {formData.features.importer && (
+                                            <motion.div 
+                                                initial={{ opacity: 0, y: 10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ delay: 0.25 }}
+                                                className="bg-gradient-to-br from-amber-50/50 to-transparent dark:from-amber-900/10 rounded-2xl border border-amber-100 dark:border-amber-800 p-5"
+                                            >
+                                                <h3 className="text-[11px] font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                                    <FileUp size={14} /> Configuración de Importación
+                                                </h3>
+                                                
+                                                {/* Selector de formato */}
+                                                <div className="mb-4">
+                                                    <label className="text-[10px] font-normal text-[var(--text-muted)] uppercase tracking-wider mb-2 block">
+                                                        Formato de archivo
+                                                    </label>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleImportConfigChange('format', 'standard')}
+                                                            className={`flex flex-col items-center gap-1 px-3 py-3 rounded-xl border-2 transition-all ${
+                                                                formData.importConfig?.format === 'standard'
+                                                                    ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/20'
+                                                                    : 'border-[var(--border-color)] hover:border-[var(--border-color)] hover:bg-[var(--bg-hover)]'
+                                                            }`}
+                                                        >
+                                                            <FileSpreadsheet size={20} className={formData.importConfig?.format === 'standard' ? 'text-amber-600' : 'text-[var(--text-muted)]'} />
+                                                            <span className={`text-[11px] font-bold text-center ${formData.importConfig?.format === 'standard' ? 'text-amber-700' : 'text-[var(--text-secondary)]'}`}>
+                                                                Estándar
+                                                            </span>
+                                                            <span className="text-[9px] text-[var(--text-muted)] text-center">Mapeo manual de columnas</span>
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleImportConfigChange('format', 'winmak')}
+                                                            className={`flex flex-col items-center gap-1 px-3 py-3 rounded-xl border-2 transition-all ${
+                                                                formData.importConfig?.format === 'winmak'
+                                                                    ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/20'
+                                                                    : 'border-[var(--border-color)] hover:border-[var(--border-color)] hover:bg-[var(--bg-hover)]'
+                                                            }`}
+                                                        >
+                                                            <Settings size={20} className={formData.importConfig?.format === 'winmak' ? 'text-amber-600' : 'text-[var(--text-muted)]'} />
+                                                            <span className={`text-[11px] font-bold text-center ${formData.importConfig?.format === 'winmak' ? 'text-amber-700' : 'text-[var(--text-secondary)]'}`}>
+                                                                Winmak
+                                                            </span>
+                                                            <span className="text-[9px] text-[var(--text-muted)] text-center">Formato específico con rubros</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {/* Configuración específica Winmak */}
+                                                {formData.importConfig?.format === 'winmak' && (
+                                                    <div className="space-y-3 border-t border-amber-200 dark:border-amber-800 pt-4">
+                                                        <p className="text-[11px] text-[var(--text-muted)] mb-3">
+                                                            Configuración para archivos Winmak (ej: Lajara)
+                                                        </p>
+                                                        
+                                                        <div className="grid grid-cols-2 gap-3">
+                                                            <div>
+                                                                <label className="text-[10px] font-normal text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">
+                                                                    Delimitador
+                                                                </label>
+                                                                <select
+                                                                    value={formData.importConfig?.winmak?.delimiter || ';'}
+                                                                    onChange={(e) => handleImportConfigChange('winmak.delimiter', e.target.value)}
+                                                                    className="w-full px-2.5 py-1.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[13px] font-medium text-[var(--text-primary)] focus:outline-none focus:border-amber-500 transition-colors"
+                                                                >
+                                                                    <option value=";">Punto y coma (;)</option>
+                                                                    <option value=",">Coma (,)</option>
+                                                                    <option value="\t">Tabulación</option>
+                                                                </select>
+                                                            </div>
+                                                            <div>
+                                                                <label className="text-[10px] font-normal text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">
+                                                                    IVA por defecto (%)
+                                                                </label>
+                                                                <input
+                                                                    type="number"
+                                                                    value={formData.importConfig?.winmak?.defaultTaxRate || 21}
+                                                                    onChange={(e) => handleImportConfigChange('winmak.defaultTaxRate', parseFloat(e.target.value) || 0)}
+                                                                    min="0"
+                                                                    max="100"
+                                                                    className="w-full px-2.5 py-1.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[13px] font-medium text-[var(--text-primary)] focus:outline-none focus:border-amber-500 transition-colors"
+                                                                />
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="p-3 bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)]">
+                                                            <p className="text-[11px] font-semibold text-[var(--text-primary)] mb-2">Columnas detectadas automáticamente:</p>
+                                                            <div className="text-[10px] text-[var(--text-muted)] space-y-1">
+                                                                <div className="flex justify-between"><span>Código:</span> <span className="font-mono text-amber-600">Codigo de Articulo</span></div>
+                                                                <div className="flex justify-between"><span>Nombre:</span> <span className="font-mono text-amber-600">Descripcion</span></div>
+                                                                <div className="flex justify-between"><span>Rubro:</span> <span className="font-mono text-amber-600">Codigo Rubro → Descripcion Rubro</span></div>
+                                                                <div className="flex justify-between"><span>Subrubro:</span> <span className="font-mono text-amber-600">Codigo SubRubro → Descripcion Subrubro</span></div>
+                                                                <div className="flex justify-between"><span>Stock:</span> <span className="font-mono text-amber-600">Stock 1</span></div>
+                                                                <div className="flex justify-between"><span>Precio L1:</span> <span className="font-mono text-amber-600">Precio 1</span></div>
+                                                                <div className="flex justify-between"><span>Precio L2:</span> <span className="font-mono text-amber-600">Precio 2</span></div>
+                                                                <div className="flex justify-between"><span>Barra:</span> <span className="font-mono text-amber-600">Barra</span></div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800">
+                                                            <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                                                                <strong>Nota:</strong> El tratamiento de IVA (precios con o sin IVA) se toma de la configuración general de la compañía "Cargar precios con IVA".
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Configuración formato Standard */}
+                                                {formData.importConfig?.format === 'standard' && (
+                                                    <div className="space-y-3 border-t border-amber-200 dark:border-amber-800 pt-4">
+                                                        <p className="text-[11px] text-[var(--text-muted)]">
+                                                            En el modo Estándar, el mapeo de columnas se configurará durante la primera importación.
+                                                        </p>
+                                                        <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800">
+                                                            <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                                                                <strong>Nota:</strong> El mapeo se hará automáticamente al importar el primer archivo. Se detectarán las columnas y se asignarán a los campos de NOVA.
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </motion.div>
                                         )}
 

@@ -80,11 +80,68 @@ export const toggleProductActive = async (id) => {
 
 /**
  * Exportar productos a Excel
+ * @param {boolean} template - Si true, descarga plantilla vacía
  * @returns {Promise<Blob>} Archivo Excel
  */
-export const exportProducts = async () => {
+export const exportProducts = async (template = false) => {
     const response = await api.get('/products/export', {
         responseType: 'blob',
+        params: template ? { template: true } : {}
+    });
+    return response.data;
+};
+
+/**
+ * Detectar columnas de un archivo Excel/CSV
+ * @param {File} file - Archivo Excel o CSV
+ * @returns {Promise<Object>} { columns: [...] }
+ */
+export const detectColumns = async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await api.post('/products/import/detect-columns', formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data',
+        },
+    });
+    return response.data;
+};
+
+/**
+ * Validar importación de productos desde Excel
+ * @param {File} file - Archivo Excel
+ * @param {Object} options - Opciones adicionales (columnMapping)
+ * @returns {Promise<Object>} Resultado de la validación
+ */
+export const validateImportProducts = async (file, options = {}) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (options.columnMapping) {
+        formData.append('columnMapping', JSON.stringify(options.columnMapping));
+    }
+
+    const response = await api.post('/products/import/validate', formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data',
+        },
+    });
+    return response.data;
+};
+
+/**
+ * Importar productos desde Excel
+ * @param {File} file - Archivo Excel
+ * @returns {Promise<Object>} Resultado de la importación
+ */
+export const importProducts = async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await api.post('/products/import', formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data',
+        },
     });
     return response.data;
 };
@@ -266,6 +323,9 @@ export default {
     deleteProduct,
     toggleProductActive,
     exportProducts,
+    detectColumns,
+    validateImportProducts,
+    importProducts,
     updateProductStock,
     checkCodeExists,
     checkBarcodeExists,

@@ -45,6 +45,11 @@ const ImporterPage = () => {
     const [detectingColumns, setDetectingColumns] = useState(false);
     const [detectedFormat, setDetectedFormat] = useState('standard'); // Formato detectado por el backend
     
+    // Opción para Winmak: usar lookup de categorías (rubros/subrubros del archivo)
+    const [useCategoryLookup, setUseCategoryLookup] = useState(
+        user?.company?.importConfig?.winmak?.useCategoryLookup !== false // true por defecto
+    );
+    
     // Obtener mapeo guardado de la compañía (convertir de Map a objeto)
     const savedMappingRaw = user?.company?.importConfig?.columnMapping || {};
     const savedMapping = savedMappingRaw instanceof Map ? Object.fromEntries(savedMappingRaw) : savedMappingRaw;
@@ -73,8 +78,8 @@ const ImporterPage = () => {
             setShowConfirmation(false);
             setShowMapping(false);
             
-            // Si es formato standard, detectar columnas para mapeo
-            if (companyFormat === 'standard' && importType === 'products') {
+            // Detectar columnas para mapeo (tanto standard como winmak)
+            if (importType === 'products') {
                 await detectFileColumns(file);
             }
         }
@@ -93,8 +98,8 @@ const ImporterPage = () => {
             setShowConfirmation(false);
             setShowMapping(false);
             
-            // Si es formato standard, detectar columnas para mapeo
-            if (companyFormat === 'standard' && importType === 'products') {
+            // Detectar columnas para mapeo (tanto standard como winmak)
+            if (importType === 'products') {
                 await detectFileColumns(file);
             }
         }
@@ -131,14 +136,7 @@ const ImporterPage = () => {
             console.log('Detected format:', format);
             console.log('Company format:', companyFormat);
             
-            // Si es Winmak, NO mostrar mapeo - usar columnas fijas
-            if (format === 'winmak') {
-                console.log('Winmak format detected - using fixed columns, no mapping needed');
-                // No mostrar mapeo para Winmak
-                setShowMapping(false);
-                setDetectingColumns(false);
-                return;
-            }
+            // Nota: Ahora también mostramos mapeo para Winmak para permitir ajustes
             
             console.log('Saved mapping from user:', user?.company?.importConfig?.columnMapping);
             console.log('Parsed saved mapping:', savedMapping);
@@ -223,16 +221,29 @@ const ImporterPage = () => {
     // Guardar mapeo en la compañía
     const handleSaveMapping = async () => {
         try {
-            await companyService.updateImportConfig(user.company._id, {
-                format: 'standard',
+            // Determinar el formato a guardar (el detectado o el de la compañía)
+            const formatToSave = detectedFormat || companyFormat || 'standard';
+            
+            const configToSave = {
+                format: formatToSave,
                 columnMapping: columnMapping
-            });
+            };
+            
+            // Si es Winmak, también guardar la config específica
+            if (formatToSave === 'winmak') {
+                configToSave.winmak = {
+                    ...(user?.company?.importConfig?.winmak || {}),
+                    useCategoryLookup: useCategoryLookup
+                };
+            }
+            
+            await companyService.updateImportConfig(user.company._id, configToSave);
+            
             // Actualizar el user en el context para reflejar el nuevo mapeo
             if (user?.company) {
                 user.company.importConfig = {
                     ...user.company.importConfig,
-                    format: 'standard',
-                    columnMapping: columnMapping
+                    ...configToSave
                 };
             }
             addToast('Mapeo guardado exitosamente', 'success');
@@ -304,10 +315,18 @@ const ImporterPage = () => {
             // Usar el formato detectado o el de la compañía
             const currentFormat = detectedFormat || companyFormat;
             
-            // Enviar el mapeo si existe (para formato standard)
-            const options = currentFormat === 'standard' && Object.keys(columnMapping).length > 0 
-                ? { columnMapping } 
-                : {};
+            // Preparar opciones según el formato
+            const options = {};
+            
+            // Enviar el mapeo si existe (para cualquier formato)
+            if (Object.keys(columnMapping).length > 0) {
+                options.columnMapping = columnMapping;
+            }
+            
+            // Para Winmak, enviar la opción de lookup de categorías
+            if (currentFormat === 'winmak') {
+                options.useCategoryLookup = useCategoryLookup;
+            }
             
             const result = await validateImportProducts(selectedFile, options);
             setValidationResult(result);
@@ -346,7 +365,21 @@ const ImporterPage = () => {
         setUploading(true);
         
         try {
-            const result = await importProducts(selectedFile);
+            // Preparar opciones según el formato
+            const currentFormat = detectedFormat || companyFormat;
+            const options = {};
+            
+            // Enviar el mapeo si existe
+            if (Object.keys(columnMapping).length > 0) {
+                options.columnMapping = columnMapping;
+            }
+            
+            // Para Winmak, enviar la opción de lookup de categorías
+            if (currentFormat === 'winmak') {
+                options.useCategoryLookup = useCategoryLookup;
+            }
+            
+            const result = await importProducts(selectedFile, options);
             
             if (result.success) {
                 addToast(
@@ -562,7 +595,7 @@ const ImporterPage = () => {
 
                             {/* UI de Mapeo de Columnas */}
                             <AnimatePresence>
-                                {showMapping && detectedFormat === 'standard' && (
+                                {showMapping && (
                                     <motion.div
                                         initial={{ opacity: 0, height: 0 }}
                                         animate={{ opacity: 1, height: 'auto' }}
@@ -580,6 +613,24 @@ const ImporterPage = () => {
                                                 </span>
                                             )}
                                         </div>
+                                        
+                                        {detectedFormat === 'winmak' && (
+                                            <div className="mb-3">
+                                                <div className="p-2 bg-info-50 border border-info-200 rounded text-[11px] text-info-700 mb-2">
+                                                    <strong>Formato Winmak detectado.</strong> Algunos campos usan valores por defecto:
+                                                    <span className="block mt-1">• Marca: vacío • IVA: {user?.company?.taxRate || 21}% • Activo: SI</span>
+                                                </div>
+                                                <label className="flex items-center gap-2 text-[11px] text-[var(--text-primary)] cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={useCategoryLookup}
+                                                        onChange={(e) => setUseCategoryLookup(e.target.checked)}
+                                                        className="rounded border-[var(--border-color)] text-primary-600 focus:ring-primary-500"
+                                                    />
+                                                    <span>Resolver categorías desde rubros/subrubros del archivo</span>
+                                                </label>
+                                            </div>
+                                        )}
                                         
                                         <p className="text-[11px] text-[var(--text-muted)] mb-3">
                                             Asigna cada columna de tu archivo al campo correspondiente en NOVA:

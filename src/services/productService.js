@@ -120,6 +120,9 @@ export const validateImportProducts = async (file, options = {}) => {
     if (options.columnMapping) {
         formData.append('columnMapping', JSON.stringify(options.columnMapping));
     }
+    if (options.useCategoryLookup !== undefined) {
+        formData.append('useCategoryLookup', options.useCategoryLookup);
+    }
 
     const response = await api.post('/products/import/validate', formData, {
         headers: {
@@ -134,9 +137,15 @@ export const validateImportProducts = async (file, options = {}) => {
  * @param {File} file - Archivo Excel
  * @returns {Promise<Object>} Resultado de la importación
  */
-export const importProducts = async (file) => {
+export const importProducts = async (file, options = {}) => {
     const formData = new FormData();
     formData.append('file', file);
+    if (options.columnMapping) {
+        formData.append('columnMapping', JSON.stringify(options.columnMapping));
+    }
+    if (options.useCategoryLookup !== undefined) {
+        formData.append('useCategoryLookup', options.useCategoryLookup);
+    }
 
     const response = await api.post('/products/import', formData, {
         headers: {

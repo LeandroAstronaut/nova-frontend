@@ -249,6 +249,7 @@ const ClientActivityDrawer = ({ isOpen, onClose, client }) => {
                             )}
                         </div>
                         
+                        {/* Comentarios */}
                         {(activities.length > 0 || loading) && (
                             <div className="px-6 py-4 border-t border-[var(--border-color)] bg-[var(--bg-hover)]">
                                 {loading && page > 1 ? (

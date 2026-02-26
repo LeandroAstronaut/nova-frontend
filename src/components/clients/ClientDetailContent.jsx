@@ -51,7 +51,7 @@ const InfoRowNormal = ({ label, value, icon: Icon }) => (
     </div>
 );
 
-// Componente para filas de contacto con acciones
+// Componente para filas de contacto con accion
 const ContactRow = ({ label, value, icon: Icon, type }) => {
     if (!value) return <InfoRow label={label} value={value} icon={Icon} />;
     

@@ -235,10 +235,14 @@ const ProductCatalog = ({
         }
     }, [showShareMenu]);
 
+    // URL pública del catálogo (solo disponible si publicCatalog está activo)
+    const publicCatalogUrl = company?.slug 
+        ? `${window.location.origin}/${company.slug}`
+        : window.location.href;
+
     // Función para copiar enlace al portapapeles
     const handleCopyLink = () => {
-        const url = window.location.href;
-        navigator.clipboard.writeText(url).then(() => {
+        navigator.clipboard.writeText(publicCatalogUrl).then(() => {
             addToast('Enlace copiado al portapapeles', 'success');
             setShowShareMenu(false);
         }).catch(() => {
@@ -248,9 +252,8 @@ const ProductCatalog = ({
 
     // Función para compartir por WhatsApp
     const handleShareWhatsApp = () => {
-        const url = window.location.href;
         const companyName = company?.name || 'la empresa';
-        const message = `Te comparto el catálogo de ${companyName}: ${url}`;
+        const message = `Te comparto el catálogo de ${companyName}: ${publicCatalogUrl}`;
         const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
         window.open(whatsappUrl, '_blank');
         setShowShareMenu(false);
@@ -282,7 +285,8 @@ const ProductCatalog = ({
                         <Store size={14} />
                         Los precios no están disponibles.
                     </div>
-                    {/* Botón Compartir */}
+                    {/* Botón Compartir - Solo si catálogo público está activo */}
+                    {company?.publicCatalog && (
                     <div className="relative" ref={shareMenuRef}>
                         <button
                             onClick={() => setShowShareMenu(!showShareMenu)}
@@ -318,6 +322,7 @@ const ProductCatalog = ({
                             )}
                         </AnimatePresence>
                     </div>
+                    )}
                 </div>
             )}
 
@@ -336,7 +341,8 @@ const ProductCatalog = ({
                         }
                         {company?.sellOnlyFullPackages && ' · Solo bultos cerrados.'}
                     </div>
-                    {/* Botón Compartir */}
+                    {/* Botón Compartir - Solo si catálogo público está activo */}
+                    {company?.publicCatalog && (
                     <div className="relative" ref={shareMenuRef}>
                         <button
                             onClick={() => setShowShareMenu(!showShareMenu)}
@@ -366,12 +372,13 @@ const ProductCatalog = ({
                                         className="w-full flex items-center gap-2 px-4 py-2.5 text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
                                     >
                                         <MessageCircle size={14} className="text-green-500" />
-                                        Compartir por WhatsApp
+                                        WhatsApp
                                     </button>
                                 </motion.div>
                             )}
                         </AnimatePresence>
                     </div>
+                    )}
                 </div>
             )}
 

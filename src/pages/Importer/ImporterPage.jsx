@@ -9,8 +9,6 @@ import {
     CheckCircle,
     AlertCircle,
     X,
-    Table,
-    Info,
     DollarSign,
     Package,
     AlertTriangle,
@@ -32,7 +30,7 @@ const ImporterPage = () => {
     const [uploading, setUploading] = useState(false);
     const [validating, setValidating] = useState(false);
     const [selectedFile, setSelectedFile] = useState(null);
-    const [importType, setImportType] = useState('products');
+    // Solo importación de productos
     
     // Estados para el preview de importación
     const [validationResult, setValidationResult] = useState(null);
@@ -60,11 +58,8 @@ const ImporterPage = () => {
     const isAdmin = user?.role?.name === 'admin';
     const features = user?.company?.features || {};
 
-    const importTypes = [
-        { id: 'products', label: 'Productos', description: 'Importa productos con código, nombre, precio, stock, etc.' },
-        { id: 'clients', label: 'Clientes', description: 'Importa clientes con nombre, contacto, dirección, etc.' },
-        { id: 'stock', label: 'Movimientos de Stock', description: 'Importa ajustes de stock masivos' },
-    ];
+    // Solo importación de productos (simplificado)
+    const importType = 'products';
 
     const handleFileSelect = async (e) => {
         const file = e.target.files[0];
@@ -280,7 +275,7 @@ const ImporterPage = () => {
                 addToast('Error al descargar plantilla', 'error');
             }
         } else {
-            addToast(`Descargando plantilla de ${importTypes.find(t => t.id === importType)?.label}...`, 'info');
+            addToast('Descargando plantilla de productos...', 'info');
         }
     };
 
@@ -433,78 +428,7 @@ const ImporterPage = () => {
                 </p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Columna izquierda - Tipo de importación */}
-                <div className="lg:col-span-1 space-y-6">
-                    <div className="card p-0! overflow-hidden border-none shadow-sm ring-1 ring-[var(--border-color)]">
-                        <div className="p-5">
-                            <h3 className="text-[11px] font-bold text-secondary-700 dark:text-secondary-300 uppercase tracking-wider mb-4 flex items-center gap-2">
-                                <Table size={14} />
-                                Tipo de Importación
-                            </h3>
-
-                            <div className="space-y-2">
-                                {importTypes.map((type) => (
-                                    <button
-                                        key={type.id}
-                                        onClick={() => {
-                                            setImportType(type.id);
-                                            handleRemoveFile();
-                                        }}
-                                        className={`w-full text-left p-4 rounded-xl border transition-all duration-200 ${
-                                            importType === type.id
-                                                ? 'border-primary-500 bg-primary-50/50 dark:bg-primary-900/20'
-                                                : 'border-[var(--border-color)] hover:border-primary-300 hover:bg-[var(--bg-hover)]'
-                                        }`}
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                                                importType === type.id
-                                                    ? 'border-primary-500 bg-primary-500'
-                                                    : 'border-[var(--border-color)]'
-                                            }`}>
-                                                {importType === type.id && (
-                                                    <CheckCircle size={12} className="text-white" />
-                                                )}
-                                            </div>
-                                            <div>
-                                                <p className={`text-[13px] font-semibold ${
-                                                    importType === type.id ? 'text-primary-700 dark:text-primary-300' : 'text-[var(--text-primary)]'
-                                                }`}>
-                                                    {type.label}
-                                                </p>
-                                                <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
-                                                    {type.description}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Instrucciones */}
-                    <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-100 dark:border-blue-800">
-                        <div className="flex items-start gap-3">
-                            <Info size={16} className="text-blue-600 mt-0.5" />
-                            <div>
-                                <p className="text-[12px] font-semibold text-blue-700 dark:text-blue-300 mb-1">
-                                    Importante
-                                </p>
-                                <ul className="text-[11px] text-blue-600 dark:text-blue-400 space-y-1 list-disc list-inside">
-                                    <li>Usa las plantillas proporcionadas</li>
-                                    <li>No modifiques los encabezados</li>
-                                    <li>Verifica los datos antes de importar</li>
-                                    <li>Máximo 10,000 filas por archivo</li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Columna derecha - Upload */}
-                <div className="lg:col-span-2 space-y-6">
+            <div className="space-y-6">
                     {/* Indicador de configuración de IVA - Solo para productos */}
                     {importType === 'products' && (
                         <div className={`rounded-xl p-4 border ${user?.company?.inputPricesWithTax 
@@ -732,22 +656,22 @@ const ImporterPage = () => {
                             </AnimatePresence>
 
                             {/* Botones de acción */}
-                            <div className="flex flex-col sm:flex-row gap-3 mt-6">
+                            <div className="flex flex-col sm:flex-row gap-2 mt-6">
                                 <Button
                                     variant="secondary"
                                     onClick={handleDownloadTemplate}
-                                    className="flex-1"
+                                    className="flex-1 text-[13px] font-normal py-2"
                                 >
-                                    <Download size={16} className="mr-2" />
+                                    <Download size={14} className="mr-1.5" />
                                     Descargar Plantilla
                                 </Button>
-                                {importType === 'products' && (
+                                {(
                                     <Button
                                         variant="secondary"
                                         onClick={handleDownloadProducts}
-                                        className="flex-1"
+                                        className="flex-1 text-[13px] font-normal py-2"
                                     >
-                                        <Package size={16} className="mr-2" />
+                                        <Package size={14} className="mr-1.5" />
                                         Descargar Productos Actuales
                                     </Button>
                                 )}
@@ -785,18 +709,18 @@ const ImporterPage = () => {
                                             <Button
                                                 variant="secondary"
                                                 onClick={handleCancelConfirmation}
-                                                className="flex-1"
+                                                className="flex-1 text-[13px] font-normal py-2"
                                             >
-                                                <X size={16} className="mr-2" />
+                                                <X size={14} className="mr-1.5" />
                                                 Cancelar
                                             </Button>
                                             <Button
                                                 variant="primary"
                                                 onClick={handleConfirmImport}
                                                 loading={uploading}
-                                                className="flex-1"
+                                                className="flex-1 text-[13px] font-normal py-2"
                                             >
-                                                <CheckCircle size={16} className="mr-2" />
+                                                <CheckCircle size={14} className="mr-1.5" />
                                                 Confirmar Importación
                                             </Button>
                                         </>
@@ -806,9 +730,9 @@ const ImporterPage = () => {
                                             onClick={handleValidate}
                                             loading={validating || detectingColumns}
                                             disabled={!selectedFile || showMapping}
-                                            className="flex-1"
+                                            className="flex-1 text-[13px] font-normal py-2"
                                         >
-                                            <FileWarning size={16} className="mr-2" />
+                                            <FileWarning size={14} className="mr-1.5" />
                                             {validating ? 'Validando...' : detectingColumns ? 'Detectando columnas...' : 'Validar Importación'}
                                         </Button>
                                     )
@@ -818,9 +742,9 @@ const ImporterPage = () => {
                                         onClick={handleValidate}
                                         loading={validating}
                                         disabled={!selectedFile}
-                                        className="flex-1"
+                                        className="flex-1 text-[13px] font-normal py-2"
                                     >
-                                        <Upload size={16} className="mr-2" />
+                                        <Upload size={14} className="mr-1.5" />
                                         {validating ? 'Importando...' : 'Importar Datos'}
                                     </Button>
                                 )}
@@ -968,26 +892,8 @@ const ImporterPage = () => {
                             </motion.div>
                         )}
                     </AnimatePresence>
-
-                    {/* Historial de importaciones (placeholder) */}
-                    <div className="card p-0! overflow-hidden border-none shadow-sm ring-1 ring-[var(--border-color)]">
-                        <div className="p-5">
-                            <h3 className="text-[11px] font-bold text-secondary-700 dark:text-secondary-300 uppercase tracking-wider mb-4">
-                                Últimas Importaciones
-                            </h3>
-                            
-                            <div className="text-center py-8 text-[var(--text-muted)]">
-                                <Table size={32} className="mx-auto mb-3 opacity-50" />
-                                <p className="text-[13px]">No hay importaciones recientes</p>
-                                <p className="text-[11px] mt-1">
-                                    Las importaciones realizadas aparecerán aquí
-                                </p>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>
-        </div>
     );
 };
 

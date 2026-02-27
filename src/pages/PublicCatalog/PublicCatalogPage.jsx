@@ -78,11 +78,11 @@ const PublicCatalogPage = () => {
     // Determinar lista de precios a mostrar
     const priceList = priceListId || 1; // Si es null, usar lista 1
 
-    // Filtrar productos por categoría seleccionada
-    const filteredProducts = selectedCategory
-        ? products.filter(p => p.category === selectedCategory && 
-            (selectedSubcategories.length === 0 || selectedSubcategories.includes(p.subcategory)))
-        : products;
+    // Debug - ver paginación
+    console.log('Pagination:', pagination);
+
+    // Los productos ya vienen filtrados del backend
+    const filteredProducts = products;
 
     // Handlers
     const handleProductClick = (product) => {
@@ -170,7 +170,7 @@ const PublicCatalogPage = () => {
     }
 
     return (
-        <div className="min-h-screen bg-[var(--bg-body)]">
+        <div className="min-h-screen flex flex-col bg-[var(--bg-body)]">
             {/* Header */}
             <header className="bg-[var(--bg-card)] border-b border-[var(--border-color)] sticky top-0 z-40">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -381,10 +381,10 @@ const PublicCatalogPage = () => {
             </AnimatePresence>
 
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-                <div className="flex gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-[256px_1fr] gap-6">
                     {/* Sidebar con categorías */}
                     {categoriesData.length > 0 && (
-                        <aside className="hidden lg:block w-64 flex-shrink-0">
+                        <aside className="hidden lg:block">
                             <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] p-4 sticky top-24">
                                 <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3 flex items-center gap-2">
                                     <Store size={16} />
@@ -457,7 +457,7 @@ const PublicCatalogPage = () => {
                     )}
 
                     {/* Contenido principal */}
-                    <main className="flex-1 min-w-0">
+                    <main className="min-w-0">
                         {/* Filtros activos (mobile) */}
                         {(selectedCategory || selectedSubcategories.length > 0) && (
                             <div className="lg:hidden mb-4 flex flex-wrap gap-2">
@@ -506,7 +506,7 @@ const PublicCatalogPage = () => {
 
                         {/* Mensaje cuando no hay productos (solo en catálogo público) */}
                         {!loadingProducts && filteredProducts.length === 0 && (
-                            <div className="flex flex-col items-center justify-center py-20 text-center mt-4">
+                            <div className="w-full flex flex-col items-center justify-center py-20 text-center mt-4 min-h-[400px]">
                                 <div className="w-20 h-20 bg-[var(--bg-hover)] rounded-2xl flex items-center justify-center mb-4">
                                     <Package size={40} className="text-[var(--text-muted)] opacity-50" />
                                 </div>
@@ -521,6 +521,9 @@ const PublicCatalogPage = () => {
                     </main>
                 </div>
             </div>
+
+            {/* Spacer para empujar el footer hacia abajo cuando hay poco contenido */}
+            <div className="flex-1 min-h-[200px]"></div>
 
             {/* Footer */}
             <footer className="bg-[var(--bg-card)] border-t border-[var(--border-color)] mt-12">

@@ -48,18 +48,19 @@ export const usePublicCatalog = (companyId, companyConfig) => {
         }));
     };
 
-    // Categorías para mostrar: si hay búsqueda, usar allCategories; si no, usar de products
+    // Categorías para mostrar: siempre usar allCategories si está disponible
     const categoriesData = useMemo(() => {
-        // Si hay una búsqueda activa y tenemos categorías guardadas, usar esas
-        if (searchQuery && allCategories.length > 0) {
+        console.log('DEBUG categoriesData - allCategories:', allCategories.length, 'products:', products.length);
+        // Si tenemos categorías de la API, usar esas (incluyen todas las disponibles)
+        if (allCategories.length > 0) {
             return allCategories;
         }
-        // Si no, calcular de los productos actuales
+        // Fallback: calcular de los productos actuales
         return extractCategories(products);
-    }, [products, allCategories, searchQuery]);
+    }, [products, allCategories]);
 
     // Fetch productos
-    const fetchProducts = useCallback(async (page = 1, search = '') => {
+    const fetchProducts = useCallback(async (page = 1, search = '', category = null, subcategories = []) => {
         if (!companyId) return;
         
         try {
@@ -69,24 +70,21 @@ export const usePublicCatalog = (companyId, companyConfig) => {
             const params = new URLSearchParams({
                 page: page.toString(),
                 limit: '20',
-                ...(search && { search })
+                ...(search && { search }),
+                ...(category && { category }),
+                ...(subcategories.length > 0 && { subcategory: subcategories.join(',') })
             });
             
             const response = await axios.get(
                 `${API_URL}/products/public/${companyId}?${params.toString()}`
             );
             
-            setProducts(response.data.products);
+            setProducts(response.data.products || []);
             setPagination({
-                page: response.data.page,
-                total: response.data.total,
-                totalPages: response.data.totalPages
+                page: response.data.page || 1,
+                total: response.data.total || 0,
+                totalPages: response.data.totalPages || 1
             });
-            
-            // Guardar categorías solo en la carga inicial (sin búsqueda)
-            if (!search && response.data.products.length > 0) {
-                setAllCategories(extractCategories(response.data.products));
-            }
         } catch (err) {
             console.error('Error fetching products:', err);
             setError(err.response?.data?.message || 'Error al cargar los productos');
@@ -95,10 +93,13 @@ export const usePublicCatalog = (companyId, companyConfig) => {
         }
     }, [companyId]);
 
-    // Cargar productos iniciales
+    // Cargar productos cuando cambian filtros de categoría o companyId
+    // NOTA: La búsqueda por texto se maneja con debounce en handleSearchChange
     useEffect(() => {
-        fetchProducts(1);
-    }, [fetchProducts]);
+        if (companyId) {
+            fetchProducts(1, searchQuery, selectedCategory, selectedSubcategories);
+        }
+    }, [fetchProducts, companyId, selectedCategory, selectedSubcategories]);
     
     // Cargar todas las categorías disponibles (una sola vez)
     useEffect(() => {
@@ -112,6 +113,7 @@ export const usePublicCatalog = (companyId, companyConfig) => {
                 );
                 
                 if (response.data.length > 0) {
+                    console.log('DEBUG fetchAllCategories - loaded:', response.data.length);
                     setAllCategories(response.data);
                 }
             } catch (err) {
@@ -124,19 +126,19 @@ export const usePublicCatalog = (companyId, companyConfig) => {
 
     // Cambiar página
     const handlePageChange = useCallback((newPage) => {
-        fetchProducts(newPage, searchQuery);
+        fetchProducts(newPage, searchQuery, selectedCategory, selectedSubcategories);
         window.scrollTo({ top: 0, behavior: 'smooth' });
-    }, [fetchProducts, searchQuery]);
+    }, [fetchProducts, searchQuery, selectedCategory, selectedSubcategories]);
 
     // Actualizar búsqueda
     const handleSearchChange = useCallback((value) => {
         setSearchQuery(value);
         // Debounce para la búsqueda
         const timer = setTimeout(() => {
-            fetchProducts(1, value);
+            fetchProducts(1, value, selectedCategory, selectedSubcategories);
         }, 400);
         return () => clearTimeout(timer);
-    }, [fetchProducts]);
+    }, [fetchProducts, selectedCategory, selectedSubcategories]);
 
     return {
         products,

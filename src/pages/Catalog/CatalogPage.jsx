@@ -3,7 +3,7 @@ import { Tag } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import ProductCatalog from '../../components/orders/ProductCatalog';
 import ProductQuickView from '../../components/products/ProductQuickView';
-import { getProducts } from '../../services/productService';
+import { getProducts, getCategories } from '../../services/productService';
 
 const CatalogPage = () => {
     const { user } = useAuth();
@@ -28,51 +28,40 @@ const CatalogPage = () => {
     // Estados para categorías y subcategorías
     const [selectedCategory, setSelectedCategory] = useState(null);
     const [selectedSubcategories, setSelectedSubcategories] = useState([]);
+    const [allCategories, setAllCategories] = useState([]); // Todas las categorías disponibles
 
-    // Extraer categorías y subcategorías únicas de los productos
+    // Cargar todas las categorías al inicio
+    useEffect(() => {
+        const loadCategories = async () => {
+            try {
+                const cats = await getCategories();
+                setAllCategories(cats || []);
+            } catch (error) {
+                console.error('Error loading categories:', error);
+            }
+        };
+        loadCategories();
+    }, []);
+
+    // Transformar categorías al formato que espera el componente
     const categoriesData = useMemo(() => {
-        const cats = new Map(); // Map<category, Set<subcategories>>
-        let hasUncategorized = false;
+        const cats = new Map();
         
-        products.forEach(p => {
-            if (p.category) {
-                if (!cats.has(p.category)) {
-                    cats.set(p.category, new Set());
-                }
-                if (p.subcategory) {
-                    cats.get(p.category).add(p.subcategory);
-                }
-            } else {
-                hasUncategorized = true;
+        allCategories.forEach(cat => {
+            if (cat.category) {
+                cats.set(cat.category, new Set(cat.subcategories || []));
             }
         });
         
         return {
             list: Array.from(cats.keys()).sort(),
             subcategoriesByCategory: cats,
-            hasUncategorized
+            hasUncategorized: false
         };
-    }, [products]);
+    }, [allCategories]);
 
-    // Filtrar productos por categoría y subcategorías seleccionadas
-    const filteredProducts = useMemo(() => {
-        let filtered = products;
-        
-        // Filtrar por categoría principal
-        if (selectedCategory) {
-            filtered = filtered.filter(p => p.category === selectedCategory);
-        }
-        
-        // Filtrar por subcategorías
-        if (selectedSubcategories.length > 0) {
-            filtered = filtered.filter(p => {
-                const productSubcat = p.subcategory || 'Sin subcategoría';
-                return selectedSubcategories.includes(productSubcat);
-            });
-        }
-        
-        return filtered;
-    }, [products, selectedCategory, selectedSubcategories]);
+    // Los productos ya vienen filtrados del backend
+    const filteredProducts = products;
 
     // Manejar selección de categoría
     const handleCategoryClick = (category) => {
@@ -103,7 +92,7 @@ const CatalogPage = () => {
     };
 
     // Cargar productos
-    const loadProducts = async (page = 1, search = '') => {
+    const loadProducts = async (page = 1, search = '', category = null, subcategories = []) => {
         setLoading(true);
         try {
             const params = {
@@ -111,10 +100,16 @@ const CatalogPage = () => {
                 limit: 20,
                 search: search || undefined,
                 active: true,
+                ...(category && { category }),
+                ...(subcategories.length > 0 && { subcategory: subcategories.join(',') })
             };
             const response = await getProducts(params);
             setProducts(response.products || []);
-            setPagination(response.pagination || { page: 1, total: 0, totalPages: 1 });
+            setPagination({
+                page: response.page || 1,
+                total: response.total || 0,
+                totalPages: response.totalPages || 1
+            });
         } catch (error) {
             console.error('Error loading products:', error);
         } finally {
@@ -129,7 +124,7 @@ const CatalogPage = () => {
 
     // Manejar cambio de página
     const handlePageChange = (newPage) => {
-        loadProducts(newPage, searchQuery);
+        loadProducts(newPage, searchInput, selectedCategory, selectedSubcategories);
     };
 
     // Abrir quickview al hacer click en un producto
@@ -141,10 +136,10 @@ const CatalogPage = () => {
     // Debounce para búsqueda
     useEffect(() => {
         const timer = setTimeout(() => {
-            loadProducts(1, searchInput);
+            loadProducts(1, searchInput, selectedCategory, selectedSubcategories);
         }, 400);
         return () => clearTimeout(timer);
-    }, [searchInput]);
+    }, [searchInput, selectedCategory, selectedSubcategories]);
 
     return (
         <div className="space-y-6">

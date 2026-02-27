@@ -21,6 +21,9 @@ const ProductCatalog = ({
     viewOnly = false,
     showPrices = true
 }) => {
+    // Debug
+    console.log('ProductCatalog pagination:', pagination, 'page:', page, 'products:', products.length);
+
     // Estado local para el input de búsqueda (sin sincronización automática con props)
     const [searchInput, setSearchInput] = useState('');
 
@@ -260,7 +263,7 @@ const ProductCatalog = ({
     };
 
     return (
-        <div className="space-y-4">
+        <div className="w-full space-y-4">
             {/* Nota general sobre IVA, bultos y descuentos - Oculta en modo catálogo */}
             {!viewOnly && (
                 <div className={`p-2.5 md:p-2 md:px-3  rounded-lg text-xs font-normal flex items-center gap-2 ${
@@ -566,7 +569,7 @@ const ProductCatalog = ({
                         })}
                 </div>
             ) : !viewOnly && (
-                <div className="flex flex-col items-center justify-center py-20 text-center">
+                <div className="w-full flex flex-col items-center justify-center py-20 text-center">
                     <div className="w-20 h-20 bg-(--bg-hover) rounded-2xl flex items-center justify-center mb-4">
                         <Package size={40} className="text-(--text-muted) opacity-50" />
                     </div>

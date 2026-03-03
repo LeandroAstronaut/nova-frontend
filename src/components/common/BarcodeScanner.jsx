@@ -6,145 +6,79 @@ import { motion, AnimatePresence } from 'framer-motion';
 const BarcodeScanner = ({ isOpen, onClose, onScan }) => {
     const videoRef = useRef(null);
     const [error, setError] = useState(null);
-    const [permissionState, setPermissionState] = useState('prompt'); // 'prompt', 'granted', 'denied', 'checking'
-    const [scanning, setScanning] = useState(false);
+    const [permissionState, setPermissionState] = useState('prompt');
+    const [isLoading, setIsLoading] = useState(false);
     const codeReaderRef = useRef(null);
     const controlsRef = useRef(null);
-
-    // Verificar permisos de cámara
-    const checkCameraPermission = useCallback(async () => {
-        try {
-            setPermissionState('checking');
-            
-            // Verificar si la API de permisos está disponible
-            if (navigator.permissions && navigator.permissions.query) {
-                const result = await navigator.permissions.query({ name: 'camera' });
-                setPermissionState(result.state);
-                
-                result.addEventListener('change', () => {
-                    setPermissionState(result.state);
-                });
-                
-                return result.state;
-            }
-            
-            // Fallback: intentar getUserMedia directamente
-            return 'prompt';
-        } catch (err) {
-            console.log('No se puede verificar permisos:', err);
-            return 'prompt';
-        }
-    }, []);
-
-    // Solicitar permiso explícitamente
-    const requestCameraPermission = async () => {
-        try {
-            setError(null);
-            setPermissionState('checking');
-            
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { 
-                    facingMode: 'environment',
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 }
-                } 
-            });
-            
-            // Si llegamos aquí, tenemos permiso
-            setPermissionState('granted');
-            
-            // Detener el stream temporal, el escáner usará el suyo propio
-            stream.getTracks().forEach(track => track.stop());
-            
-            return true;
-        } catch (err) {
-            console.error('Error solicitando permiso:', err);
-            
-            if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                setPermissionState('denied');
-                setError('Permiso de cámara denegado. Por favor, habilita el acceso en la configuración de tu navegador.');
-            } else if (err.name === 'NotFoundError') {
-                setError('No se encontró cámara disponible en este dispositivo.');
-            } else if (err.name === 'NotReadableError') {
-                setError('La cámara está siendo usada por otra aplicación.');
-            } else {
-                setError(`Error al acceder a la cámara: ${err.message}`);
-            }
-            
-            return false;
-        }
-    };
 
     const startScanning = useCallback(async () => {
         if (!videoRef.current) return;
         
         try {
+            setIsLoading(true);
             setError(null);
-            setScanning(true);
             
             const codeReader = new BrowserMultiFormatReader();
             codeReaderRef.current = codeReader;
 
-            // Intentar obtener dispositivos de video
-            let videoInputDevices = [];
-            try {
-                videoInputDevices = await codeReader.listVideoInputDevices();
-            } catch (e) {
-                console.log('No se pueden listar dispositivos, intentando directamente');
-            }
+            // Obtener dispositivos de video usando la API del navegador
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(d => d.kind === 'videoinput');
+            console.log('Dispositivos de video:', videoDevices);
             
-            // Configuración de video optimizada para códigos de barras
-            const constraints = {
-                video: {
-                    facingMode: 'environment',
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 },
-                    frameRate: { ideal: 30 }
-                }
-            };
+            if (videoDevices.length === 0) {
+                setError('No se encontró cámara disponible');
+                setIsLoading(false);
+                return;
+            }
 
-            // Si tenemos dispositivos específicos, usar el trasero
-            if (videoInputDevices.length > 0) {
-                const backCamera = videoInputDevices.find(device => 
+            // Seleccionar cámara trasera o la primera disponible
+            let selectedDeviceId = null;
+            if (videoDevices.length > 1) {
+                const backCamera = videoDevices.find(device => 
                     device.label.toLowerCase().includes('back') || 
                     device.label.toLowerCase().includes('trasera') ||
                     device.label.toLowerCase().includes('rear')
                 );
-                
-                if (backCamera) {
-                    constraints.video.deviceId = { exact: backCamera.deviceId };
-                    delete constraints.video.facingMode;
-                } else {
-                    constraints.video.deviceId = { exact: videoInputDevices[0].deviceId };
-                    delete constraints.video.facingMode;
-                }
+                // Preferir cámara trasera, sino la segunda (índice 1) suele ser trasera en móviles
+                selectedDeviceId = backCamera?.deviceId || videoDevices[1]?.deviceId || videoDevices[0].deviceId;
+            } else {
+                selectedDeviceId = videoDevices[0].deviceId;
             }
 
-            // Iniciar decodificación desde stream con constraints específicos
-            controlsRef.current = await codeReader.decodeFromConstraints(
-                constraints,
+            console.log('Usando dispositivo:', selectedDeviceId);
+
+            // Iniciar escaneo con el dispositivo seleccionado
+            controlsRef.current = await codeReader.decodeFromVideoDevice(
+                selectedDeviceId,
                 videoRef.current,
                 (result, err) => {
                     if (result) {
                         const code = result.getText();
-                        console.log('Código detectado:', code);
+                        console.log('✅ Código detectado:', code);
                         onScan(code);
                     }
-                    // Ignorar errores cuando no se encuentra código (es normal mientras se enfoca)
-                    if (err && err.name !== 'NotFoundException') {
-                        console.error('Error de decodificación:', err);
+                    if (err) {
+                        // No loguear errores de NotFoundException que son normales
+                        if (err.name !== 'NotFoundException') {
+                            console.log('Scan error:', err.name);
+                        }
                     }
                 }
             );
             
             setPermissionState('granted');
+            setIsLoading(false);
+            
         } catch (err) {
             console.error('Error iniciando escáner:', err);
-            setScanning(false);
+            setIsLoading(false);
             
             if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
                 setPermissionState('denied');
-                setError('Permiso de cámara denegado. Por favor, habilita el acceso en la configuración de tu navegador.');
+                setError('Permiso de cámara denegado. Habilita el acceso en la configuración de tu navegador.');
+            } else if (err.name === 'NotFoundError') {
+                setError('No se encontró cámara disponible.');
             } else {
                 setError(`Error al iniciar la cámara: ${err.message}`);
             }
@@ -154,39 +88,22 @@ const BarcodeScanner = ({ isOpen, onClose, onScan }) => {
     useEffect(() => {
         if (!isOpen) return;
 
-        // Verificar si es HTTPS o localhost
-        const isSecureContext = window.isSecureContext;
-        if (!isSecureContext) {
-            setError('La cámara requiere una conexión segura (HTTPS). Por favor, accede usando https:// o localhost.');
+        // Verificar HTTPS
+        if (!window.isSecureContext) {
+            setError('La cámara requiere HTTPS. Usa https:// o localhost.');
             setPermissionState('denied');
             return;
         }
 
-        // Verificar soporte de getUserMedia
+        // Verificar soporte
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            setError('Tu navegador no soporta acceso a la cámara. Intenta con Chrome, Firefox o Safari actualizados.');
+            setError('Tu navegador no soporta acceso a la cámara.');
             setPermissionState('denied');
             return;
         }
 
-        // Verificar permisos y luego iniciar
-        const init = async () => {
-            const permission = await checkCameraPermission();
-            
-            if (permission === 'granted') {
-                startScanning();
-            } else if (permission === 'prompt') {
-                // Solicitar permiso explícitamente
-                const granted = await requestCameraPermission();
-                if (granted) {
-                    startScanning();
-                }
-            } else {
-                setError('Permiso de cámara denegado. Por favor, habilita el acceso en la configuración de tu navegador.');
-            }
-        };
-
-        init();
+        // Iniciar escaneo directamente (solicitará permiso automáticamente)
+        startScanning();
 
         return () => {
             if (controlsRef.current) {
@@ -196,9 +113,8 @@ const BarcodeScanner = ({ isOpen, onClose, onScan }) => {
             if (codeReaderRef.current) {
                 codeReaderRef.current = null;
             }
-            setScanning(false);
         };
-    }, [isOpen, checkCameraPermission, startScanning]);
+    }, [isOpen, startScanning]);
 
     const handleClose = () => {
         if (controlsRef.current) {
@@ -207,21 +123,18 @@ const BarcodeScanner = ({ isOpen, onClose, onScan }) => {
         onClose();
     };
 
-    const handleRetry = async () => {
-        const granted = await requestCameraPermission();
-        if (granted) {
-            startScanning();
-        }
+    const handleRetry = () => {
+        setError(null);
+        setPermissionState('prompt');
+        startScanning();
     };
 
-    // Verificar si estamos en HTTPS
     const isHttps = window.location.protocol === 'https:' || window.location.hostname === 'localhost';
 
     return (
         <AnimatePresence>
             {isOpen && (
                 <>
-                    {/* Backdrop */}
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
@@ -230,7 +143,6 @@ const BarcodeScanner = ({ isOpen, onClose, onScan }) => {
                         className="fixed inset-0 bg-black/80 z-50"
                     />
                     
-                    {/* Modal */}
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95, y: 20 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -253,48 +165,32 @@ const BarcodeScanner = ({ isOpen, onClose, onScan }) => {
                             </button>
                         </div>
 
-                        {/* Content */}
-                        <div className="flex-1 relative bg-black min-h-[300px] flex items-center justify-center">
+                        {/* Video Area */}
+                        <div className="flex-1 relative bg-black min-h-[350px] flex items-center justify-center">
                             {!isHttps ? (
                                 <div className="text-center p-6">
                                     <Camera size={48} className="text-amber-500 mx-auto mb-3" />
-                                    <p className="text-amber-500 font-medium mb-2">Conexión no segura</p>
-                                    <p className="text-white/70 text-sm">
-                                        La cámara requiere HTTPS. Usa un navegador con https:// o localhost.
+                                    <p className="text-amber-500 font-medium">HTTPS requerido</p>
+                                    <p className="text-white/70 text-sm mt-2">
+                                        Usa https:// o localhost
                                     </p>
                                 </div>
                             ) : error ? (
                                 <div className="text-center p-6">
                                     <Camera size={48} className="text-red-500 mx-auto mb-3" />
-                                    <p className="text-red-500 font-medium mb-2">{error}</p>
-                                    {permissionState === 'denied' && (
-                                        <div className="mt-4 space-y-3">
-                                            <p className="text-white/70 text-sm">
-                                                Para habilitar la cámara:
-                                            </p>
-                                            <ol className="text-white/70 text-sm text-left list-decimal pl-5 space-y-1">
-                                                <li>Haz clic en el ícono 🔒 al lado de la URL</li>
-                                                <li>Busca &quot;Cámara&quot; o &quot;Camera&quot;</li>
-                                                <li>Cambia a &quot;Permitir&quot; o &quot;Allow&quot;</li>
-                                                <li>Recarga la página</li>
-                                            </ol>
-                                            <button
-                                                onClick={handleRetry}
-                                                className="mt-4 flex items-center gap-2 mx-auto px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 transition-colors"
-                                            >
-                                                <RefreshCw size={16} />
-                                                Intentar nuevamente
-                                            </button>
-                                        </div>
-                                    )}
+                                    <p className="text-red-500 font-medium mb-4">{error}</p>
+                                    <button
+                                        onClick={handleRetry}
+                                        className="flex items-center gap-2 mx-auto px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700"
+                                    >
+                                        <RefreshCw size={16} />
+                                        Intentar de nuevo
+                                    </button>
                                 </div>
-                            ) : permissionState === 'checking' || permissionState === 'prompt' ? (
+                            ) : isLoading ? (
                                 <div className="text-center p-6">
                                     <div className="w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-                                    <p className="text-white/80">Solicitando acceso a la cámara...</p>
-                                    <p className="text-white/60 text-sm mt-2">
-                                        Por favor, acepta el permiso cuando el navegador lo solicite.
-                                    </p>
+                                    <p className="text-white/80">Iniciando cámara...</p>
                                 </div>
                             ) : (
                                 <>
@@ -305,19 +201,26 @@ const BarcodeScanner = ({ isOpen, onClose, onScan }) => {
                                         muted
                                         autoPlay
                                     />
-                                    {/* Overlay de guía */}
+                                    {/* Overlay */}
                                     <div className="absolute inset-0 pointer-events-none">
-                                        <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/30" />
-                                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-32 border-2 border-white/50 rounded-lg">
-                                            <div className="absolute inset-0 border-2 border-primary-500/50 rounded-lg animate-pulse" />
+                                        {/* Marco de escaneo */}
+                                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-32">
                                             {/* Esquinas */}
-                                            <div className="absolute -top-1 -left-1 w-4 h-4 border-t-4 border-l-4 border-primary-500" />
-                                            <div className="absolute -top-1 -right-1 w-4 h-4 border-t-4 border-r-4 border-primary-500" />
-                                            <div className="absolute -bottom-1 -left-1 w-4 h-4 border-b-4 border-l-4 border-primary-500" />
-                                            <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-4 border-r-4 border-primary-500" />
+                                            <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-primary-500" />
+                                            <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-primary-500" />
+                                            <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-primary-500" />
+                                            <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-primary-500" />
+                                            {/* Línea de escaneo */}
+                                            <div 
+                                                className="absolute left-0 right-0 h-0.5 bg-primary-400 shadow-[0_0_10px_rgba(59,130,246,0.8)]"
+                                                style={{
+                                                    animation: 'scan 2.5s ease-in-out infinite',
+                                                    top: '0%'
+                                                }}
+                                            />
                                         </div>
-                                        <p className="absolute bottom-4 left-0 right-0 text-center text-white/80 text-sm">
-                                            Centra el código de barras en el recuadro
+                                        <p className="absolute bottom-4 left-0 right-0 text-center text-white text-sm font-medium drop-shadow-md">
+                                            Acerca el código de barras al recuadro
                                         </p>
                                     </div>
                                 </>
@@ -325,20 +228,19 @@ const BarcodeScanner = ({ isOpen, onClose, onScan }) => {
                         </div>
 
                         {/* Footer */}
-                        <div className="p-4 border-t border-[var(--border-color)] bg-[var(--bg-body)]">
-                            {error ? (
-                                <p className="text-xs text-[var(--text-muted)] text-center">
-                                    {isHttps 
-                                        ? 'Si el problema persiste, verifica que tu dispositivo tenga cámara disponible.' 
-                                        : 'La cámara requiere una conexión segura (HTTPS).'}
-                                </p>
-                            ) : (
-                                <p className="text-xs text-[var(--text-muted)] text-center">
-                                    Escanea el código de barras del producto para buscarlo
-                                </p>
-                            )}
+                        <div className="p-3 border-t border-[var(--border-color)] bg-[var(--bg-body)]">
+                            <p className="text-xs text-[var(--text-muted)] text-center">
+                                {error ? 'Verifica los permisos de cámara' : 'Escanea el código de barras del producto'}
+                            </p>
                         </div>
                     </motion.div>
+                    
+                    <style>{`
+                        @keyframes scan {
+                            0%, 100% { top: 0%; }
+                            50% { top: 100%; }
+                        }
+                    `}</style>
                 </>
             )}
         </AnimatePresence>

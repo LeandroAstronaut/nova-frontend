@@ -1,18 +1,18 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { BrowserMultiFormatReader } from '@zxing/browser';
-import { X, ScanLine, Camera, RefreshCw } from 'lucide-react';
+import { X, ScanLine, Camera, RefreshCw, Focus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const BarcodeScanner = ({ isOpen, onClose, onScan }) => {
-    const videoElementRef = useRef(null);
+    const videoRef = useRef(null);
     const [error, setError] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
-    const [isStarted, setIsStarted] = useState(false);
+    const [hasAutoFocus, setHasAutoFocus] = useState(false);
     const codeReaderRef = useRef(null);
     const controlsRef = useRef(null);
+    const trackRef = useRef(null);
 
     const stopScanning = useCallback(() => {
-        console.log('Deteniendo escáner...');
         if (controlsRef.current) {
             controlsRef.current.stop();
             controlsRef.current = null;
@@ -20,15 +20,51 @@ const BarcodeScanner = ({ isOpen, onClose, onScan }) => {
         if (codeReaderRef.current) {
             codeReaderRef.current = null;
         }
-        setIsStarted(false);
+        trackRef.current = null;
+    }, []);
+
+    const applyFocusSettings = useCallback(async (track) => {
+        if (!track) return;
+        
+        trackRef.current = track;
+        const capabilities = track.getCapabilities();
+        console.log('Capacidades de la cámara:', capabilities);
+        
+        // Verificar si soporta enfoque continuo
+        if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
+            try {
+                await track.applyConstraints({
+                    advanced: [{ focusMode: 'continuous' }]
+                });
+                console.log('✅ Enfoque continuo aplicado');
+                setHasAutoFocus(true);
+            } catch (e) {
+                console.log('No se pudo aplicar enfoque continuo:', e);
+            }
+        } else if (capabilities.focusMode && capabilities.focusMode.includes('auto')) {
+            try {
+                await track.applyConstraints({
+                    advanced: [{ focusMode: 'auto' }]
+                });
+                console.log('✅ Enfoque auto aplicado');
+                setHasAutoFocus(true);
+            } catch (e) {
+                console.log('No se pudo aplicar enfoque auto:', e);
+            }
+        }
+        
+        // Intentar mejorar la exposición
+        if (capabilities.exposureMode) {
+            try {
+                await track.applyConstraints({
+                    advanced: [{ exposureMode: 'continuous' }]
+                });
+            } catch (e) {}
+        }
     }, []);
 
     const startScanning = useCallback(async () => {
-        console.log('Intentando iniciar escáner...');
-        console.log('Video element:', videoElementRef.current);
-        
-        if (!videoElementRef.current) {
-            console.error('Video element no disponible');
+        if (!videoRef.current) {
             setError('Error: Elemento de video no encontrado');
             return;
         }
@@ -36,16 +72,44 @@ const BarcodeScanner = ({ isOpen, onClose, onScan }) => {
         try {
             setIsLoading(true);
             setError(null);
+            setHasAutoFocus(false);
             
-            const video = videoElementRef.current;
+            const video = videoRef.current;
+            
+            // Obtener stream manualmente para poder configurar el enfoque
+            console.log('Solicitando acceso a cámara...');
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: 'environment',
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 }
+                }
+            });
+            
+            // Aplicar configuraciones de enfoque al track
+            const videoTrack = stream.getVideoTracks()[0];
+            if (videoTrack) {
+                await applyFocusSettings(videoTrack);
+            }
+            
+            // Asignar stream al video
+            video.srcObject = stream;
+            
+            // Esperar a que el video esté listo
+            await new Promise((resolve, reject) => {
+                video.onloadeddata = () => resolve();
+                video.onerror = () => reject(new Error('Error cargando video'));
+                setTimeout(() => reject(new Error('Timeout')), 5000);
+            });
+            
+            await video.play();
+            console.log('Video reproduciendo');
+            
+            // Iniciar escáner
             const codeReader = new BrowserMultiFormatReader();
             codeReaderRef.current = codeReader;
             
-            console.log('Iniciando decodeFromVideoDevice...');
-            
-            // Usar undefined como deviceId para que elija automáticamente
-            controlsRef.current = await codeReader.decodeFromVideoDevice(
-                undefined, // Auto-seleccionar cámara
+            controlsRef.current = await codeReader.decodeFromVideoElement(
                 video,
                 (result, err) => {
                     if (result) {
@@ -59,8 +123,7 @@ const BarcodeScanner = ({ isOpen, onClose, onScan }) => {
                 }
             );
             
-            console.log('Escáner iniciado correctamente');
-            setIsStarted(true);
+            console.log('Escáner iniciado');
             setIsLoading(false);
             
         } catch (err) {
@@ -75,28 +138,24 @@ const BarcodeScanner = ({ isOpen, onClose, onScan }) => {
                 setError(`Error: ${err.message}`);
             }
         }
-    }, [onScan]);
+    }, [onScan, applyFocusSettings]);
 
-    // Iniciar cuando el modal se abre y el video está listo
     useEffect(() => {
         if (!isOpen) {
             stopScanning();
             return;
         }
 
-        // Verificar HTTPS
         if (!window.isSecureContext) {
             setError('La cámara requiere HTTPS.');
             return;
         }
 
-        // Verificar soporte
         if (!navigator.mediaDevices?.getUserMedia) {
             setError('Tu navegador no soporta acceso a la cámara.');
             return;
         }
 
-        // Esperar a que el DOM esté listo
         const timer = setTimeout(() => {
             startScanning();
         }, 300);
@@ -106,6 +165,35 @@ const BarcodeScanner = ({ isOpen, onClose, onScan }) => {
             stopScanning();
         };
     }, [isOpen, startScanning, stopScanning]);
+
+    // Función para reintentar el enfoque manualmente
+    const triggerAutoFocus = useCallback(async () => {
+        if (!trackRef.current) return;
+        
+        const track = trackRef.current;
+        const capabilities = track.getCapabilities();
+        
+        // Intentar single-shot focus si está disponible
+        if (capabilities.focusMode && capabilities.focusMode.includes('single-shot')) {
+            try {
+                await track.applyConstraints({
+                    advanced: [{ focusMode: 'single-shot' }]
+                });
+                console.log('Enfoque single-shot aplicado');
+                
+                // Volver a continuo después
+                setTimeout(async () => {
+                    if (capabilities.focusMode.includes('continuous')) {
+                        await track.applyConstraints({
+                            advanced: [{ focusMode: 'continuous' }]
+                        });
+                    }
+                }, 1000);
+            } catch (e) {
+                console.log('No se pudo aplicar single-shot focus:', e);
+            }
+        }
+    }, []);
 
     const handleClose = () => {
         stopScanning();
@@ -145,12 +233,24 @@ const BarcodeScanner = ({ isOpen, onClose, onScan }) => {
                                     Escanear código
                                 </h3>
                             </div>
-                            <button
-                                onClick={handleClose}
-                                className="p-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
-                            >
-                                <X size={20} />
-                            </button>
+                            <div className="flex items-center gap-2">
+                                {/* Botón de enfoque manual */}
+                                {!isLoading && !error && (
+                                    <button
+                                        onClick={triggerAutoFocus}
+                                        className="p-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
+                                        title="Forzar enfoque"
+                                    >
+                                        <Focus size={18} className={hasAutoFocus ? 'text-primary-600' : 'text-[var(--text-muted)]'} />
+                                    </button>
+                                )}
+                                <button
+                                    onClick={handleClose}
+                                    className="p-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
+                                >
+                                    <X size={20} />
+                                </button>
+                            </div>
                         </div>
 
                         {/* Video Area */}
@@ -159,7 +259,6 @@ const BarcodeScanner = ({ isOpen, onClose, onScan }) => {
                                 <div className="text-center p-6">
                                     <Camera size={48} className="text-amber-500 mx-auto mb-3" />
                                     <p className="text-amber-500 font-medium">HTTPS requerido</p>
-                                    <p className="text-white/70 text-sm mt-2">Usa https:// o localhost</p>
                                 </div>
                             ) : error ? (
                                 <div className="text-center p-6">
@@ -175,24 +274,17 @@ const BarcodeScanner = ({ isOpen, onClose, onScan }) => {
                                 </div>
                             ) : (
                                 <>
-                                    {/* Video Element - usando callback ref */}
+                                    {/* Video Element */}
                                     <video
-                                        ref={(el) => {
-                                            videoElementRef.current = el;
-                                            console.log('Video element asignado:', el);
-                                        }}
+                                        ref={videoRef}
                                         className="absolute inset-0 w-full h-full object-cover"
                                         playsInline
                                         muted
                                         autoPlay
-                                        style={{ 
-                                            backgroundColor: 'black',
-                                            minHeight: '100%',
-                                            minWidth: '100%'
-                                        }}
+                                        style={{ backgroundColor: 'black' }}
                                     />
                                     
-                                    {/* Overlay de guía */}
+                                    {/* Overlay */}
                                     <div className="absolute inset-0 pointer-events-none">
                                         <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/20" />
                                         
@@ -214,9 +306,17 @@ const BarcodeScanner = ({ isOpen, onClose, onScan }) => {
                                             />
                                         </div>
                                         
-                                        <p className="absolute bottom-4 left-0 right-0 text-center text-white text-sm font-medium drop-shadow-md">
-                                            {isLoading ? 'Iniciando cámara...' : 'Acerca el código de barras al recuadro'}
-                                        </p>
+                                        {/* Instrucciones */}
+                                        <div className="absolute bottom-4 left-0 right-0 text-center">
+                                            <p className="text-white text-sm font-medium drop-shadow-md">
+                                                {isLoading ? 'Iniciando...' : 'Acerca el código al recuadro'}
+                                            </p>
+                                            {!isLoading && (
+                                                <p className="text-white/70 text-xs mt-1">
+                                                    Toca el icono 🔍 para enfocar
+                                                </p>
+                                            )}
+                                        </div>
                                     </div>
                                 </>
                             )}

@@ -4,70 +4,63 @@ import { X, ScanLine, Camera, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const BarcodeScanner = ({ isOpen, onClose, onScan }) => {
-    const videoRef = useRef(null);
+    const videoElementRef = useRef(null);
     const [error, setError] = useState(null);
-    const [permissionState, setPermissionState] = useState('prompt');
     const [isLoading, setIsLoading] = useState(false);
+    const [isStarted, setIsStarted] = useState(false);
     const codeReaderRef = useRef(null);
     const controlsRef = useRef(null);
 
+    const stopScanning = useCallback(() => {
+        console.log('Deteniendo escáner...');
+        if (controlsRef.current) {
+            controlsRef.current.stop();
+            controlsRef.current = null;
+        }
+        if (codeReaderRef.current) {
+            codeReaderRef.current = null;
+        }
+        setIsStarted(false);
+    }, []);
+
     const startScanning = useCallback(async () => {
-        if (!videoRef.current) return;
+        console.log('Intentando iniciar escáner...');
+        console.log('Video element:', videoElementRef.current);
+        
+        if (!videoElementRef.current) {
+            console.error('Video element no disponible');
+            setError('Error: Elemento de video no encontrado');
+            return;
+        }
         
         try {
             setIsLoading(true);
             setError(null);
             
+            const video = videoElementRef.current;
             const codeReader = new BrowserMultiFormatReader();
             codeReaderRef.current = codeReader;
-
-            // Obtener dispositivos de video usando la API del navegador
-            const devices = await navigator.mediaDevices.enumerateDevices();
-            const videoDevices = devices.filter(d => d.kind === 'videoinput');
-            console.log('Dispositivos de video:', videoDevices);
             
-            if (videoDevices.length === 0) {
-                setError('No se encontró cámara disponible');
-                setIsLoading(false);
-                return;
-            }
-
-            // Seleccionar cámara trasera o la primera disponible
-            let selectedDeviceId = null;
-            if (videoDevices.length > 1) {
-                const backCamera = videoDevices.find(device => 
-                    device.label.toLowerCase().includes('back') || 
-                    device.label.toLowerCase().includes('trasera') ||
-                    device.label.toLowerCase().includes('rear')
-                );
-                // Preferir cámara trasera, sino la segunda (índice 1) suele ser trasera en móviles
-                selectedDeviceId = backCamera?.deviceId || videoDevices[1]?.deviceId || videoDevices[0].deviceId;
-            } else {
-                selectedDeviceId = videoDevices[0].deviceId;
-            }
-
-            console.log('Usando dispositivo:', selectedDeviceId);
-
-            // Iniciar escaneo con el dispositivo seleccionado
+            console.log('Iniciando decodeFromVideoDevice...');
+            
+            // Usar undefined como deviceId para que elija automáticamente
             controlsRef.current = await codeReader.decodeFromVideoDevice(
-                selectedDeviceId,
-                videoRef.current,
+                undefined, // Auto-seleccionar cámara
+                video,
                 (result, err) => {
                     if (result) {
                         const code = result.getText();
                         console.log('✅ Código detectado:', code);
                         onScan(code);
                     }
-                    if (err) {
-                        // No loguear errores de NotFoundException que son normales
-                        if (err.name !== 'NotFoundException') {
-                            console.log('Scan error:', err.name);
-                        }
+                    if (err && err.name !== 'NotFoundException') {
+                        console.log('Scan error:', err.name);
                     }
                 }
             );
             
-            setPermissionState('granted');
+            console.log('Escáner iniciado correctamente');
+            setIsStarted(true);
             setIsLoading(false);
             
         } catch (err) {
@@ -75,57 +68,52 @@ const BarcodeScanner = ({ isOpen, onClose, onScan }) => {
             setIsLoading(false);
             
             if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                setPermissionState('denied');
-                setError('Permiso de cámara denegado. Habilita el acceso en la configuración de tu navegador.');
+                setError('Permiso de cámara denegado. Habilita el acceso en la configuración.');
             } else if (err.name === 'NotFoundError') {
                 setError('No se encontró cámara disponible.');
             } else {
-                setError(`Error al iniciar la cámara: ${err.message}`);
+                setError(`Error: ${err.message}`);
             }
         }
     }, [onScan]);
 
+    // Iniciar cuando el modal se abre y el video está listo
     useEffect(() => {
-        if (!isOpen) return;
+        if (!isOpen) {
+            stopScanning();
+            return;
+        }
 
         // Verificar HTTPS
         if (!window.isSecureContext) {
-            setError('La cámara requiere HTTPS. Usa https:// o localhost.');
-            setPermissionState('denied');
+            setError('La cámara requiere HTTPS.');
             return;
         }
 
         // Verificar soporte
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        if (!navigator.mediaDevices?.getUserMedia) {
             setError('Tu navegador no soporta acceso a la cámara.');
-            setPermissionState('denied');
             return;
         }
 
-        // Iniciar escaneo directamente (solicitará permiso automáticamente)
-        startScanning();
+        // Esperar a que el DOM esté listo
+        const timer = setTimeout(() => {
+            startScanning();
+        }, 300);
 
         return () => {
-            if (controlsRef.current) {
-                controlsRef.current.stop();
-                controlsRef.current = null;
-            }
-            if (codeReaderRef.current) {
-                codeReaderRef.current = null;
-            }
+            clearTimeout(timer);
+            stopScanning();
         };
-    }, [isOpen, startScanning]);
+    }, [isOpen, startScanning, stopScanning]);
 
     const handleClose = () => {
-        if (controlsRef.current) {
-            controlsRef.current.stop();
-        }
+        stopScanning();
         onClose();
     };
 
     const handleRetry = () => {
         setError(null);
-        setPermissionState('prompt');
         startScanning();
     };
 
@@ -171,9 +159,7 @@ const BarcodeScanner = ({ isOpen, onClose, onScan }) => {
                                 <div className="text-center p-6">
                                     <Camera size={48} className="text-amber-500 mx-auto mb-3" />
                                     <p className="text-amber-500 font-medium">HTTPS requerido</p>
-                                    <p className="text-white/70 text-sm mt-2">
-                                        Usa https:// o localhost
-                                    </p>
+                                    <p className="text-white/70 text-sm mt-2">Usa https:// o localhost</p>
                                 </div>
                             ) : error ? (
                                 <div className="text-center p-6">
@@ -187,29 +173,37 @@ const BarcodeScanner = ({ isOpen, onClose, onScan }) => {
                                         Intentar de nuevo
                                     </button>
                                 </div>
-                            ) : isLoading ? (
-                                <div className="text-center p-6">
-                                    <div className="w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-                                    <p className="text-white/80">Iniciando cámara...</p>
-                                </div>
                             ) : (
                                 <>
+                                    {/* Video Element - usando callback ref */}
                                     <video
-                                        ref={videoRef}
-                                        className="w-full h-full object-cover"
+                                        ref={(el) => {
+                                            videoElementRef.current = el;
+                                            console.log('Video element asignado:', el);
+                                        }}
+                                        className="absolute inset-0 w-full h-full object-cover"
                                         playsInline
                                         muted
                                         autoPlay
+                                        style={{ 
+                                            backgroundColor: 'black',
+                                            minHeight: '100%',
+                                            minWidth: '100%'
+                                        }}
                                     />
-                                    {/* Overlay */}
+                                    
+                                    {/* Overlay de guía */}
                                     <div className="absolute inset-0 pointer-events-none">
+                                        <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/20" />
+                                        
                                         {/* Marco de escaneo */}
-                                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-32">
+                                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-40">
                                             {/* Esquinas */}
                                             <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-primary-500" />
                                             <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-primary-500" />
                                             <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-primary-500" />
                                             <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-primary-500" />
+                                            
                                             {/* Línea de escaneo */}
                                             <div 
                                                 className="absolute left-0 right-0 h-0.5 bg-primary-400 shadow-[0_0_10px_rgba(59,130,246,0.8)]"
@@ -219,8 +213,9 @@ const BarcodeScanner = ({ isOpen, onClose, onScan }) => {
                                                 }}
                                             />
                                         </div>
+                                        
                                         <p className="absolute bottom-4 left-0 right-0 text-center text-white text-sm font-medium drop-shadow-md">
-                                            Acerca el código de barras al recuadro
+                                            {isLoading ? 'Iniciando cámara...' : 'Acerca el código de barras al recuadro'}
                                         </p>
                                     </div>
                                 </>

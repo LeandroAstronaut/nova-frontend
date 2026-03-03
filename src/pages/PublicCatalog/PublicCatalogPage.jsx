@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Package, Globe, Store, AlertCircle, Search, Phone, Mail, MapPin, MessageCircle, ChevronDown, X, Menu, Filter } from 'lucide-react';
+import { Package, Globe, Store, AlertCircle, Search, Phone, Mail, MapPin, MessageCircle, ChevronDown, X, Menu, Filter, ScanLine } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getCompanyBySlug } from '../../services/companyService';
 import { usePublicCatalog } from '../../hooks/usePublicCatalog';
 import ProductCatalog from '../../components/orders/ProductCatalog';
 import ProductQuickView from '../../components/products/ProductQuickView';
+import BarcodeScanner from '../../components/common/BarcodeScanner';
 
 const PublicCatalogPage = () => {
     const { slug } = useParams();
@@ -21,6 +22,9 @@ const PublicCatalogPage = () => {
     
     // Estado para drawer de categorías en mobile
     const [isMobileCategoriesOpen, setIsMobileCategoriesOpen] = useState(false);
+    
+    // Estado para escáner de códigos de barras
+    const [isScannerOpen, setIsScannerOpen] = useState(false);
     
     // Cargar compañía
     useEffect(() => {
@@ -106,6 +110,55 @@ const PublicCatalogPage = () => {
             }
         }
     }, [searchParams, products]);
+
+    // Manejar resultado del escaneo
+    const handleBarcodeScan = async (code) => {
+        setIsScannerOpen(false);
+        setSearchQuery(code);
+        
+        // Primero buscar en los productos ya cargados
+        const foundProduct = products.find(p => 
+            p.barcode === code || 
+            p.code === code || 
+            p.variants?.some(v => v.sku === code)
+        );
+        
+        if (foundProduct) {
+            setQuickViewProduct(foundProduct);
+            setIsQuickViewOpen(true);
+            return;
+        }
+        
+        // Si no se encuentra en los productos cargados, esperar a que se carguen
+        // con el nuevo searchQuery (el hook usePublicCatalog ya está haciendo la búsqueda)
+        // Vamos a hacer una búsqueda directa
+        try {
+            const response = await fetch(
+                `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/products/public/${company._id}?search=${encodeURIComponent(code)}&limit=10`
+            );
+            const data = await response.json();
+            
+            if (data.products && data.products.length > 0) {
+                // Buscar coincidencia exacta primero
+                const exactMatch = data.products.find(p => 
+                    p.barcode === code || 
+                    p.code === code || 
+                    p.variants?.some(v => v.sku === code)
+                );
+                
+                if (exactMatch) {
+                    setQuickViewProduct(exactMatch);
+                    setIsQuickViewOpen(true);
+                } else {
+                    // Si no hay coincidencia exacta, mostrar el primer resultado
+                    setQuickViewProduct(data.products[0]);
+                    setIsQuickViewOpen(true);
+                }
+            }
+        } catch (err) {
+            console.error('Error buscando producto escaneado:', err);
+        }
+    };
 
     // Manejar selección de categoría
     const handleCategoryClick = (category) => {
@@ -222,9 +275,9 @@ const PublicCatalogPage = () => {
                             </button>
                         </div>
 
-                        {/* Búsqueda */}
-                        <div className="hidden sm:block w-52 md:w-64 flex-shrink-0">
-                            <div className="relative">
+                        {/* Búsqueda + Escáner */}
+                        <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
+                            <div className="relative w-52 md:w-64">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={16} />
                                 <input
                                     type="text"
@@ -242,6 +295,14 @@ const PublicCatalogPage = () => {
                                     </button>
                                 )}
                             </div>
+                            {/* Botón Escáner */}
+                            <button
+                                onClick={() => setIsScannerOpen(true)}
+                                className="flex items-center justify-center w-9 h-9 bg-primary-100 dark:bg-primary-900/30 text-primary-600 rounded-lg hover:bg-primary-200 dark:hover:bg-primary-900/50 transition-colors"
+                                title="Escanear código de barras"
+                            >
+                                <ScanLine size={18} />
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -279,6 +340,15 @@ const PublicCatalogPage = () => {
                                 </button>
                             )}
                         </div>
+                        
+                        {/* Botón Escáner Mobile */}
+                        <button
+                            onClick={() => setIsScannerOpen(true)}
+                            className="flex items-center justify-center w-9 h-9 bg-primary-100 dark:bg-primary-900/30 text-primary-600 rounded-lg hover:bg-primary-200 dark:hover:bg-primary-900/50 transition-colors flex-shrink-0"
+                            title="Escanear código de barras"
+                        >
+                            <ScanLine size={18} />
+                        </button>
                     </div>
                 </div>
             </header>
@@ -577,6 +647,13 @@ const PublicCatalogPage = () => {
                 priceList={priceList}
                 user={null}
                 showPrices={showPrices}
+            />
+
+            {/* Escáner de códigos de barras */}
+            <BarcodeScanner
+                isOpen={isScannerOpen}
+                onClose={() => setIsScannerOpen(false)}
+                onScan={handleBarcodeScan}
             />
         </div>
     );

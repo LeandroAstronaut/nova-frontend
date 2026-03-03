@@ -12,6 +12,7 @@
   "dependencies": {
     "@tailwindcss/postcss": "^4.1.18",
     "@tailwindcss/vite": "^4.1.18",
+    "@zxing/browser": "^0.1.5",
     "apexcharts": "^5.6.0",
     "axios": "^1.13.4",
     "date-fns": "^4.1.0",

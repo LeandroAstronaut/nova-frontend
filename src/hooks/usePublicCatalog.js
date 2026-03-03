@@ -69,7 +69,7 @@ export const usePublicCatalog = (companyId, companyConfig) => {
             
             const params = new URLSearchParams({
                 page: page.toString(),
-                limit: '20',
+                limit: '24',
                 ...(search && { search }),
                 ...(category && { category }),
                 ...(subcategories.length > 0 && { subcategory: subcategories.join(',') })

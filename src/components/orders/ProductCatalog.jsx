@@ -454,6 +454,13 @@ const ProductCatalog = ({
                                             {product.name}
                                         </h3>
                                         <p className="text-[11px] text-(--text-muted) font-medium uppercase tracking-wide">Cod. {product.code}</p>
+                                        
+                                        {/* Código de barras */}
+                                        {product.barcode && (
+                                            <p className="text-[10px] text-(--text-muted)/70 font-medium mt-0.5">
+                                                Barcode: {product.barcode}
+                                            </p>
+                                        )}
 
                                         {/* Badge de Opciones - Abajo del código */}
                                         {priceInfo.hasVariants && (

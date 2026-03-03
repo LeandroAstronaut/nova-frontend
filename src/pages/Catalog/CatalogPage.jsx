@@ -97,7 +97,7 @@ const CatalogPage = () => {
         try {
             const params = {
                 page,
-                limit: 20,
+                limit: 24,
                 search: search || undefined,
                 active: true,
                 ...(category && { category }),

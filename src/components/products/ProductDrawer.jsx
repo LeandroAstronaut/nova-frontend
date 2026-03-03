@@ -74,7 +74,7 @@ const AutocompleteInput = ({
         
         if (value && suggestions.length > 0) {
             const filtered = suggestions.filter(s => 
-                s.toLowerCase().includes(value.toLowerCase())
+                String(s).toLowerCase().includes(value.toLowerCase())
             );
             setFilteredSuggestions(filtered.slice(0, 5));
         } else {

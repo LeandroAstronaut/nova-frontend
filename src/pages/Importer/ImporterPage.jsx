@@ -48,10 +48,6 @@ const ImporterPage = () => {
         user?.company?.importConfig?.winmak?.useCategoryLookup !== false // true por defecto
     );
     
-    // Obtener mapeo guardado de la compañía (convertir de Map a objeto)
-    const savedMappingRaw = user?.company?.importConfig?.columnMapping || {};
-    const savedMapping = savedMappingRaw instanceof Map ? Object.fromEntries(savedMappingRaw) : savedMappingRaw;
-    
     // Usar el formato configurado en la compañía como default
     const companyFormat = user?.company?.importConfig?.format || 'standard';
 
@@ -127,22 +123,26 @@ const ImporterPage = () => {
             const format = result.format || companyFormat;
             setDetectedFormat(format);
             
-            console.log('Detected columns:', result.columns);
-            console.log('Detected format:', format);
-            console.log('Company format:', companyFormat);
+            // Obtener el mapeo guardado directamente del user (PRIORIDAD #1)
+            const rawMapping = user?.company?.importConfig?.columnMapping || {};
+            const mappingFromUser = rawMapping instanceof Map ? Object.fromEntries(rawMapping) : rawMapping;
             
-            // Nota: Ahora también mostramos mapeo para Winmak para permitir ajustes
+            console.log('=== DETECT FILE COLUMNS ===');
+            console.log('User company importConfig:', user?.company?.importConfig);
+            console.log('Raw mapping from DB:', rawMapping);
+            console.log('Parsed mapping:', mappingFromUser);
+            console.log('Has keys:', Object.keys(mappingFromUser).length);
             
-            console.log('Saved mapping from user:', user?.company?.importConfig?.columnMapping);
-            console.log('Parsed saved mapping:', savedMapping);
+            // SIEMPRE dar prioridad al mapeo guardado de la compañía
+            const hasSavedMapping = mappingFromUser && 
+                                   Object.keys(mappingFromUser).length > 0 &&
+                                   Object.values(mappingFromUser).some(v => v && v.trim && v.trim() !== '');
             
-            // Si hay un mapeo guardado, usarlo; si no, intentar auto-detectar
-            if (savedMapping && Object.keys(savedMapping).length > 0) {
-                console.log('Using saved mapping:', savedMapping);
-                setColumnMapping({...savedMapping});
+            if (hasSavedMapping) {
+                console.log('✅ USING SAVED MAPPING (PRIORITY):', mappingFromUser);
+                setColumnMapping({...mappingFromUser});
             } else {
-                // Auto-detectar mapeo basado en nombres similares
-                console.log('No saved mapping, auto-detecting...');
+                console.log('⚠️ No saved mapping found, auto-detecting...');
                 const autoMapping = autoDetectMapping(result.columns);
                 console.log('Auto-detected mapping:', autoMapping);
                 setColumnMapping(autoMapping);
@@ -531,7 +531,11 @@ const ImporterPage = () => {
                                             <h4 className="text-[13px] font-semibold text-[var(--text-primary)]">
                                                 Mapeo de Columnas
                                             </h4>
-                                            {savedMapping && Object.keys(savedMapping).length > 0 && (
+                                            {(() => {
+                                                const raw = user?.company?.importConfig?.columnMapping || {};
+                                                const mapping = raw instanceof Map ? Object.fromEntries(raw) : raw;
+                                                return mapping && Object.keys(mapping).length > 0;
+                                            })() && (
                                                 <span className="text-[10px] bg-success-100 text-success-700 px-2 py-0.5 rounded-full">
                                                     Mapeo guardado
                                                 </span>

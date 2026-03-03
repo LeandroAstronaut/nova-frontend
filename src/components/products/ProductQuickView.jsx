@@ -345,7 +345,45 @@ const ProductQuickView = ({
                                     </p>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1">
+                                {/* Botón Compartir - Solo en catálogo público */}
+                                {viewOnly && (
+                                    <div className="relative" ref={shareMenuRef}>
+                                        <button
+                                            onClick={() => setShowShareMenu(!showShareMenu)}
+                                            className="p-2 hover:bg-[var(--bg-hover)] rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                                            title="Compartir"
+                                        >
+                                            <Share2 size={18} />
+                                        </button>
+                                        <AnimatePresence>
+                                            {showShareMenu && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                                                    transition={{ duration: 0.15 }}
+                                                    className="absolute right-0 top-full mt-2 w-44 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg shadow-lg z-50 py-1"
+                                                >
+                                                    <button
+                                                        onClick={handleCopyLink}
+                                                        className="w-full flex items-center gap-2 px-4 py-2 text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                                                    >
+                                                        <Link size={14} className="text-[var(--text-muted)]" />
+                                                        Copiar enlace
+                                                    </button>
+                                                    <button
+                                                        onClick={handleShareWhatsApp}
+                                                        className="w-full flex items-center gap-2 px-4 py-2 text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                                                    >
+                                                        <MessageCircle size={14} className="text-green-500" />
+                                                        WhatsApp
+                                                    </button>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </div>
+                                )}
                                 <button
                                     onClick={onClose}
                                     className="p-2 hover:bg-[var(--bg-hover)] rounded-lg text-[var(--text-muted)] transition-colors"
@@ -883,46 +921,7 @@ const ProductQuickView = ({
                             </div>
                         )}
 
-                        {/* Botón Compartir - Solo en catálogo público (viewOnly) */}
-                        {viewOnly && (
-                            <div className="px-4 md:px-6 py-3 border-t border-[var(--border-color)] bg-[var(--bg-hover)] shrink-0">
-                                <div className="relative" ref={shareMenuRef}>
-                                    <button
-                                        onClick={() => setShowShareMenu(!showShareMenu)}
-                                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-primary-300 rounded-lg text-sm font-medium text-[var(--text-primary)] transition-colors"
-                                    >
-                                        <Share2 size={16} />
-                                        Compartir producto
-                                    </button>
-                                    <AnimatePresence>
-                                        {showShareMenu && (
-                                            <motion.div
-                                                initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                                exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                                                transition={{ duration: 0.15 }}
-                                                className="absolute left-0 right-0 bottom-full mb-2 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg shadow-lg z-50 py-1"
-                                            >
-                                                <button
-                                                    onClick={handleCopyLink}
-                                                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
-                                                >
-                                                    <Link size={16} className="text-[var(--text-muted)]" />
-                                                    Copiar enlace
-                                                </button>
-                                                <button
-                                                    onClick={handleShareWhatsApp}
-                                                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
-                                                >
-                                                    <MessageCircle size={16} className="text-green-500" />
-                                                    WhatsApp
-                                                </button>
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
-                                </div>
-                            </div>
-                        )}
+
                     </motion.div>
 
                     {/* ===== LIGHTBOX ORIGINAL del QuickView ===== */}

@@ -250,9 +250,19 @@ const BarcodeScanner = ({ isOpen, onClose, onScan }) => {
                                                 style={{ animation: 'scan 2s linear infinite' }}
                                             />
                                         </div>
-                                        <p className="absolute bottom-4 left-0 right-0 text-center text-white text-sm">
-                                            {isLoading ? 'Iniciando...' : 'Acerca el código al recuadro'}
-                                        </p>
+                                        <div className="absolute bottom-4 left-0 right-0 text-center">
+                                            <p className="text-white text-sm font-medium drop-shadow-md">
+                                                {isLoading ? 'Iniciando...' : 'Acerca el código al recuadro'}
+                                            </p>
+                                            {!isLoading && (
+                                                <button 
+                                                    onClick={() => fileInputRef.current?.click()}
+                                                    className="mt-2 px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-full text-white/90 text-xs backdrop-blur-sm transition-colors pointer-events-auto"
+                                                >
+                                                    📷 Si tu cámara no enfoca, tocá acá
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
                                 </>
                             )}
@@ -270,7 +280,7 @@ const BarcodeScanner = ({ isOpen, onClose, onScan }) => {
                         {/* Footer */}
                         <div className="p-3 border-t border-[var(--border-color)] bg-[var(--bg-body)]">
                             <p className="text-xs text-[var(--text-muted)] text-center">
-                                {error ? 'Intenta con la opción de foto' : 'Toca 📷 para usar foto de la galería'}
+                                {error ? 'Intenta con la opción de foto' : 'Escanea el código de barras del producto'}
                             </p>
                         </div>
                     </motion.div>

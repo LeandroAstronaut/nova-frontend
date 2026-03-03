@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Loader2, Package, Plus, Check, Tag, Percent, Sparkles, Grid3X3, Store, Share2, Link, MessageCircle, X } from 'lucide-react';
+import { Search, Loader2, Package, Plus, Check, Tag, Percent, Sparkles, Grid3X3, Store, Share2, Link, MessageCircle, X, ScanLine } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '../../context/ToastContext';
+import BarcodeScanner from '../common/BarcodeScanner';
 
 const ProductCatalog = ({
     products,
@@ -26,6 +27,9 @@ const ProductCatalog = ({
 
     // Estado local para el input de búsqueda (sin sincronización automática con props)
     const [searchInput, setSearchInput] = useState('');
+    
+    // Estado para escáner de códigos de barras
+    const [isScannerOpen, setIsScannerOpen] = useState(false);
 
     // Configuración de stock
     const hasStockFeature = company?.features?.stock === true;
@@ -378,18 +382,36 @@ const ProductCatalog = ({
                 </div>
             )}
 
-            {/* Header con Search - Oculto en modo catálogo (se maneja desde afuera) */}
+            {/* Header con Search + Escáner - Oculto en modo catálogo (se maneja desde afuera) */}
             {!viewOnly && (
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={14} strokeWidth={2.5} />
-                    <input
-                        type="text"
-                        placeholder="Buscar producto..."
-                        className="w-full pl-9 pr-4 py-2 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-xs font-medium text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900 focus:bg-[var(--bg-card)] transition-all"
-                        value={searchInput}
-                        onChange={(e) => setSearchInput(e.target.value)}
-                        autoFocus
-                    />
+                <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={14} strokeWidth={2.5} />
+                        <input
+                            type="text"
+                            placeholder="Buscar producto..."
+                            className="w-full pl-9 pr-8 py-2 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-xs font-medium text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900 focus:bg-[var(--bg-card)] transition-all"
+                            value={searchInput}
+                            onChange={(e) => setSearchInput(e.target.value)}
+                            autoFocus
+                        />
+                        {searchInput && (
+                            <button
+                                onClick={() => setSearchInput('')}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-primary)] p-0.5"
+                            >
+                                <X size={14} />
+                            </button>
+                        )}
+                    </div>
+                    {/* Botón Escáner */}
+                    <button
+                        onClick={() => setIsScannerOpen(true)}
+                        className="flex items-center justify-center w-9 h-9 bg-primary-100 dark:bg-primary-900/30 text-primary-600 rounded-lg hover:bg-primary-200 dark:hover:bg-primary-900/50 transition-colors flex-shrink-0"
+                        title="Escanear código de barras"
+                    >
+                        <ScanLine size={18} />
+                    </button>
                 </div>
             )}
 
@@ -614,6 +636,17 @@ const ProductCatalog = ({
                     </div>
                 </div>
             )}
+
+            {/* Escáner de códigos de barras */}
+            <BarcodeScanner
+                isOpen={isScannerOpen}
+                onClose={() => setIsScannerOpen(false)}
+                onScan={(code) => {
+                    setIsScannerOpen(false);
+                    setSearchInput(code);
+                    // El useEffect se encargará de llamar a setSearchQuery
+                }}
+            />
         </div>
     );
 };

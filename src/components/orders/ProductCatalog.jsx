@@ -263,7 +263,7 @@ const ProductCatalog = ({
     };
 
     return (
-        <div className="w-full space-y-4">
+        <div className="w-full space-y-3">
             {/* Nota general sobre IVA, bultos y descuentos - Oculta en modo catálogo */}
             {!viewOnly && (
                 <div className={`p-2.5 md:p-2 md:px-3  rounded-lg text-xs font-normal flex items-center gap-2 ${
@@ -281,15 +281,9 @@ const ProductCatalog = ({
                 </div>
             )}
 
-            {/* Indicador: Precios ocultos */}
-            {viewOnly && !showPrices && (
-                <div className="flex items-center justify-between gap-3">
-                    <div className="flex-1 p-2.5 md:p-2 md:px-3 rounded-lg text-xs font-normal flex items-center gap-2 bg-secondary-100 dark:bg-secondary-800 text-secondary-600 dark:text-secondary-400 border border-secondary-200 dark:border-secondary-700">
-                        <Store size={14} />
-                        Los precios no están disponibles.
-                    </div>
-                    {/* Botón Compartir - Solo si catálogo público está activo */}
-                    {company?.publicCatalog && (
+            {/* Botón Compartir - Solo cuando precios están ocultos */}
+            {viewOnly && !showPrices && company?.publicCatalog && (
+                <div className="flex justify-end">
                     <div className="relative" ref={shareMenuRef}>
                         <button
                             onClick={() => setShowShareMenu(!showShareMenu)}
@@ -325,7 +319,6 @@ const ProductCatalog = ({
                             )}
                         </AnimatePresence>
                     </div>
-                    )}
                 </div>
             )}
 
@@ -401,12 +394,12 @@ const ProductCatalog = ({
             )}
 
             {loading ? (
-                <div className="flex flex-col items-center justify-center py-20 gap-4">
+                <div className="w-full flex flex-col items-center justify-center py-20 gap-4">
                     <Loader2 className="animate-spin text-primary-600" size={32} />
                     <p className="text-(--text-muted) text-sm font-medium">Cargando catálogo...</p>
                 </div>
             ) : filteredProducts.length > 0 ? (
-                <div className="grid gap-3 grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5">
+                <div className="grid gap-3 grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                     {filteredProducts.map((product, index) => {
                             // Sumar todas las cantidades de este producto en el carrito (incluyendo variantes/descuentos diferentes)
                             const cartItemsForProduct = itemsInCart.filter(i => i.productId === product._id);
